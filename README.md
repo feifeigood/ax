@@ -190,28 +190,83 @@ Options:
 #### Run Controller Server
 
 ```bash
-gar serve [--addr <address>] [--eventlog-dir <dir>]
+gar serve [--config <path>]
 ```
 
-Starts the controller as a gRPC server, exposing the GARService API for remote session management and agent registration.
+Starts the controller as a gRPC server using a YAML configuration file.
 
 Options:
-- `--addr`: Server address to listen on (default: ":8494")
-- `--eventlog-dir`: Directory for event log files (default: "eventlog")
+- `--config`: Path to YAML configuration file (default: "gar.yaml")
+
+The configuration file specifies:
+- Server address and port
+- Event log directory
+- Controller settings (max steps, health check interval)
+- Gemini planner settings (optional)
+
+Example configuration file (`gar.yaml`):
+```yaml
+server:
+  address: ":8494"
+
+eventlog:
+  dir: "eventlog"
+
+controller:
+  max_steps: 100
+  health_check_interval: 30s
+```
 
 Example:
 ```bash
-# Start server on default port
+# Start server with default config (gar.yaml)
 gar serve
 
-# Start server on custom port
-gar serve --addr :8080
+# Start server with custom config
+gar serve --config my-config.yaml
 ```
 
 Once running, clients can connect to the server to:
 - Start and resume sessions remotely
 - Query session status and list sessions
 - Register and unregister agents dynamically
+
+### Gemini-Powered Agent Selection
+
+GAR uses Google's Gemini models by default for intelligent agent selection. Instead of simple round-robin routing, Gemini analyzes the conversation context and agent capabilities to choose the best agent for each task.
+
+**Setup:**
+
+1. Get an API key from [Google AI Studio](https://aistudio.google.com/app/apikey)
+2. Set the environment variable:
+   ```bash
+   export GEMINI_API_KEY="your-api-key-here"
+   ```
+3. Start the server:
+   ```bash
+   gar serve
+   ```
+
+**How it works:**
+- Each registered agent becomes a "tool" that Gemini can call
+- Gemini reviews conversation history and agent descriptions
+- Gemini selects the most appropriate agent for each step
+- Agent metadata helps Gemini make better routing decisions
+
+**Environment Variables:**
+- `GEMINI_API_KEY`: Your Google AI API key (required)
+- `GAR_GEMINI_MODEL`: Model name (optional, defaults to "gemini-flash-latest")
+
+**Example agent registration with metadata:**
+```bash
+gar register \
+  --server localhost:8494 \
+  --agent-id math-agent \
+  --name "Math Agent" \
+  --description "Specialized in mathematical calculations and problem solving"
+```
+
+When a user asks "What is 25 * 4?", Gemini will automatically route to the math-agent instead of a generic agent.
 
 ### Checkpoints
 

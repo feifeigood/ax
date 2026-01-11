@@ -14,13 +14,13 @@ import (
 
 // GeminiPlannerConfig configures the Gemini-based planner.
 type GeminiPlannerConfig struct {
-	APIKey        string        // Google AI API key (if empty, uses GEMINI_API_KEY env var)
-	Model         string        // Model name (default: "gemini-2.0-flash-exp")
+	APIKey        string        // Google AI API key (for programmatic use only; if empty, uses GEMINI_API_KEY env var - recommended)
+	Model         string        // Model name (default: "gemini-flash-latest", can override with GAR_GEMINI_MODEL env var)
 	Temperature   float32       // Temperature for generation (default: 0.7)
 	MaxTokens     int32         // Max output tokens (default: 8192)
-	Timeout       time.Duration // Request timeout (default: 30s)
+	Timeout       time.Duration // Request timeout (default: 60s)
 	SystemPrompt  string        // Custom system prompt (optional)
-	ContextWindow int           // Number of recent messages to include (default: 20)
+	ContextWindow int           // Number of recent messages to include (default: 30)
 }
 
 // NewGeminiPlanFunc creates a planning function that uses Gemini for intelligent agent selection.

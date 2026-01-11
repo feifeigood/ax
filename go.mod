@@ -41,4 +41,5 @@ require (
 	google.golang.org/api v0.186.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20251029180050-ab9386a59fda // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20251222181119-0a764e51fe1b // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

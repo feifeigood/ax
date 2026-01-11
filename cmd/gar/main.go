@@ -16,6 +16,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/google/gar/internal/config"
 	"github.com/google/gar/internal/controller"
 	"github.com/google/gar/internal/eventlog"
 	"github.com/google/gar/internal/server"
@@ -26,14 +27,13 @@ import (
 var (
 	command          string
 	sessionID        string
-	eventLogDir      string
 	input            string
 	checkpointID     string
 	agentID          string
 	agentName        string
 	agentDescription string
 	agentAddr        string
-	serveAddr        string
+	configFile       string // YAML config file path for serve command
 	serverAddr       string // gRPC controller server address
 )
 
@@ -62,8 +62,7 @@ func main() {
 	registerCmd.StringVar(&serverAddr, "server", "", "gRPC controller server address (e.g., localhost:8494)")
 
 	// Serve command flags
-	serveCmd.StringVar(&serveAddr, "addr", ":8494", "Server address to listen on")
-	serveCmd.StringVar(&eventLogDir, "eventlog-dir", "eventlog", "Event log directory")
+	serveCmd.StringVar(&configFile, "config", "gar.yaml", "Path to YAML configuration file")
 
 	if len(os.Args) < 2 {
 		printUsage()
@@ -102,15 +101,6 @@ func main() {
 	default:
 		printUsage()
 		os.Exit(1)
-	}
-}
-
-func eventLogFactory(sessionID, eventLogDir string) controller.EventLogFactory {
-	return func(sessionID string) (eventlog.EventLog, error) {
-		return eventlog.NewFileEventLog(eventlog.FileConfig{
-			SessionID: sessionID,
-			Dir:       eventLogDir,
-		})
 	}
 }
 
@@ -295,9 +285,27 @@ func runRegister() {
 }
 
 func runServe() {
-	fmt.Printf("Starting GAR server at %s...\n", serveAddr)
+	// Load configuration from YAML file
+	cfg, err := config.LoadFromFile(configFile)
+	if err != nil {
+		fmt.Printf("Error loading config file '%s': %v\n", configFile, err)
+		fmt.Println("\nTip: Create a config file with 'gar serve --help' to see an example")
+		os.Exit(1)
+	}
 
-	c, err := newController()
+	// Validate configuration
+	if err := cfg.Validate(); err != nil {
+		fmt.Printf("Invalid configuration: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("Starting GAR server at %s...\n", cfg.Server.Address)
+	fmt.Printf("Event log directory: %s\n", cfg.EventLog.Dir)
+	fmt.Printf("Max steps: %d\n", cfg.Controller.MaxSteps)
+	fmt.Printf("Health check interval: %s\n", cfg.Controller.HealthCheckInterval)
+
+	// Create controller with config
+	c, err := newControllerFromConfig(cfg)
 	if err != nil {
 		fmt.Printf("Error creating controller: %v\n", err)
 		os.Exit(1)
@@ -318,18 +326,32 @@ func runServe() {
 	}()
 
 	// Start serving
-	if err := srv.Serve(serveAddr); err != nil {
+	if err := srv.Serve(cfg.Server.Address); err != nil {
 		fmt.Printf("Error serving: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func newController() (*controller.Controller, error) {
-	c, err := controller.New(controller.Config{
-		EventLogFactory:     eventLogFactory(sessionID, eventLogDir),
-		MaxSteps:            100,
-		HealthCheckInterval: 30 * time.Second,
-	})
+func newControllerFromConfig(cfg *config.Config) (*controller.Controller, error) {
+	// Create event log factory
+	eventLogFactory := func(sessionID string) (eventlog.EventLog, error) {
+		return eventlog.NewFileEventLog(eventlog.FileConfig{
+			SessionID: sessionID,
+			Dir:       cfg.EventLog.Dir,
+		})
+	}
+
+	// Build controller config
+	// The controller will create a default Gemini planner if PlanFunc is nil
+	// Gemini config can be customized via environment variables (GEMINI_API_KEY, GAR_GEMINI_MODEL)
+	controllerConfig := controller.Config{
+		EventLogFactory:     eventLogFactory,
+		MaxSteps:            cfg.Controller.MaxSteps,
+		HealthCheckInterval: cfg.Controller.HealthCheckInterval,
+	}
+
+	// Create controller
+	c, err := controller.New(controllerConfig)
 	if err != nil {
 		return nil, err
 	}

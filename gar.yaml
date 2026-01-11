@@ -1,0 +1,46 @@
+# GAR Server Configuration
+# This file configures the GAR (Google Agent Runtime) server.
+
+# Server configuration
+server:
+  # Address to listen on (host:port)
+  address: ":8494"
+
+# Event log configuration
+eventlog:
+  # Directory where event logs are stored
+  dir: "eventlog"
+
+# Controller configuration
+controller:
+  # Maximum number of steps per session
+  max_steps: 1000
+
+  # Health check interval for agents (e.g., "30s", "1m")
+  health_check_interval: 30s
+
+# Gemini planner configuration (optional)
+# The Gemini planner uses Google's Gemini models for intelligent agent selection.
+# API key must be set via GEMINI_API_KEY environment variable (required).
+# Model name can be set via GAR_GEMINI_MODEL environment variable (optional).
+#
+# gemini_planner:
+#   Set GEMINI_API_KEY for authentication.
+#
+#   # Model name (e.g., "gemini-2.5-flash")
+#   model: "gemini-flash-latest"
+#
+#   # Temperature for generation (0.0 to 1.0)
+#   temperature: 0.7
+#
+#   # Maximum output tokens
+#   max_tokens: 8192
+#
+#   # Request timeout (e.g., "30s", "1m")
+#   timeout: 60s
+#
+#   # Number of recent messages to include in context
+#   context_window: 30
+#
+#   # Custom system prompt for the planner (optional)
+#   system_prompt: ""
