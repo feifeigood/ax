@@ -41,21 +41,9 @@ func (s *Server) TriggerSession(req *proto.TriggerSessionRequest, stream grpc.Se
 		return fmt.Errorf("session_id is required")
 	}
 
-	// Send initial response
-	statusMsg := "Starting session..."
-	if checkpointID != "" {
-		statusMsg = fmt.Sprintf("Starting session from checkpoint %s...", checkpointID)
-	}
-
 	if err := stream.Send(&proto.TriggerSessionResponse{
 		SessionId: sessionID,
 		State:     proto.State_STATE_STARTING,
-		Output: &proto.Content{
-			Role:     "system",
-			Type:     "text",
-			Mimetype: "text/plain",
-			Data:     statusMsg,
-		},
 	}); err != nil {
 		return err
 	}
@@ -66,12 +54,6 @@ func (s *Server) TriggerSession(req *proto.TriggerSessionRequest, stream grpc.Se
 		stream.Send(&proto.TriggerSessionResponse{
 			SessionId: sessionID,
 			State:     proto.State_STATE_FAILED,
-			Output: &proto.Content{
-				Role:     "system",
-				Type:     "text",
-				Mimetype: "text/plain",
-				Data:     fmt.Sprintf("Failed to trigger session: %v", err),
-			},
 		})
 		return err
 	}
@@ -79,17 +61,6 @@ func (s *Server) TriggerSession(req *proto.TriggerSessionRequest, stream grpc.Se
 	// Get session state
 	session, err := s.controller.GetSession(sessionID)
 	if err != nil {
-		// Send unknown state response
-		stream.Send(&proto.TriggerSessionResponse{
-			SessionId: sessionID,
-			State:     proto.State_STATE_UNKNOWN,
-			Output: &proto.Content{
-				Role:     "system",
-				Type:     "text",
-				Mimetype: "text/plain",
-				Data:     fmt.Sprintf("Session triggered but failed to retrieve state: %v", err),
-			},
-		})
 		return err
 	}
 
