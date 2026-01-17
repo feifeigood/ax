@@ -123,7 +123,7 @@ func (s *server) HealthCheck(ctx context.Context, req *proto.HealthCheckRequest)
 }
 
 func main() {
-	agentID := "remote-echo-agent"
+	const agentID = "remote-echo-agent"
 
 	fmt.Printf("Listening on port: %s\n", port)
 	lis, err := net.Listen("tcp", port)
