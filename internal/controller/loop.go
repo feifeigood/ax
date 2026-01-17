@@ -89,7 +89,7 @@ func (e *LoopExecutor) Execute(ctx context.Context, sessionID string, inputs []*
 
 	// Write input content to session
 	for _, content := range inputs {
-		if _, err := session.WriteContentIn(content); err != nil {
+		if _, err := session.WriteContentIn(ctx, content); err != nil {
 			return fmt.Errorf("failed to write input content: %w", err)
 		}
 	}
@@ -189,7 +189,7 @@ func (e *LoopExecutor) executeTask(ctx context.Context, session *Session, ag age
 	// Define output handler to collect responses
 	outputHandler := func(content *proto.Content) error {
 		output = append(output, content)
-		if _, err := session.WriteContentOut(content); err != nil {
+		if _, err := session.WriteContentOut(ctx, content); err != nil {
 			return fmt.Errorf("failed to write output: %w", err)
 		}
 		return nil
@@ -200,7 +200,7 @@ func (e *LoopExecutor) executeTask(ctx context.Context, session *Session, ag age
 	defer cancelLifecycle()
 
 	lifecycleHandler := func(event *proto.LifecycleEvent) error {
-		if err := session.WriteLifecycleEvent(event); err != nil {
+		if err := session.WriteLifecycleEvent(ctx, event); err != nil {
 			return fmt.Errorf("failed to write lifecycle event: %w", err)
 		}
 		e.HandleLifecycleEvent(session, event)

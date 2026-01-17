@@ -2,6 +2,7 @@ package eventlog
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -102,7 +103,7 @@ func (e *FileEventLog) Append(entryType EventType, checkpointID string, data map
 }
 
 // AppendContent writes a content message to the event log with a checkpoint UUID.
-func (e *FileEventLog) AppendContent(direction EventType, checkpointID string, content *proto.Content) error {
+func (e *FileEventLog) AppendContent(ctx context.Context, direction EventType, checkpointID string, content *proto.Content) error {
 	data := map[string]interface{}{
 		"role":     content.Role,
 		"type":     content.Type,
@@ -114,7 +115,7 @@ func (e *FileEventLog) AppendContent(direction EventType, checkpointID string, c
 
 // AppendLifecycleEvent writes a lifecycle event to the event log.
 // Lifecycle events don't have checkpoint IDs.
-func (e *FileEventLog) AppendLifecycleEvent(event *proto.LifecycleEvent) error {
+func (e *FileEventLog) AppendLifecycleEvent(ctx context.Context, event *proto.LifecycleEvent) error {
 	var timestampSeconds int64
 	var timestampNanos int32
 	if event.Timestamp != nil {
@@ -159,7 +160,7 @@ func (e *FileEventLog) SessionID() string {
 
 // RetrieveEntries reads and returns all entries from the event log file.
 // Returns entries in order.
-func (e *FileEventLog) RetrieveEntries() ([]Entry, error) {
+func (e *FileEventLog) RetrieveEntries(ctx context.Context) ([]Entry, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 

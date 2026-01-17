@@ -3,6 +3,7 @@
 package eventlog
 
 import (
+	"context"
 	"time"
 
 	"github.com/google/gar/proto"
@@ -30,13 +31,13 @@ type Entry struct {
 // It provides methods for appending events, reading entries, and managing the log lifecycle.
 type EventLog interface {
 	// AppendContent appends a content message to the event log with a checkpoint UUID.
-	AppendContent(t EventType, checkpointID string, content *proto.Content) error
+	AppendContent(ctx context.Context, t EventType, checkpointID string, content *proto.Content) error
 
 	// AppendLifecycleEvent appends a lifecycle event to the event log.
-	AppendLifecycleEvent(event *proto.LifecycleEvent) error
+	AppendLifecycleEvent(ctx context.Context, event *proto.LifecycleEvent) error
 
 	// RetrieveEntries returns all entries from the event log in order.
-	RetrieveEntries() ([]Entry, error)
+	RetrieveEntries(ctx context.Context) ([]Entry, error)
 
 	// Close closes the event log and releases any resources.
 	Close() error

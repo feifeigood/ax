@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -45,13 +46,6 @@ func NewSessionManager(factory EventLogFactory) *SessionManager {
 		eventLogFactory: factory,
 	}
 }
-
-// // NewSessionManagerWithFileEventLog creates a new session manager using file-based event logs.
-// // This is a convenience function for the common case of using file-based event logs.
-// func NewSessionManagerWithFileEventLog(elogFactory EventLogFactory) *SessionManager {
-
-// 	return NewSessionManager(factory)
-// }
 
 // NewSession creates a new session with the given ID.
 func (sm *SessionManager) NewSession(sessionID string) (*Session, error) {
@@ -109,8 +103,8 @@ func (sm *SessionManager) LoadSessionFromCheckpoint(sessionID string, checkpoint
 	}
 	defer replayLog.Close()
 
-	// Get all entries from the event log
-	entries, err := replayLog.RetrieveEntries()
+	// TODO(jbd): Propagate the context properly.
+	entries, err := replayLog.RetrieveEntries(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get event log entries: %w", err)
 	}
@@ -247,14 +241,14 @@ func (sm *SessionManager) CloseAll() {
 }
 
 // WriteContentIn appends an incoming content message to the session with a new checkpoint.
-func (s *Session) WriteContentIn(content *proto.Content) (string, error) {
+func (s *Session) WriteContentIn(ctx context.Context, content *proto.Content) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	// Generate a new checkpoint UUID
 	checkpointID := uuid.New().String()
 
-	if err := s.eventLog.AppendContent(eventlog.EventTypeContentIn, checkpointID, content); err != nil {
+	if err := s.eventLog.AppendContent(ctx, eventlog.EventTypeContentIn, checkpointID, content); err != nil {
 		return "", err
 	}
 
@@ -265,14 +259,14 @@ func (s *Session) WriteContentIn(content *proto.Content) (string, error) {
 }
 
 // WriteContentOut appends an outgoing content message to the session with a new checkpoint.
-func (s *Session) WriteContentOut(content *proto.Content) (string, error) {
+func (s *Session) WriteContentOut(ctx context.Context, content *proto.Content) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	// Generate a new checkpoint UUID
 	checkpointID := uuid.New().String()
 
-	if err := s.eventLog.AppendContent(eventlog.EventTypeContentOut, checkpointID, content); err != nil {
+	if err := s.eventLog.AppendContent(ctx, eventlog.EventTypeContentOut, checkpointID, content); err != nil {
 		return "", err
 	}
 
@@ -283,11 +277,11 @@ func (s *Session) WriteContentOut(content *proto.Content) (string, error) {
 }
 
 // WriteLifecycleEvent appends a lifecycle event to the session.
-func (s *Session) WriteLifecycleEvent(event *proto.LifecycleEvent) error {
+func (s *Session) WriteLifecycleEvent(ctx context.Context, event *proto.LifecycleEvent) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if err := s.eventLog.AppendLifecycleEvent(event); err != nil {
+	if err := s.eventLog.AppendLifecycleEvent(ctx, event); err != nil {
 		return err
 	}
 

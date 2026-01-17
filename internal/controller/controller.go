@@ -87,7 +87,7 @@ func (d *Controller) TriggerSession(ctx context.Context, sessionID string, input
 
 		// Add new inputs to the session if provided
 		for _, content := range inputs {
-			if _, err := existingSession.WriteContentIn(content); err != nil {
+			if _, err := existingSession.WriteContentIn(ctx, content); err != nil {
 				return fmt.Errorf("failed to write input content: %w", err)
 			}
 		}
