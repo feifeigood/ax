@@ -263,7 +263,7 @@ lifecycleFunc := func(ctx context.Context, handler agent.LifecycleHandler) error
     return handler(&proto.LifecycleEvent{
         EventType: "PROGRESS",
         AgentId:   "my-agent",
-        Timestamp: time.Now().UnixMilli(),
+        Timestamp: timestamppb.Now(),
         Metadata:  map[string]string{"status": "processing"},
     })
 }
