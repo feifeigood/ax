@@ -153,7 +153,8 @@ func (s *Server) RegisterAgent(ctx context.Context, req *proto.RegisterAgentRequ
 	return &proto.RegisterAgentResponse{}, nil
 }
 
-// UnregisterAgent removes an agent from the dispatcher.
+// UnregisterAgent removes a remote agent from the dispatcher.
+// Local agents cannot be unregistered via this API.
 func (s *Server) UnregisterAgent(ctx context.Context, req *proto.UnregisterAgentRequest) (*proto.UnregisterAgentResponse, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -163,6 +164,17 @@ func (s *Server) UnregisterAgent(ctx context.Context, req *proto.UnregisterAgent
 	}
 
 	registry := s.controller.Registry()
+
+	// Check if the agent is local
+	info, err := registry.GetInfo(req.AgentId)
+	if err != nil {
+		return nil, fmt.Errorf("agent not found: %w", err)
+	}
+
+	if info.Type == controller.AgentTypeLocal {
+		return nil, fmt.Errorf("cannot unregister local agents via API")
+	}
+
 	if err := registry.Unregister(req.AgentId); err != nil {
 		return nil, fmt.Errorf("failed to unregister agent: %w", err)
 	}
