@@ -198,7 +198,6 @@ var AgentService_ServiceDesc = grpc.ServiceDesc{
 const (
 	GARService_TriggerSession_FullMethodName  = "/proto.GARService/TriggerSession"
 	GARService_GetSession_FullMethodName      = "/proto.GARService/GetSession"
-	GARService_ListSessions_FullMethodName    = "/proto.GARService/ListSessions"
 	GARService_RegisterAgent_FullMethodName   = "/proto.GARService/RegisterAgent"
 	GARService_UnregisterAgent_FullMethodName = "/proto.GARService/UnregisterAgent"
 )
@@ -214,8 +213,6 @@ type GARServiceClient interface {
 	TriggerSession(ctx context.Context, in *TriggerSessionRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[TriggerSessionResponse], error)
 	// GetSession retrieves session details
 	GetSession(ctx context.Context, in *GetSessionRequest, opts ...grpc.CallOption) (*GetSessionResponse, error)
-	// ListSessions lists all available sessions
-	ListSessions(ctx context.Context, in *ListSessionsRequest, opts ...grpc.CallOption) (*ListSessionsResponse, error)
 	// RegisterAgent registers a new agent with the controller
 	RegisterAgent(ctx context.Context, in *RegisterAgentRequest, opts ...grpc.CallOption) (*RegisterAgentResponse, error)
 	// UnregisterAgent removes an agent from the controller
@@ -259,16 +256,6 @@ func (c *gARServiceClient) GetSession(ctx context.Context, in *GetSessionRequest
 	return out, nil
 }
 
-func (c *gARServiceClient) ListSessions(ctx context.Context, in *ListSessionsRequest, opts ...grpc.CallOption) (*ListSessionsResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ListSessionsResponse)
-	err := c.cc.Invoke(ctx, GARService_ListSessions_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *gARServiceClient) RegisterAgent(ctx context.Context, in *RegisterAgentRequest, opts ...grpc.CallOption) (*RegisterAgentResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(RegisterAgentResponse)
@@ -300,8 +287,6 @@ type GARServiceServer interface {
 	TriggerSession(*TriggerSessionRequest, grpc.ServerStreamingServer[TriggerSessionResponse]) error
 	// GetSession retrieves session details
 	GetSession(context.Context, *GetSessionRequest) (*GetSessionResponse, error)
-	// ListSessions lists all available sessions
-	ListSessions(context.Context, *ListSessionsRequest) (*ListSessionsResponse, error)
 	// RegisterAgent registers a new agent with the controller
 	RegisterAgent(context.Context, *RegisterAgentRequest) (*RegisterAgentResponse, error)
 	// UnregisterAgent removes an agent from the controller
@@ -321,9 +306,6 @@ func (UnimplementedGARServiceServer) TriggerSession(*TriggerSessionRequest, grpc
 }
 func (UnimplementedGARServiceServer) GetSession(context.Context, *GetSessionRequest) (*GetSessionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetSession not implemented")
-}
-func (UnimplementedGARServiceServer) ListSessions(context.Context, *ListSessionsRequest) (*ListSessionsResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method ListSessions not implemented")
 }
 func (UnimplementedGARServiceServer) RegisterAgent(context.Context, *RegisterAgentRequest) (*RegisterAgentResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RegisterAgent not implemented")
@@ -381,24 +363,6 @@ func _GARService_GetSession_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
-func _GARService_ListSessions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ListSessionsRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(GARServiceServer).ListSessions(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: GARService_ListSessions_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GARServiceServer).ListSessions(ctx, req.(*ListSessionsRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _GARService_RegisterAgent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RegisterAgentRequest)
 	if err := dec(in); err != nil {
@@ -445,10 +409,6 @@ var GARService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetSession",
 			Handler:    _GARService_GetSession_Handler,
-		},
-		{
-			MethodName: "ListSessions",
-			Handler:    _GARService_ListSessions_Handler,
 		},
 		{
 			MethodName: "RegisterAgent",

@@ -94,16 +94,6 @@ message GetSessionResponse {
   SessionInfo session = 1;
 }
 
-// ListSessionsRequest for listing all sessions
-message ListSessionsRequest {
-  // Empty for now, can add pagination later
-}
-
-// ListSessionsResponse contains list of session IDs
-message ListSessionsResponse {
-  repeated string session_ids = 1;
-}
-
 // RegisterAgentRequest for registering an agent
 message RegisterAgentRequest {
   string agent_id = 1;
@@ -134,9 +124,6 @@ service GARService {
 
   // GetSession retrieves session details
   rpc GetSession(GetSessionRequest) returns (GetSessionResponse);
-
-  // ListSessions lists all available sessions
-  rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse);
 
   // RegisterAgent registers a new agent with the controller
   rpc RegisterAgent(RegisterAgentRequest) returns (RegisterAgentResponse);

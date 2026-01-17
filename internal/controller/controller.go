@@ -124,11 +124,6 @@ func (d *Controller) LoadSession(sessionID string) (*Session, error) {
 	return d.sessionManager.LoadSession(sessionID)
 }
 
-// ListSessions returns all session IDs.
-func (d *Controller) ListSessions() ([]string, error) {
-	return d.sessionManager.ListSessions()
-}
-
 // CloseSession closes a session.
 func (d *Controller) CloseSession(sessionID string) error {
 	return d.sessionManager.CloseSession(sessionID)
@@ -154,9 +149,6 @@ func (d *Controller) Close() error {
 	if err := d.registry.Close(); err != nil {
 		return fmt.Errorf("failed to close registry: %w", err)
 	}
-	sessions, _ := d.sessionManager.ListSessions()
-	for _, sessionID := range sessions {
-		_ = d.sessionManager.CloseSession(sessionID)
-	}
+	d.sessionManager.CloseAll()
 	return nil
 }

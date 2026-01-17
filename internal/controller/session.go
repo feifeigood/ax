@@ -214,13 +214,6 @@ func (sm *SessionManager) GetSession(sessionID string) (*Session, error) {
 	return session, nil
 }
 
-// ListSessions returns all session IDs.
-// Note: This currently only works with file-based event logs.
-// TODO: Make this more generic for non-file implementations.
-func (sm *SessionManager) ListSessions() ([]string, error) {
-	return eventlog.ListSessions("eventlog")
-}
-
 // CloseSession closes a session and its event log.
 func (sm *SessionManager) CloseSession(sessionID string) error {
 	sm.mu.Lock()
@@ -237,6 +230,20 @@ func (sm *SessionManager) CloseSession(sessionID string) error {
 
 	delete(sm.sessions, sessionID)
 	return nil
+}
+
+// CloseAll closes all active sessions.
+func (sm *SessionManager) CloseAll() {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+
+	for sessionID, session := range sm.sessions {
+		if err := session.eventLog.Close(); err != nil {
+			// Log error but continue closing other sessions
+			_ = err
+		}
+		delete(sm.sessions, sessionID)
+	}
 }
 
 // WriteContentIn appends an incoming content message to the session with a new checkpoint.

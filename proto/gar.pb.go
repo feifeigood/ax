@@ -638,88 +638,6 @@ func (x *GetSessionResponse) GetSession() *SessionInfo {
 	return nil
 }
 
-// ListSessionsRequest for listing all sessions
-type ListSessionsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ListSessionsRequest) Reset() {
-	*x = ListSessionsRequest{}
-	mi := &file_proto_gar_proto_msgTypes[9]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ListSessionsRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ListSessionsRequest) ProtoMessage() {}
-
-func (x *ListSessionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_gar_proto_msgTypes[9]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ListSessionsRequest.ProtoReflect.Descriptor instead.
-func (*ListSessionsRequest) Descriptor() ([]byte, []int) {
-	return file_proto_gar_proto_rawDescGZIP(), []int{9}
-}
-
-// ListSessionsResponse contains list of session IDs
-type ListSessionsResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	SessionIds    []string               `protobuf:"bytes,1,rep,name=session_ids,json=sessionIds,proto3" json:"session_ids,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ListSessionsResponse) Reset() {
-	*x = ListSessionsResponse{}
-	mi := &file_proto_gar_proto_msgTypes[10]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ListSessionsResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ListSessionsResponse) ProtoMessage() {}
-
-func (x *ListSessionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_gar_proto_msgTypes[10]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ListSessionsResponse.ProtoReflect.Descriptor instead.
-func (*ListSessionsResponse) Descriptor() ([]byte, []int) {
-	return file_proto_gar_proto_rawDescGZIP(), []int{10}
-}
-
-func (x *ListSessionsResponse) GetSessionIds() []string {
-	if x != nil {
-		return x.SessionIds
-	}
-	return nil
-}
-
 // RegisterAgentRequest for registering an agent
 type RegisterAgentRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -734,7 +652,7 @@ type RegisterAgentRequest struct {
 
 func (x *RegisterAgentRequest) Reset() {
 	*x = RegisterAgentRequest{}
-	mi := &file_proto_gar_proto_msgTypes[11]
+	mi := &file_proto_gar_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -746,7 +664,7 @@ func (x *RegisterAgentRequest) String() string {
 func (*RegisterAgentRequest) ProtoMessage() {}
 
 func (x *RegisterAgentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_gar_proto_msgTypes[11]
+	mi := &file_proto_gar_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -759,7 +677,7 @@ func (x *RegisterAgentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterAgentRequest.ProtoReflect.Descriptor instead.
 func (*RegisterAgentRequest) Descriptor() ([]byte, []int) {
-	return file_proto_gar_proto_rawDescGZIP(), []int{11}
+	return file_proto_gar_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *RegisterAgentRequest) GetAgentId() string {
@@ -806,7 +724,7 @@ type RegisterAgentResponse struct {
 
 func (x *RegisterAgentResponse) Reset() {
 	*x = RegisterAgentResponse{}
-	mi := &file_proto_gar_proto_msgTypes[12]
+	mi := &file_proto_gar_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -818,7 +736,7 @@ func (x *RegisterAgentResponse) String() string {
 func (*RegisterAgentResponse) ProtoMessage() {}
 
 func (x *RegisterAgentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_gar_proto_msgTypes[12]
+	mi := &file_proto_gar_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -831,7 +749,7 @@ func (x *RegisterAgentResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterAgentResponse.ProtoReflect.Descriptor instead.
 func (*RegisterAgentResponse) Descriptor() ([]byte, []int) {
-	return file_proto_gar_proto_rawDescGZIP(), []int{12}
+	return file_proto_gar_proto_rawDescGZIP(), []int{10}
 }
 
 // UnregisterAgentRequest for unregistering an agent
@@ -844,7 +762,7 @@ type UnregisterAgentRequest struct {
 
 func (x *UnregisterAgentRequest) Reset() {
 	*x = UnregisterAgentRequest{}
-	mi := &file_proto_gar_proto_msgTypes[13]
+	mi := &file_proto_gar_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -856,7 +774,7 @@ func (x *UnregisterAgentRequest) String() string {
 func (*UnregisterAgentRequest) ProtoMessage() {}
 
 func (x *UnregisterAgentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_gar_proto_msgTypes[13]
+	mi := &file_proto_gar_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -869,7 +787,7 @@ func (x *UnregisterAgentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnregisterAgentRequest.ProtoReflect.Descriptor instead.
 func (*UnregisterAgentRequest) Descriptor() ([]byte, []int) {
-	return file_proto_gar_proto_rawDescGZIP(), []int{13}
+	return file_proto_gar_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *UnregisterAgentRequest) GetAgentId() string {
@@ -888,7 +806,7 @@ type UnregisterAgentResponse struct {
 
 func (x *UnregisterAgentResponse) Reset() {
 	*x = UnregisterAgentResponse{}
-	mi := &file_proto_gar_proto_msgTypes[14]
+	mi := &file_proto_gar_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -900,7 +818,7 @@ func (x *UnregisterAgentResponse) String() string {
 func (*UnregisterAgentResponse) ProtoMessage() {}
 
 func (x *UnregisterAgentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_gar_proto_msgTypes[14]
+	mi := &file_proto_gar_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -913,7 +831,7 @@ func (x *UnregisterAgentResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnregisterAgentResponse.ProtoReflect.Descriptor instead.
 func (*UnregisterAgentResponse) Descriptor() ([]byte, []int) {
-	return file_proto_gar_proto_rawDescGZIP(), []int{14}
+	return file_proto_gar_proto_rawDescGZIP(), []int{12}
 }
 
 var File_proto_gar_proto protoreflect.FileDescriptor
@@ -967,11 +885,7 @@ const file_proto_gar_proto_rawDesc = "" +
 	"\rmessage_count\x18\a \x01(\x05R\fmessageCount\x12)\n" +
 	"\x10checkpoint_count\x18\b \x01(\x05R\x0fcheckpointCount\"B\n" +
 	"\x12GetSessionResponse\x12,\n" +
-	"\asession\x18\x01 \x01(\v2\x12.proto.SessionInfoR\asession\"\x15\n" +
-	"\x13ListSessionsRequest\"7\n" +
-	"\x14ListSessionsResponse\x12\x1f\n" +
-	"\vsession_ids\x18\x01 \x03(\tR\n" +
-	"sessionIds\"\x85\x02\n" +
+	"\asession\x18\x01 \x01(\v2\x12.proto.SessionInfoR\asession\"\x85\x02\n" +
 	"\x14RegisterAgentRequest\x12\x19\n" +
 	"\bagent_id\x18\x01 \x01(\tR\aagentId\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
@@ -995,13 +909,12 @@ const file_proto_gar_proto_rawDesc = "" +
 	"\fAgentService\x12-\n" +
 	"\aProcess\x12\x0e.proto.Content\x1a\x0e.proto.Content(\x010\x01\x12C\n" +
 	"\x0fStreamLifecycle\x12\x15.proto.LifecycleEvent\x1a\x15.proto.LifecycleEvent(\x010\x01\x12D\n" +
-	"\vHealthCheck\x12\x19.proto.HealthCheckRequest\x1a\x1a.proto.HealthCheckResponse2\x87\x03\n" +
+	"\vHealthCheck\x12\x19.proto.HealthCheckRequest\x1a\x1a.proto.HealthCheckResponse2\xbe\x02\n" +
 	"\n" +
 	"GARService\x12O\n" +
 	"\x0eTriggerSession\x12\x1c.proto.TriggerSessionRequest\x1a\x1d.proto.TriggerSessionResponse0\x01\x12A\n" +
 	"\n" +
-	"GetSession\x12\x18.proto.GetSessionRequest\x1a\x19.proto.GetSessionResponse\x12G\n" +
-	"\fListSessions\x12\x1a.proto.ListSessionsRequest\x1a\x1b.proto.ListSessionsResponse\x12J\n" +
+	"GetSession\x12\x18.proto.GetSessionRequest\x1a\x19.proto.GetSessionResponse\x12J\n" +
 	"\rRegisterAgent\x12\x1b.proto.RegisterAgentRequest\x1a\x1c.proto.RegisterAgentResponse\x12P\n" +
 	"\x0fUnregisterAgent\x12\x1d.proto.UnregisterAgentRequest\x1a\x1e.proto.UnregisterAgentResponseB\x1dZ\x1bgithub.com/google/gar/protob\x06proto3"
 
@@ -1018,7 +931,7 @@ func file_proto_gar_proto_rawDescGZIP() []byte {
 }
 
 var file_proto_gar_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_proto_gar_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
+var file_proto_gar_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_proto_gar_proto_goTypes = []any{
 	(State)(0),                      // 0: proto.State
 	(*Content)(nil),                 // 1: proto.Content
@@ -1030,45 +943,41 @@ var file_proto_gar_proto_goTypes = []any{
 	(*GetSessionRequest)(nil),       // 7: proto.GetSessionRequest
 	(*SessionInfo)(nil),             // 8: proto.SessionInfo
 	(*GetSessionResponse)(nil),      // 9: proto.GetSessionResponse
-	(*ListSessionsRequest)(nil),     // 10: proto.ListSessionsRequest
-	(*ListSessionsResponse)(nil),    // 11: proto.ListSessionsResponse
-	(*RegisterAgentRequest)(nil),    // 12: proto.RegisterAgentRequest
-	(*RegisterAgentResponse)(nil),   // 13: proto.RegisterAgentResponse
-	(*UnregisterAgentRequest)(nil),  // 14: proto.UnregisterAgentRequest
-	(*UnregisterAgentResponse)(nil), // 15: proto.UnregisterAgentResponse
-	nil,                             // 16: proto.LifecycleEvent.MetadataEntry
-	nil,                             // 17: proto.RegisterAgentRequest.MetadataEntry
-	(*timestamppb.Timestamp)(nil),   // 18: google.protobuf.Timestamp
+	(*RegisterAgentRequest)(nil),    // 10: proto.RegisterAgentRequest
+	(*RegisterAgentResponse)(nil),   // 11: proto.RegisterAgentResponse
+	(*UnregisterAgentRequest)(nil),  // 12: proto.UnregisterAgentRequest
+	(*UnregisterAgentResponse)(nil), // 13: proto.UnregisterAgentResponse
+	nil,                             // 14: proto.LifecycleEvent.MetadataEntry
+	nil,                             // 15: proto.RegisterAgentRequest.MetadataEntry
+	(*timestamppb.Timestamp)(nil),   // 16: google.protobuf.Timestamp
 }
 var file_proto_gar_proto_depIdxs = []int32{
-	18, // 0: proto.LifecycleEvent.timestamp:type_name -> google.protobuf.Timestamp
-	16, // 1: proto.LifecycleEvent.metadata:type_name -> proto.LifecycleEvent.MetadataEntry
+	16, // 0: proto.LifecycleEvent.timestamp:type_name -> google.protobuf.Timestamp
+	14, // 1: proto.LifecycleEvent.metadata:type_name -> proto.LifecycleEvent.MetadataEntry
 	1,  // 2: proto.TriggerSessionRequest.inputs:type_name -> proto.Content
 	0,  // 3: proto.TriggerSessionResponse.state:type_name -> proto.State
 	1,  // 4: proto.TriggerSessionResponse.output:type_name -> proto.Content
 	0,  // 5: proto.SessionInfo.state:type_name -> proto.State
-	18, // 6: proto.SessionInfo.created_at:type_name -> google.protobuf.Timestamp
-	18, // 7: proto.SessionInfo.updated_at:type_name -> google.protobuf.Timestamp
+	16, // 6: proto.SessionInfo.created_at:type_name -> google.protobuf.Timestamp
+	16, // 7: proto.SessionInfo.updated_at:type_name -> google.protobuf.Timestamp
 	8,  // 8: proto.GetSessionResponse.session:type_name -> proto.SessionInfo
-	17, // 9: proto.RegisterAgentRequest.metadata:type_name -> proto.RegisterAgentRequest.MetadataEntry
+	15, // 9: proto.RegisterAgentRequest.metadata:type_name -> proto.RegisterAgentRequest.MetadataEntry
 	1,  // 10: proto.AgentService.Process:input_type -> proto.Content
 	2,  // 11: proto.AgentService.StreamLifecycle:input_type -> proto.LifecycleEvent
 	3,  // 12: proto.AgentService.HealthCheck:input_type -> proto.HealthCheckRequest
 	5,  // 13: proto.GARService.TriggerSession:input_type -> proto.TriggerSessionRequest
 	7,  // 14: proto.GARService.GetSession:input_type -> proto.GetSessionRequest
-	10, // 15: proto.GARService.ListSessions:input_type -> proto.ListSessionsRequest
-	12, // 16: proto.GARService.RegisterAgent:input_type -> proto.RegisterAgentRequest
-	14, // 17: proto.GARService.UnregisterAgent:input_type -> proto.UnregisterAgentRequest
-	1,  // 18: proto.AgentService.Process:output_type -> proto.Content
-	2,  // 19: proto.AgentService.StreamLifecycle:output_type -> proto.LifecycleEvent
-	4,  // 20: proto.AgentService.HealthCheck:output_type -> proto.HealthCheckResponse
-	6,  // 21: proto.GARService.TriggerSession:output_type -> proto.TriggerSessionResponse
-	9,  // 22: proto.GARService.GetSession:output_type -> proto.GetSessionResponse
-	11, // 23: proto.GARService.ListSessions:output_type -> proto.ListSessionsResponse
-	13, // 24: proto.GARService.RegisterAgent:output_type -> proto.RegisterAgentResponse
-	15, // 25: proto.GARService.UnregisterAgent:output_type -> proto.UnregisterAgentResponse
-	18, // [18:26] is the sub-list for method output_type
-	10, // [10:18] is the sub-list for method input_type
+	10, // 15: proto.GARService.RegisterAgent:input_type -> proto.RegisterAgentRequest
+	12, // 16: proto.GARService.UnregisterAgent:input_type -> proto.UnregisterAgentRequest
+	1,  // 17: proto.AgentService.Process:output_type -> proto.Content
+	2,  // 18: proto.AgentService.StreamLifecycle:output_type -> proto.LifecycleEvent
+	4,  // 19: proto.AgentService.HealthCheck:output_type -> proto.HealthCheckResponse
+	6,  // 20: proto.GARService.TriggerSession:output_type -> proto.TriggerSessionResponse
+	9,  // 21: proto.GARService.GetSession:output_type -> proto.GetSessionResponse
+	11, // 22: proto.GARService.RegisterAgent:output_type -> proto.RegisterAgentResponse
+	13, // 23: proto.GARService.UnregisterAgent:output_type -> proto.UnregisterAgentResponse
+	17, // [17:24] is the sub-list for method output_type
+	10, // [10:17] is the sub-list for method input_type
 	10, // [10:10] is the sub-list for extension type_name
 	10, // [10:10] is the sub-list for extension extendee
 	0,  // [0:10] is the sub-list for field type_name
@@ -1085,7 +994,7 @@ func file_proto_gar_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_gar_proto_rawDesc), len(file_proto_gar_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   17,
+			NumMessages:   15,
 			NumExtensions: 0,
 			NumServices:   2,
 		},

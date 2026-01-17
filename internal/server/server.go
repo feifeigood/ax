@@ -115,21 +115,6 @@ func (s *Server) GetSession(ctx context.Context, req *proto.GetSessionRequest) (
 	}, nil
 }
 
-// ListSessions lists all available sessions.
-func (s *Server) ListSessions(ctx context.Context, req *proto.ListSessionsRequest) (*proto.ListSessionsResponse, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	sessions, err := s.controller.ListSessions()
-	if err != nil {
-		return nil, fmt.Errorf("failed to list sessions: %w", err)
-	}
-
-	return &proto.ListSessionsResponse{
-		SessionIds: sessions,
-	}, nil
-}
-
 // RegisterAgent registers a new remote agent with the dispatcher.
 func (s *Server) RegisterAgent(ctx context.Context, req *proto.RegisterAgentRequest) (*proto.RegisterAgentResponse, error) {
 	s.mu.Lock()
