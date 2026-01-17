@@ -165,9 +165,7 @@ func (a *RemoteAgent) HealthCheck(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	resp, err := a.client.HealthCheck(ctx, &proto.HealthCheckRequest{
-		AgentId: a.id,
-	})
+	resp, err := a.client.HealthCheck(ctx, &proto.HealthCheckRequest{})
 	if err != nil {
 		return fmt.Errorf("health check failed: %w", err)
 	}

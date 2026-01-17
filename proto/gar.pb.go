@@ -214,7 +214,6 @@ func (x *LifecycleEvent) GetMetadata() map[string]string {
 // HealthCheckRequest for agent health checks
 type HealthCheckRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	AgentId       string                 `protobuf:"bytes,1,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -247,13 +246,6 @@ func (x *HealthCheckRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use HealthCheckRequest.ProtoReflect.Descriptor instead.
 func (*HealthCheckRequest) Descriptor() ([]byte, []int) {
 	return file_proto_gar_proto_rawDescGZIP(), []int{2}
-}
-
-func (x *HealthCheckRequest) GetAgentId() string {
-	if x != nil {
-		return x.AgentId
-	}
-	return ""
 }
 
 // HealthCheckResponse contains agent health status
@@ -843,9 +835,8 @@ const file_proto_gar_proto_rawDesc = "" +
 	"\bmetadata\x18\x03 \x03(\v2#.proto.LifecycleEvent.MetadataEntryR\bmetadata\x1a;\n" +
 	"\rMetadataEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"/\n" +
-	"\x12HealthCheckRequest\x12\x19\n" +
-	"\bagent_id\x18\x01 \x01(\tR\aagentId\"I\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x14\n" +
+	"\x12HealthCheckRequest\"I\n" +
 	"\x13HealthCheckResponse\x12\x18\n" +
 	"\ahealthy\x18\x01 \x01(\bR\ahealthy\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\"\x83\x01\n" +

@@ -113,7 +113,7 @@ func (s *server) StreamLifecycle(stream proto.AgentService_StreamLifecycleServer
 
 // HealthCheck checks if the agent is healthy.
 func (s *server) HealthCheck(ctx context.Context, req *proto.HealthCheckRequest) (*proto.HealthCheckResponse, error) {
-	log.Printf("Health check requested for agent: %s", req.AgentId)
+	log.Println("Health check requested")
 
 	return &proto.HealthCheckResponse{
 		Healthy: true,

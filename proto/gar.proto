@@ -24,9 +24,7 @@ message LifecycleEvent {
 }
 
 // HealthCheckRequest for agent health checks
-message HealthCheckRequest {
-  string agent_id = 1;
-}
+message HealthCheckRequest {}
 
 // HealthCheckResponse contains agent health status
 message HealthCheckResponse {
