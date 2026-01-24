@@ -205,7 +205,7 @@ func (e *LoopExecutor) executeTask(ctx context.Context, session *Session, ag age
 	defer cancelLifecycle()
 
 	lifecycleHandler := func(event *proto.LifecycleEvent) error {
-		e.HandleLifecycleEvent(session, event)
+		// TODO(jbd): Handle lifecycle events.
 		return nil
 	}
 
@@ -225,19 +225,6 @@ func (e *LoopExecutor) executeTask(ctx context.Context, session *Session, ag age
 	cancelLifecycle()
 
 	return output, nil
-}
-
-// HandleLifecycleEvent processes lifecycle events from agents.
-func (e *LoopExecutor) HandleLifecycleEvent(session *Session, event *proto.LifecycleEvent) {
-	// Handle different event types
-	switch event.EventType {
-	case "PROGRESS":
-		// Log progress events
-		// TODO: Add progress tracking
-	case "HEARTBEAT":
-		// Agent health signal
-		// TODO: Update agent health status in registry
-	}
 }
 
 // defaultEvaluateFunc is a simple default evaluation function.
