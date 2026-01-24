@@ -54,9 +54,3 @@ health_check_interval: 30s
 #     address: "localhost:50051"
 #     metadata:
 #       version: "1.0"
-#       language: "python"
-#
-#   - id: "custom-agent"
-#     name: "Custom Agent"
-#     description: "Custom agent implementation"
-#     address: "localhost:50052"
