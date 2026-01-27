@@ -172,7 +172,7 @@ Guidelines:
 
 				return &Task{
 					AgentID:   agentID,
-					Input:     input,
+					Inputs:    input,
 					Goal:      &Goal{Description: "Process user request using model selected agent"},
 					StepIndex: session.CurrentStep,
 				}, nil

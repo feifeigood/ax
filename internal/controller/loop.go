@@ -16,7 +16,7 @@ type Goal struct {
 // Task represents a task to be executed by an agent.
 type Task struct {
 	AgentID   string
-	Input     []*proto.Content
+	Inputs    []*proto.Content
 	Goal      *Goal
 	StepIndex int
 }
@@ -196,7 +196,7 @@ func (e *LoopExecutor) executeTask(ctx context.Context, session *Session, ag age
 	}
 
 	// Process inputs with the agent
-	if err := ag.Process(ctx, session.ID, task.Input, outputHandler); err != nil {
+	if err := ag.Process(ctx, session.ID, task.Inputs, outputHandler); err != nil {
 		return nil, fmt.Errorf("agent process failed: %w", err)
 	}
 
