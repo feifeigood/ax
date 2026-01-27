@@ -17,9 +17,16 @@ message Content {
   // TODO: Replace Content with Interactions Content.
 }
 
+// EventType represents the type of lifecycle event
+enum EventType {
+  EVENT_TYPE_UNSPECIFIED = 0;  // Unspecified event type
+  EVENT_TYPE_PROGRESS = 1;     // Progress update
+  EVENT_TYPE_HEARTBEAT = 2;    // Heartbeat signal
+}
+
 // LifecycleEvent represents events from agent lifecycle
 message LifecycleEvent {
-  string event_type = 1;            // Event type: "PROGRESS", "HEARTBEAT"
+  EventType event_type = 1;            // Event type
   google.protobuf.Timestamp timestamp = 2;  // Timestamp of the event
   map<string, string> metadata = 3;  // Additional event metadata
 }

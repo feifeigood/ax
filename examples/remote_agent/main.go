@@ -79,7 +79,7 @@ func (s *server) StreamLifecycle(stream proto.AgentService_StreamLifecycleServer
 		select {
 		case <-ticker.C:
 			event := &proto.LifecycleEvent{
-				EventType: "HEARTBEAT",
+				EventType: proto.EventType_EVENT_TYPE_HEARTBEAT,
 				Timestamp: timestamppb.Now(),
 			}
 

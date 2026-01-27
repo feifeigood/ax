@@ -271,7 +271,7 @@ processFunc := func(ctx context.Context, sessionID string, inputs []*proto.Conte
 lifecycleFunc := func(ctx context.Context, handler agent.LifecycleHandler) error {
     // Send lifecycle events via handler callback
     return handler(&proto.LifecycleEvent{
-        EventType: "PROGRESS",
+        EventType: proto.EventType_EVENT_TYPE_PROGRESS,
         Timestamp: timestamppb.Now(),
     })
 }

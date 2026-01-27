@@ -22,6 +22,56 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// EventType represents the type of lifecycle event
+type EventType int32
+
+const (
+	EventType_EVENT_TYPE_UNSPECIFIED EventType = 0 // Unspecified event type
+	EventType_EVENT_TYPE_PROGRESS    EventType = 1 // Progress update
+	EventType_EVENT_TYPE_HEARTBEAT   EventType = 2 // Heartbeat signal
+)
+
+// Enum value maps for EventType.
+var (
+	EventType_name = map[int32]string{
+		0: "EVENT_TYPE_UNSPECIFIED",
+		1: "EVENT_TYPE_PROGRESS",
+		2: "EVENT_TYPE_HEARTBEAT",
+	}
+	EventType_value = map[string]int32{
+		"EVENT_TYPE_UNSPECIFIED": 0,
+		"EVENT_TYPE_PROGRESS":    1,
+		"EVENT_TYPE_HEARTBEAT":   2,
+	}
+)
+
+func (x EventType) Enum() *EventType {
+	p := new(EventType)
+	*p = x
+	return p
+}
+
+func (x EventType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (EventType) Descriptor() protoreflect.EnumDescriptor {
+	return file_proto_gar_proto_enumTypes[0].Descriptor()
+}
+
+func (EventType) Type() protoreflect.EnumType {
+	return &file_proto_gar_proto_enumTypes[0]
+}
+
+func (x EventType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use EventType.Descriptor instead.
+func (EventType) EnumDescriptor() ([]byte, []int) {
+	return file_proto_gar_proto_rawDescGZIP(), []int{0}
+}
+
 // State represents the state of a session
 type State int32
 
@@ -56,11 +106,11 @@ func (x State) String() string {
 }
 
 func (State) Descriptor() protoreflect.EnumDescriptor {
-	return file_proto_gar_proto_enumTypes[0].Descriptor()
+	return file_proto_gar_proto_enumTypes[1].Descriptor()
 }
 
 func (State) Type() protoreflect.EnumType {
-	return &file_proto_gar_proto_enumTypes[0]
+	return &file_proto_gar_proto_enumTypes[1]
 }
 
 func (x State) Number() protoreflect.EnumNumber {
@@ -69,7 +119,7 @@ func (x State) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use State.Descriptor instead.
 func (State) EnumDescriptor() ([]byte, []int) {
-	return file_proto_gar_proto_rawDescGZIP(), []int{0}
+	return file_proto_gar_proto_rawDescGZIP(), []int{1}
 }
 
 // Content represents a message with role, type, mimetype, and data fields
@@ -152,7 +202,7 @@ func (x *Content) GetCheckpointId() string {
 // LifecycleEvent represents events from agent lifecycle
 type LifecycleEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	EventType     string                 `protobuf:"bytes,1,opt,name=event_type,json=eventType,proto3" json:"event_type,omitempty"`                                                        // Event type: "PROGRESS", "HEARTBEAT"
+	EventType     EventType              `protobuf:"varint,1,opt,name=event_type,json=eventType,proto3,enum=proto.EventType" json:"event_type,omitempty"`                                  // Event type
 	Timestamp     *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=timestamp,proto3" json:"timestamp,omitempty"`                                                                         // Timestamp of the event
 	Metadata      map[string]string      `protobuf:"bytes,3,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // Additional event metadata
 	unknownFields protoimpl.UnknownFields
@@ -189,11 +239,11 @@ func (*LifecycleEvent) Descriptor() ([]byte, []int) {
 	return file_proto_gar_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *LifecycleEvent) GetEventType() string {
+func (x *LifecycleEvent) GetEventType() EventType {
 	if x != nil {
 		return x.EventType
 	}
-	return ""
+	return EventType_EVENT_TYPE_UNSPECIFIED
 }
 
 func (x *LifecycleEvent) GetTimestamp() *timestamppb.Timestamp {
@@ -811,10 +861,10 @@ const file_proto_gar_proto_rawDesc = "" +
 	"\x04type\x18\x02 \x01(\tR\x04type\x12\x1a\n" +
 	"\bmimetype\x18\x03 \x01(\tR\bmimetype\x12\x12\n" +
 	"\x04data\x18\x04 \x01(\tR\x04data\x12#\n" +
-	"\rcheckpoint_id\x18\x05 \x01(\tR\fcheckpointId\"\xe7\x01\n" +
-	"\x0eLifecycleEvent\x12\x1d\n" +
+	"\rcheckpoint_id\x18\x05 \x01(\tR\fcheckpointId\"\xf9\x01\n" +
+	"\x0eLifecycleEvent\x12/\n" +
 	"\n" +
-	"event_type\x18\x01 \x01(\tR\teventType\x128\n" +
+	"event_type\x18\x01 \x01(\x0e2\x10.proto.EventTypeR\teventType\x128\n" +
 	"\ttimestamp\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\x12?\n" +
 	"\bmetadata\x18\x03 \x03(\v2#.proto.LifecycleEvent.MetadataEntryR\bmetadata\x1a;\n" +
 	"\rMetadataEntry\x12\x10\n" +
@@ -861,7 +911,11 @@ const file_proto_gar_proto_rawDesc = "" +
 	"\x15RegisterAgentResponse\"3\n" +
 	"\x16UnregisterAgentRequest\x12\x19\n" +
 	"\bagent_id\x18\x01 \x01(\tR\aagentId\"\x19\n" +
-	"\x17UnregisterAgentResponse*C\n" +
+	"\x17UnregisterAgentResponse*Z\n" +
+	"\tEventType\x12\x1a\n" +
+	"\x16EVENT_TYPE_UNSPECIFIED\x10\x00\x12\x17\n" +
+	"\x13EVENT_TYPE_PROGRESS\x10\x01\x12\x18\n" +
+	"\x14EVENT_TYPE_HEARTBEAT\x10\x02*C\n" +
 	"\x05State\x12\x15\n" +
 	"\x11STATE_UNSPECIFIED\x10\x00\x12\x11\n" +
 	"\rSTATE_RUNNING\x10\x01\x12\x10\n" +
@@ -890,57 +944,59 @@ func file_proto_gar_proto_rawDescGZIP() []byte {
 	return file_proto_gar_proto_rawDescData
 }
 
-var file_proto_gar_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_proto_gar_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
 var file_proto_gar_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_proto_gar_proto_goTypes = []any{
-	(State)(0),                      // 0: proto.State
-	(*Content)(nil),                 // 1: proto.Content
-	(*LifecycleEvent)(nil),          // 2: proto.LifecycleEvent
-	(*HealthCheckRequest)(nil),      // 3: proto.HealthCheckRequest
-	(*HealthCheckResponse)(nil),     // 4: proto.HealthCheckResponse
-	(*TriggerSessionRequest)(nil),   // 5: proto.TriggerSessionRequest
-	(*TriggerSessionResponse)(nil),  // 6: proto.TriggerSessionResponse
-	(*GetSessionRequest)(nil),       // 7: proto.GetSessionRequest
-	(*SessionInfo)(nil),             // 8: proto.SessionInfo
-	(*GetSessionResponse)(nil),      // 9: proto.GetSessionResponse
-	(*RegisterAgentRequest)(nil),    // 10: proto.RegisterAgentRequest
-	(*RegisterAgentResponse)(nil),   // 11: proto.RegisterAgentResponse
-	(*UnregisterAgentRequest)(nil),  // 12: proto.UnregisterAgentRequest
-	(*UnregisterAgentResponse)(nil), // 13: proto.UnregisterAgentResponse
-	nil,                             // 14: proto.LifecycleEvent.MetadataEntry
-	nil,                             // 15: proto.RegisterAgentRequest.MetadataEntry
-	(*timestamppb.Timestamp)(nil),   // 16: google.protobuf.Timestamp
+	(EventType)(0),                  // 0: proto.EventType
+	(State)(0),                      // 1: proto.State
+	(*Content)(nil),                 // 2: proto.Content
+	(*LifecycleEvent)(nil),          // 3: proto.LifecycleEvent
+	(*HealthCheckRequest)(nil),      // 4: proto.HealthCheckRequest
+	(*HealthCheckResponse)(nil),     // 5: proto.HealthCheckResponse
+	(*TriggerSessionRequest)(nil),   // 6: proto.TriggerSessionRequest
+	(*TriggerSessionResponse)(nil),  // 7: proto.TriggerSessionResponse
+	(*GetSessionRequest)(nil),       // 8: proto.GetSessionRequest
+	(*SessionInfo)(nil),             // 9: proto.SessionInfo
+	(*GetSessionResponse)(nil),      // 10: proto.GetSessionResponse
+	(*RegisterAgentRequest)(nil),    // 11: proto.RegisterAgentRequest
+	(*RegisterAgentResponse)(nil),   // 12: proto.RegisterAgentResponse
+	(*UnregisterAgentRequest)(nil),  // 13: proto.UnregisterAgentRequest
+	(*UnregisterAgentResponse)(nil), // 14: proto.UnregisterAgentResponse
+	nil,                             // 15: proto.LifecycleEvent.MetadataEntry
+	nil,                             // 16: proto.RegisterAgentRequest.MetadataEntry
+	(*timestamppb.Timestamp)(nil),   // 17: google.protobuf.Timestamp
 }
 var file_proto_gar_proto_depIdxs = []int32{
-	16, // 0: proto.LifecycleEvent.timestamp:type_name -> google.protobuf.Timestamp
-	14, // 1: proto.LifecycleEvent.metadata:type_name -> proto.LifecycleEvent.MetadataEntry
-	1,  // 2: proto.TriggerSessionRequest.inputs:type_name -> proto.Content
-	0,  // 3: proto.TriggerSessionResponse.state:type_name -> proto.State
-	1,  // 4: proto.TriggerSessionResponse.output:type_name -> proto.Content
-	0,  // 5: proto.SessionInfo.state:type_name -> proto.State
-	16, // 6: proto.SessionInfo.created_at:type_name -> google.protobuf.Timestamp
-	16, // 7: proto.SessionInfo.updated_at:type_name -> google.protobuf.Timestamp
-	8,  // 8: proto.GetSessionResponse.session:type_name -> proto.SessionInfo
-	15, // 9: proto.RegisterAgentRequest.metadata:type_name -> proto.RegisterAgentRequest.MetadataEntry
-	1,  // 10: proto.AgentService.Process:input_type -> proto.Content
-	2,  // 11: proto.AgentService.StreamLifecycle:input_type -> proto.LifecycleEvent
-	3,  // 12: proto.AgentService.HealthCheck:input_type -> proto.HealthCheckRequest
-	5,  // 13: proto.GARService.TriggerSession:input_type -> proto.TriggerSessionRequest
-	7,  // 14: proto.GARService.GetSession:input_type -> proto.GetSessionRequest
-	10, // 15: proto.GARService.RegisterAgent:input_type -> proto.RegisterAgentRequest
-	12, // 16: proto.GARService.UnregisterAgent:input_type -> proto.UnregisterAgentRequest
-	1,  // 17: proto.AgentService.Process:output_type -> proto.Content
-	2,  // 18: proto.AgentService.StreamLifecycle:output_type -> proto.LifecycleEvent
-	4,  // 19: proto.AgentService.HealthCheck:output_type -> proto.HealthCheckResponse
-	6,  // 20: proto.GARService.TriggerSession:output_type -> proto.TriggerSessionResponse
-	9,  // 21: proto.GARService.GetSession:output_type -> proto.GetSessionResponse
-	11, // 22: proto.GARService.RegisterAgent:output_type -> proto.RegisterAgentResponse
-	13, // 23: proto.GARService.UnregisterAgent:output_type -> proto.UnregisterAgentResponse
-	17, // [17:24] is the sub-list for method output_type
-	10, // [10:17] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	0,  // 0: proto.LifecycleEvent.event_type:type_name -> proto.EventType
+	17, // 1: proto.LifecycleEvent.timestamp:type_name -> google.protobuf.Timestamp
+	15, // 2: proto.LifecycleEvent.metadata:type_name -> proto.LifecycleEvent.MetadataEntry
+	2,  // 3: proto.TriggerSessionRequest.inputs:type_name -> proto.Content
+	1,  // 4: proto.TriggerSessionResponse.state:type_name -> proto.State
+	2,  // 5: proto.TriggerSessionResponse.output:type_name -> proto.Content
+	1,  // 6: proto.SessionInfo.state:type_name -> proto.State
+	17, // 7: proto.SessionInfo.created_at:type_name -> google.protobuf.Timestamp
+	17, // 8: proto.SessionInfo.updated_at:type_name -> google.protobuf.Timestamp
+	9,  // 9: proto.GetSessionResponse.session:type_name -> proto.SessionInfo
+	16, // 10: proto.RegisterAgentRequest.metadata:type_name -> proto.RegisterAgentRequest.MetadataEntry
+	2,  // 11: proto.AgentService.Process:input_type -> proto.Content
+	3,  // 12: proto.AgentService.StreamLifecycle:input_type -> proto.LifecycleEvent
+	4,  // 13: proto.AgentService.HealthCheck:input_type -> proto.HealthCheckRequest
+	6,  // 14: proto.GARService.TriggerSession:input_type -> proto.TriggerSessionRequest
+	8,  // 15: proto.GARService.GetSession:input_type -> proto.GetSessionRequest
+	11, // 16: proto.GARService.RegisterAgent:input_type -> proto.RegisterAgentRequest
+	13, // 17: proto.GARService.UnregisterAgent:input_type -> proto.UnregisterAgentRequest
+	2,  // 18: proto.AgentService.Process:output_type -> proto.Content
+	3,  // 19: proto.AgentService.StreamLifecycle:output_type -> proto.LifecycleEvent
+	5,  // 20: proto.AgentService.HealthCheck:output_type -> proto.HealthCheckResponse
+	7,  // 21: proto.GARService.TriggerSession:output_type -> proto.TriggerSessionResponse
+	10, // 22: proto.GARService.GetSession:output_type -> proto.GetSessionResponse
+	12, // 23: proto.GARService.RegisterAgent:output_type -> proto.RegisterAgentResponse
+	14, // 24: proto.GARService.UnregisterAgent:output_type -> proto.UnregisterAgentResponse
+	18, // [18:25] is the sub-list for method output_type
+	11, // [11:18] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_proto_gar_proto_init() }
@@ -953,7 +1009,7 @@ func file_proto_gar_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_gar_proto_rawDesc), len(file_proto_gar_proto_rawDesc)),
-			NumEnums:      1,
+			NumEnums:      2,
 			NumMessages:   15,
 			NumExtensions: 0,
 			NumServices:   2,
