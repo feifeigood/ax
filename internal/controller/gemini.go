@@ -174,7 +174,7 @@ Guidelines:
 					AgentID:   agentID,
 					Inputs:    input,
 					Goal:      &Goal{Description: "Process user request using model selected agent"},
-					StepIndex: session.CurrentStep,
+					StepIndex: session.CurrentStep(),
 				}, nil
 			}
 		}

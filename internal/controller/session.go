@@ -16,14 +16,15 @@ import (
 type Session struct {
 	ID             string
 	State          proto.State
-	CurrentStep    int
 	ActiveAgents   []string
 	MessageHistory []*proto.Content
 	CheckpointIDs  []string // Ordered list of checkpoint UUIDs
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
-	mu             sync.RWMutex
-	eventLog       eventlog.EventLog
+
+	mu          sync.RWMutex
+	eventLog    eventlog.EventLog
+	currentStep int
 }
 
 // EventLogFactory is a function that creates EventLog instances for sessions.
@@ -64,7 +65,7 @@ func (sm *SessionManager) NewSession(sessionID string) (*Session, error) {
 	session := &Session{
 		ID:             sessionID,
 		State:          proto.State_STATE_RUNNING,
-		CurrentStep:    0,
+		currentStep:    0,
 		ActiveAgents:   []string{},
 		MessageHistory: []*proto.Content{},
 		CheckpointIDs:  []string{},
@@ -109,7 +110,7 @@ func (sm *SessionManager) LoadSessionFromCheckpoint(sessionID string, checkpoint
 	session := &Session{
 		ID:             sessionID,
 		State:          proto.State_STATE_RUNNING,
-		CurrentStep:    0,
+		currentStep:    0,
 		ActiveAgents:   []string{},
 		MessageHistory: []*proto.Content{},
 		CheckpointIDs:  []string{},
@@ -275,8 +276,15 @@ func (s *Session) AdvanceStep() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.CurrentStep++
+	s.currentStep++
 	s.UpdatedAt = time.Now()
+}
+
+func (s *Session) CurrentStep() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return s.currentStep
 }
 
 // Helper function to extract string from map[string]any
