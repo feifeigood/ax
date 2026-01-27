@@ -21,10 +21,10 @@ const (
 // Entry represents a single entry in the event log.
 type Entry struct {
 	SessionID    string         `json:"session_id"`
+	CheckpointID string         `json:"checkpoint_id,omitempty"` // UUID for checkpoint tracking
 	Timestamp    time.Time      `json:"timestamp"`
 	Sequence     int64          `json:"seq"` // Monotonic sequence number
 	Type         EventType      `json:"type"`
-	CheckpointID string         `json:"checkpoint_id,omitempty"` // UUID for checkpoint tracking
 	Data         map[string]any `json:"data"`
 }
 
