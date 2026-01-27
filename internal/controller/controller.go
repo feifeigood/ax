@@ -75,6 +75,10 @@ func (d *Controller) TriggerSession(ctx context.Context, sessionID string, input
 		return fmt.Errorf("session_id is required")
 	}
 
+	// TODO(jbd): Don't allow a running session to accept
+	// new triggers. Also mark, a session as COMPLETED
+	// if it's no longer running.
+
 	// Check if session already exists
 	sess, err := d.sessionManager.GetSession(sessionID)
 	if err == nil && sess == nil {
