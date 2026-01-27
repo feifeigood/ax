@@ -406,7 +406,7 @@ gar register \
 # Trigger a session
 gar trigger \
   --session-id session123 \
-  --input "Hello Python agent"
+  --input "Hello, I heard that there is a Python agent that can help!"
 ```
 
 ## Future Enhancements
