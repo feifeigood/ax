@@ -16,6 +16,7 @@ const (
 	EventTypeContentIn  EventType = "CONTENT_IN"
 	EventTypeContentOut EventType = "CONTENT_OUT"
 	EventTypeLifecycle  EventType = "LIFECYCLE"
+	// TODO(jbd): Add EventTypeCompaction.
 )
 
 // Entry represents a single entry in the event log.
