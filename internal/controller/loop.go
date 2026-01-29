@@ -140,13 +140,19 @@ func (e *LoopExecutor) runLoop(ctx context.Context, session *Session) error {
 		}
 
 		// Phase 2: Execute - Send content to agent and receive response
-		output, err := e.executeTask(ctx, session, task)
+		outputs, err := e.executeTask(ctx, session, task)
 		if err != nil {
 			return fmt.Errorf("execution failed: %w", err)
 		}
 
+		for _, output := range outputs {
+			if _, err := session.WriteContentOut(ctx, output); err != nil {
+				return fmt.Errorf("failed to write task inputs: %w", err)
+			}
+		}
+
 		// Phase 3: Evaluate - Check if goal achieved
-		goalAchieved, err := e.evaluateFunc(ctx, session, task, output)
+		goalAchieved, err := e.evaluateFunc(ctx, session, task, outputs)
 		if err != nil {
 			return fmt.Errorf("evaluation failed: %w", err)
 		}
@@ -172,14 +178,12 @@ func (e *LoopExecutor) executeTask(ctx context.Context, session *Session, task *
 		return nil, fmt.Errorf("failed to get agent: %w", err)
 	}
 
-	var output []*proto.Content
+	var outputs []*proto.Content
 
 	// Define output handler to collect responses
 	outputHandler := func(content *proto.Content) error {
-		output = append(output, content)
-		if _, err := session.WriteContentIn(ctx, content); err != nil {
-			return fmt.Errorf("failed to write task inputs: %w", err)
-		}
+		outputs = append(outputs, content)
+
 		return nil
 	}
 
@@ -188,7 +192,7 @@ func (e *LoopExecutor) executeTask(ctx context.Context, session *Session, task *
 		return nil, fmt.Errorf("agent process failed: %w", err)
 	}
 
-	return output, nil
+	return outputs, nil
 }
 
 // defaultEvaluateFunc is a simple default evaluation function.
