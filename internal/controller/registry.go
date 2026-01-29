@@ -207,8 +207,8 @@ func (r *Registry) ListHealthy() []string {
 	return ids
 }
 
-// HealthCheck performs a health check on a specific agent.
-func (r *Registry) HealthCheck(id string) error {
+// healthCheck performs a health check on a specific agent.
+func (r *Registry) healthCheck(id string) error {
 	a, err := r.Get(id)
 	if err != nil {
 		return err
@@ -248,7 +248,7 @@ func (r *Registry) performHealthChecks() {
 	ids := r.List()
 	for _, id := range ids {
 		// Run health check (ignore errors, status is updated in HealthCheck method)
-		_ = r.HealthCheck(id)
+		_ = r.healthCheck(id)
 	}
 }
 
