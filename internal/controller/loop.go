@@ -98,13 +98,10 @@ func NewLoopExecutor(ctx context.Context, config LoopConfig) (*LoopExecutor, err
 }
 
 // Execute starts a new agentic loop execution for the given session.
-func (e *LoopExecutor) Execute(ctx context.Context, sessionID string, inputs []*proto.Content) error {
-	// Get or create session
-	session, err := e.sessionManager.GetSession(sessionID)
-	if err != nil {
-		return fmt.Errorf("failed to get session: %w", err)
+func (e *LoopExecutor) Execute(ctx context.Context, session *Session, inputs []*proto.Content) error {
+	if session.State() == proto.State_STATE_FAILED {
+		return fmt.Errorf("session has failed and cannot continue")
 	}
-
 	if err := session.SetState(ctx, proto.State_STATE_RUNNING); err != nil {
 		return fmt.Errorf("failed to set session state: %w", err)
 	}
