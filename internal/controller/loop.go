@@ -18,7 +18,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/google/gar/agent"
 	"github.com/google/gar/proto"
 )
 
@@ -151,14 +150,8 @@ func (e *LoopExecutor) runLoop(ctx context.Context, session *Session) error {
 			return nil
 		}
 
-		// Get the agent from registry
-		ag, err := e.registry.Get(task.AgentID)
-		if err != nil {
-			return fmt.Errorf("failed to get agent: %w", err)
-		}
-
 		// Phase 2: Execute - Send content to agent and receive response
-		output, err := e.executeTask(ctx, session, ag, task)
+		output, err := e.executeTask(ctx, session, task)
 		if err != nil {
 			return fmt.Errorf("execution failed: %w", err)
 		}
@@ -184,7 +177,13 @@ func (e *LoopExecutor) runLoop(ctx context.Context, session *Session) error {
 }
 
 // executeTask sends input to an agent and collects output.
-func (e *LoopExecutor) executeTask(ctx context.Context, session *Session, ag agent.Agent, task *Task) ([]*proto.Content, error) {
+func (e *LoopExecutor) executeTask(ctx context.Context, session *Session, task *Task) ([]*proto.Content, error) {
+	// Get the agent from registry
+	ag, err := e.registry.Get(task.AgentID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get agent: %w", err)
+	}
+
 	var output []*proto.Content
 
 	// Define output handler to collect responses
