@@ -27,6 +27,7 @@ import (
 type EventType string
 
 const (
+	EventTypeState      EventType = "STATE"
 	EventTypeContentIn  EventType = "CONTENT_IN"
 	EventTypeContentOut EventType = "CONTENT_OUT"
 	// TODO(jbd): Add EventTypeCompaction.
@@ -47,6 +48,9 @@ type Entry struct {
 type EventLog interface {
 	// AppendContent appends a content message to the event log with a checkpoint UUID.
 	AppendContent(ctx context.Context, t EventType, checkpointID string, content *proto.Content) error
+
+	// AppendState appends a state to the event log.
+	AppendState(ctx context.Context, s proto.State) error
 
 	// RetrieveEntries returns all entries from the event log in order.
 	RetrieveEntries(ctx context.Context) ([]Entry, error)

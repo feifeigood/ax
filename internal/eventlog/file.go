@@ -153,6 +153,13 @@ func (e *FileEventLog) AppendContent(ctx context.Context, direction EventType, c
 	return e.Append(direction, checkpointID, data)
 }
 
+func (e *FileEventLog) AppendState(ctx context.Context, s proto.State) error {
+	data := map[string]any{
+		"state": s,
+	}
+	return e.Append(EventTypeState, "", data)
+}
+
 // Close closes the event log file.
 func (e *FileEventLog) Close() error {
 	e.mu.Lock()
