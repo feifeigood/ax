@@ -22,8 +22,7 @@ import (
 	"time"
 
 	"github.com/google/gar/proto"
-	"github.com/google/generative-ai-go/genai"
-	"google.golang.org/api/option"
+	"google.golang.org/genai"
 )
 
 const noActionAgentID = "no_action_agent"
@@ -59,9 +58,6 @@ func NewGeminiPlanFunc(ctx context.Context, registry *Registry, config GeminiPla
 			return nil, fmt.Errorf("GEMINI_API_KEY not set and no API key provided in config")
 		}
 	}
-	if config.ContextWindow == 0 {
-		config.ContextWindow = 30
-	}
 
 	// Default system prompt
 	if config.SystemPrompt == "" {
@@ -80,13 +76,14 @@ Your job is to:
 
 Guidelines:
 - Choose agents based on their capabilities and the user's needs
-- If no suitable agent exists, call no_action to indicate completion
+- If no suitable agent exists, call no_action_agent to indicate completion
 - Keep the conversation context in mind when selecting agents
 - Provide concise but complete input to the selected agent`
 	}
 
-	// Create Gemini client
-	client, err := genai.NewClient(ctx, option.WithAPIKey(config.APIKey))
+	client, err := genai.NewClient(ctx, &genai.ClientConfig{
+		APIKey: config.APIKey,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Gemini client: %w", err)
 	}
@@ -109,7 +106,6 @@ Guidelines:
 			return nil, fmt.Errorf("failed to convert agents to tools: %w", err)
 		}
 
-		// Add a special "no_action" tool to indicate completion
 		tools = append(tools, &genai.Tool{
 			FunctionDeclarations: []*genai.FunctionDeclaration{
 				{
@@ -129,27 +125,19 @@ Guidelines:
 			},
 		})
 
-		// Configure the model
-		model := client.GenerativeModel(config.Model)
-		model.SetTemperature(config.Temperature)
-		model.SetMaxOutputTokens(config.MaxTokens)
-		model.SystemInstruction = &genai.Content{
-			Parts: []genai.Part{genai.Text(config.SystemPrompt)},
-		}
-		model.Tools = tools
-
 		// Convert session to conversation history
 		history := sessionToHistory(session, config.ContextWindow)
+		contents := append(history, genai.Text("Based on the above conversation, determine the next best agent to handle the task.")...)
 
-		// Start chat session
-		chat := model.StartChat()
-		chat.History = history
+		resp, err := client.Models.GenerateContent(ctx, config.Model, contents, &genai.GenerateContentConfig{
+			Tools:             tools,
+			SystemInstruction: genai.Text(config.SystemPrompt)[0],
+			MaxOutputTokens:   config.MaxTokens,
+			Temperature:       &config.Temperature,
+		})
 
-		// Request Gemini to select an agent
-		prompt := "Based on the conversation above, which agent should handle the next step? Call the appropriate agent function."
-		resp, err := chat.SendMessage(ctx, genai.Text(prompt))
 		if err != nil {
-			return nil, fmt.Errorf("Gemini request failed: %w", err)
+			return nil, fmt.Errorf("failed to generate content: %w", err)
 		}
 
 		// Parse function calls from response
@@ -159,22 +147,20 @@ Guidelines:
 
 		// Look for function calls in the response
 		for _, part := range resp.Candidates[0].Content.Parts {
-			if fc, ok := part.(genai.FunctionCall); ok {
-				// Check if it's the no_action function
+			if part == nil {
+				continue
+			}
+			if fc := part.FunctionCall; fc != nil {
 				if fc.Name == noActionAgentID {
 					return nil, nil // No more tasks
 				}
 
-				// Extract agent ID from function name (format: agent_<id>)
 				agentID := fc.Name
-
 				// Get the input from function call args
 				inputText := ""
 				if input, ok := fc.Args["input"].(string); ok {
 					inputText = input
 				}
-
-				// Create input content for the agent
 				input := []*proto.Content{
 					{
 						Role:     "user",
@@ -183,7 +169,6 @@ Guidelines:
 						Data:     inputText,
 					},
 				}
-
 				return &Task{
 					AgentID:   agentID,
 					Inputs:    input,
@@ -192,8 +177,6 @@ Guidelines:
 				}, nil
 			}
 		}
-
-		// No function call found, treat as completion
 		return nil, nil
 	}, nil
 }
@@ -253,8 +236,10 @@ func sessionToHistory(session *Session, contextWindow int) []*genai.Content {
 		role := msg.Role
 		history = append(history, &genai.Content{
 			Role: role,
-			Parts: []genai.Part{
-				genai.Text(msg.Data),
+			Parts: []*genai.Part{
+				{
+					Text: msg.Data,
+				},
 			},
 		})
 	}
