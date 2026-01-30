@@ -400,6 +400,7 @@ gar trigger \
 - [ ] Make checkpointing optional
 - [ ] gar deploy from container
 - [ ] Fork session when resuming from a checkpoint that isn't the latest
+- [ ] Create a package of local agents (listing files, reading files, grep'ing the directory)
 - [ ] Web UI
 
 ## License
