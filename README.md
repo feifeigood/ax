@@ -12,7 +12,6 @@ GAR, a short for Google Agent Runtime, is a single-writer agent orchestrator sys
 Built-in consistency and resumability features:
 - **Single-Writer Architecture**: Centralized controller ensures consistent state management
 - **Event Log**: Durable session state with automatic recovery
-- **Lifecycle Events**: HEARTBEAT events for monitoring agent health
 
 ## Overview
 
