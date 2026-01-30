@@ -63,13 +63,12 @@ func main() {
 		log.Fatalf("Error registering agent: %v\n", err)
 	}
 
-	fmt.Println("Agent registered successfully")
 	inputs := []*proto.Content{
 		{
 			Role:     "user",
 			Type:     "text",
 			Mimetype: "text/plain",
-			Data:     "Hello, echo agent!",
+			Data:     "Hello, uppercase my message!",
 		},
 	}
 
@@ -96,7 +95,7 @@ func createEchoAgent(id string) (*agent.LocalAgent, error) {
 				Role:     "assistant",
 				Type:     content.Type,
 				Mimetype: content.Mimetype,
-				Data:     fmt.Sprintf("Echo (session %s): %s", sessionID, strings.ToUpper(content.Data)),
+				Data:     strings.ToUpper(content.Data),
 			}
 
 			// Call handler with the response
