@@ -107,19 +107,19 @@ func (e *LoopExecutor) runLoop(ctx context.Context, session *Session, handler ag
 			return nil
 		}
 
-		outputs, err := e.executeTask(ctx, session.ID, task)
-		if err != nil {
+		taskOutputHandler := func(content *proto.Content) error {
+			if _, err := session.WriteContentOut(ctx, content); err != nil {
+				return fmt.Errorf("failed to write output content: %w", err)
+			}
+			if err := handler(content); err != nil {
+				return fmt.Errorf("output handler error: %w", err)
+			}
+			return nil
+		}
+		if err := e.executeTask(ctx, session.ID, task, taskOutputHandler); err != nil {
 			return err
 		}
 
-		for _, output := range outputs {
-			if _, err := session.WriteContentOut(ctx, output); err != nil {
-				return fmt.Errorf("failed to write output content: %w", err)
-			}
-			if err := handler(output); err != nil {
-				return fmt.Errorf("output handler error: %w", err)
-			}
-		}
 		steps++
 	}
 
@@ -128,23 +128,16 @@ func (e *LoopExecutor) runLoop(ctx context.Context, session *Session, handler ag
 }
 
 // executeTask sends input to an agent and collects output.
-func (e *LoopExecutor) executeTask(ctx context.Context, sessionID string, task *Task) ([]*proto.Content, error) {
+func (e *LoopExecutor) executeTask(ctx context.Context, sessionID string, task *Task, handler agent.OutputHandler) error {
 	// Get the agent from registry
 	ag, err := e.registry.Get(task.AgentID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get agent: %w", err)
-	}
-
-	var outputs []*proto.Content
-	outputHandler := func(content *proto.Content) error {
-		outputs = append(outputs, content)
-		return nil
+		return fmt.Errorf("failed to get agent: %w", err)
 	}
 
 	// Process inputs with the agent
-	if err := ag.Process(ctx, sessionID, task.Inputs, outputHandler); err != nil {
-		return nil, fmt.Errorf("agent process failed: %w", err)
+	if err := ag.Process(ctx, sessionID, task.Inputs, handler); err != nil {
+		return fmt.Errorf("agent process failed: %w", err)
 	}
-
-	return outputs, nil
+	return nil
 }
