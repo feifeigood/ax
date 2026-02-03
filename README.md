@@ -386,6 +386,7 @@ gar trigger \
 ## Future Enhancements
 
 - [ ] Replace Content with Interactions Content
+- [ ] Rehydrate dangling agent invocations by appending agent events to the event log
 - [ ] Observability and trajectory collection
 - [ ] TLS support for remote agents
 - [ ] gar deploy from container
