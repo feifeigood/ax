@@ -30,8 +30,13 @@ type Config struct {
 	EventLog            EventLogConfig      `yaml:"eventlog"`
 	MaxSteps            int                 `yaml:"max_steps"`             // Maximum steps per trigger
 	HealthCheckInterval time.Duration       `yaml:"health_check_interval"` // Health check interval for agents
-	GeminiPlanner       GeminiPlannerConfig `yaml:"gemini_planner,omitempty"`
+	Planner             PlannerConfig       `yaml:"planner,omitempty"`
 	RemoteAgents        []RemoteAgentConfig `yaml:"remote_agents,omitempty"` // List of remote agents to register
+}
+
+// PlannerConfig configures the planner.
+type PlannerConfig struct {
+	Gemini GeminiPlannerConfig `yaml:"gemini"`
 }
 
 // ServerConfig configures the gRPC server.

@@ -27,7 +27,7 @@ import (
 // GeminiPlannerConfig configures the Gemini-based planner.
 type GeminiPlannerConfig struct {
 	APIKey       string        // Google AI API key (for programmatic use only; if empty, uses GEMINI_API_KEY env var - recommended)
-	Model        string        // Model name (default: gemini-2.5-flash)
+	Model        string        // Model name (default: gemini-3-flash-preview)
 	MaxTokens    int32         // Max output tokens (default: 8192)
 	Timeout      time.Duration // Request timeout (default: 60s)
 	SystemPrompt string        // Custom system prompt (optional)
@@ -44,7 +44,7 @@ func NewGeminiPlanFunc(ctx context.Context, registry *Registry, config GeminiPla
 	if config.Model == "" {
 		config.Model = os.Getenv("GAR_GEMINI_MODEL")
 		if config.Model == "" {
-			config.Model = "gemini-2.5-flash"
+			config.Model = "gemini-3-flash-preview"
 		}
 	}
 	if config.APIKey == "" {

@@ -38,13 +38,14 @@ type Controller struct {
 	loopExecutor   *LoopExecutor
 }
 
+// PlannerFactory is a function that creates a PlanFunc given a Registry.
+type PlannerFactory func(ctx context.Context, r *Registry) (PlanFunc, error)
+
 // Config configures the controller.
 type Config struct {
 	EventLogFactory eventlog.EventLogFactory
-	PlanFunc        PlanFunc
-
+	PlannerFactory  PlannerFactory
 	// TODO(jbd): Add CompactionFunc.
-
 	HealthCheckInterval time.Duration
 	MaxSteps            int
 }
@@ -72,12 +73,24 @@ func New(ctx context.Context, config Config) (*Controller, error) {
 	// Initialize agent registry
 	registry := NewRegistry(config.HealthCheckInterval)
 
+	// Determine plan function
+	// If no planner factory is provided, use the default Gemini planner.
+	if config.PlannerFactory == nil {
+		config.PlannerFactory = func(ctx context.Context, r *Registry) (PlanFunc, error) {
+			return NewGeminiPlanFunc(ctx, r, GeminiPlannerConfig{})
+		}
+	}
+	planFunc, err := config.PlannerFactory(ctx, registry)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create planner from factory: %w", err)
+	}
+
 	// Initialize loop executor
 	loopExecutor, err := NewLoopExecutor(ctx, LoopConfig{
 		Registry:       registry,
 		SessionManager: sessionManager,
 		MaxSteps:       config.MaxSteps,
-		PlanFunc:       config.PlanFunc,
+		PlanFunc:       planFunc,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create loop executor: %w", err)

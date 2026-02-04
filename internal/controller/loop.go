@@ -61,15 +61,9 @@ func NewLoopExecutor(ctx context.Context, config LoopConfig) (*LoopExecutor, err
 	if config.MaxSteps == 0 {
 		config.MaxSteps = 10 // Default max steps per trigger
 	}
-
-	// Provide default plan function if not specified
+	// Plan function is required
 	if config.PlanFunc == nil {
-		// Use Gemini planner by default
-		geminiPlanFunc, err := NewGeminiPlanFunc(ctx, config.Registry, GeminiPlannerConfig{})
-		if err != nil {
-			return nil, fmt.Errorf("failed to initialize default Gemini planner: %w (set GEMINI_API_KEY env var or provide custom PlanFunc)", err)
-		}
-		config.PlanFunc = geminiPlanFunc
+		return nil, fmt.Errorf("plan function is required")
 	}
 
 	return &LoopExecutor{

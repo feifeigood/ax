@@ -95,11 +95,25 @@ func newControllerFromConfig(ctx context.Context, cfg *config.Config) (*controll
 		})
 	}
 
+	// Create planner factory
+	plannerFactory := func(ctx context.Context, r *controller.Registry) (controller.PlanFunc, error) {
+
+		// The factory defines which planner to use.
+		// Currently, it uses the Gemini planner.
+		// Gemini config can be customized via environment variables (GEMINI_API_KEY, GAR_GEMINI_MODEL)
+		// TODO(lhuan): allow other planners based on cfg.PlannerType
+		return controller.NewGeminiPlanFunc(ctx, r, controller.GeminiPlannerConfig{
+			Model:        cfg.Planner.Gemini.Model,
+			MaxTokens:    cfg.Planner.Gemini.MaxTokens,
+			Timeout:      cfg.Planner.Gemini.Timeout,
+			SystemPrompt: cfg.Planner.Gemini.SystemPrompt,
+		})
+	}
+
 	// Build controller config
-	// The controller will create a default Gemini planner if PlanFunc is nil
-	// Gemini config can be customized via environment variables (GEMINI_API_KEY, GAR_GEMINI_MODEL)
 	controllerConfig := controller.Config{
 		EventLogFactory:     eventLogFactory,
+		PlannerFactory:      plannerFactory,
 		MaxSteps:            cfg.MaxSteps,
 		HealthCheckInterval: cfg.HealthCheckInterval,
 	}
