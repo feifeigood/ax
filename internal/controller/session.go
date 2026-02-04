@@ -17,6 +17,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"sync"
 
 	"github.com/google/gar/internal/eventlog"
@@ -54,6 +55,9 @@ func NewSessionManager(factory eventlog.EventLogFactory) *SessionManager {
 
 // NewSession creates a new session with the given ID.
 func (sm *SessionManager) NewSession(sessionID string) (*Session, error) {
+	if err := validateSessionID(sessionID); err != nil {
+		return nil, err
+	}
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
@@ -90,6 +94,9 @@ func (sm *SessionManager) LoadSession(ctx context.Context, sessionID string) (*S
 // If checkpointID is empty, loads to the latest state.
 // If checkpointID is provided, loads up to and including that checkpoint UUID.
 func (sm *SessionManager) LoadSessionFromCheckpoint(ctx context.Context, sessionID string, checkpointID string) (*Session, error) {
+	if err := validateSessionID(sessionID); err != nil {
+		return nil, err
+	}
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
@@ -313,4 +320,18 @@ func (s *Session) CheckpointIDs() []string {
 		checkpointIDs = append(checkpointIDs, checkpointID)
 	}
 	return checkpointIDs
+}
+
+var sessionIDRegex = regexp.MustCompile(`^[A-Za-z0-9\-_]+$`)
+
+// validateSessionID checks if the session ID contains allowed characters.
+func validateSessionID(sessionID string) error {
+	if sessionID == "" {
+		return fmt.Errorf("session_id is required")
+	}
+
+	if !sessionIDRegex.MatchString(sessionID) {
+		return fmt.Errorf("invalid session ID %q: must only contain A-Z, a-z, 0-9, -, and _", sessionID)
+	}
+	return nil
 }
