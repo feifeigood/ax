@@ -81,14 +81,28 @@ func NewLoopExecutor(ctx context.Context, config LoopConfig) (*LoopExecutor, err
 }
 
 // Execute starts a new agentic loop execution for the given session.
-func (e *LoopExecutor) Execute(ctx context.Context, session *Session, handler agent.OutputHandler) error {
-	return e.runLoop(ctx, session, handler)
+func (e *LoopExecutor) Execute(ctx context.Context, session *Session, inputs []*proto.Content, handler agent.OutputHandler) error {
+	return e.runLoop(ctx, session, inputs, handler)
 }
 
 // runLoop executes the main agentic loop.
 // It runs up to maxSteps iterations per trigger/resume invocation.
-func (e *LoopExecutor) runLoop(ctx context.Context, session *Session, handler agent.OutputHandler) error {
+func (e *LoopExecutor) runLoop(ctx context.Context, session *Session, inputs []*proto.Content, handler agent.OutputHandler) error {
 	steps := 0
+
+	for _, agentID := range session.WaitingAgents() {
+		buffer := session.WaitingBuffer(agentID)
+		_ = buffer
+		// TODO(jbd): Run the agent with session history and buffer as input.
+		return fmt.Errorf("resuming waiting agents is not yet supported")
+	}
+
+	// Write the new inputs to the event log.
+	for _, content := range inputs {
+		if err := session.WriteContent(ctx, "", content); err != nil {
+			return fmt.Errorf("failed to write input content: %w", err)
+		}
+	}
 
 	for steps < e.maxSteps {
 		// Check context cancellation
@@ -128,27 +142,18 @@ func (e *LoopExecutor) runLoop(ctx context.Context, session *Session, handler ag
 func (e *LoopExecutor) runTask(ctx context.Context, session *Session, task *Task, handler agent.OutputHandler) error {
 	// TODO(jbd): Log task start and task end to allow resuming dangling tasks.
 	taskOutputHandler := func(content *proto.Content) error {
-		if _, err := session.WriteContentOut(ctx, task.AgentID, content); err != nil {
+		if err := session.WriteContent(ctx, task.AgentID, content); err != nil {
 			return fmt.Errorf("failed to write output content: %w", err)
 		}
-		if err := handler(content); err != nil {
-			return fmt.Errorf("output handler error: %w", err)
-		}
-		return nil
+		return handler(content)
 	}
-	return e.executeTask(ctx, session.ID(), task, taskOutputHandler)
-}
 
-// executeTask sends input to an agent and collects output.
-func (e *LoopExecutor) executeTask(ctx context.Context, sessionID string, task *Task, handler agent.OutputHandler) error {
-	// Get the agent from registry
 	ag, err := e.registry.Get(task.AgentID)
 	if err != nil {
 		return fmt.Errorf("failed to get agent: %w", err)
 	}
 
-	// Process inputs with the agent
-	if err := ag.Process(ctx, sessionID, task.Inputs, handler); err != nil {
+	if err := ag.Process(ctx, session.ID(), task.Inputs, taskOutputHandler); err != nil {
 		return fmt.Errorf("agent process failed: %w", err)
 	}
 	return nil

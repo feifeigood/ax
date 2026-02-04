@@ -17,15 +17,13 @@ package eventlog
 import (
 	"bufio"
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
-	"time"
 
 	"github.com/google/gar/proto"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 // FileEventLog represents a file-based event log for a single session.
@@ -36,7 +34,6 @@ type FileEventLog struct {
 	filePath  string
 	file      *os.File
 	writer    *bufio.Writer
-	sequence  int64 // Monotonic sequence counter
 }
 
 // FileConfig configures a FileEventLog instance.
@@ -68,32 +65,11 @@ func NewFileEventLog(config FileConfig) (*FileEventLog, error) {
 		return nil, fmt.Errorf("failed to open event log file: %w", err)
 	}
 
-	// Read existing entries to determine the current sequence number
-	var sequence int64
-	if fileInfo, err := os.Stat(filePath); err == nil && fileInfo.Size() > 0 {
-		readFile, err := os.Open(filePath)
-		if err != nil {
-			file.Close()
-			return nil, fmt.Errorf("failed to read existing log for sequence: %w", err)
-		}
-		scanner := bufio.NewScanner(readFile)
-		for scanner.Scan() {
-			var entry Entry
-			if err := json.Unmarshal(scanner.Bytes(), &entry); err == nil {
-				if entry.Sequence > sequence {
-					sequence = entry.Sequence
-				}
-			}
-		}
-		readFile.Close()
-	}
-
 	return &FileEventLog{
 		sessionID: config.SessionID,
 		filePath:  filePath,
 		file:      file,
 		writer:    bufio.NewWriter(file),
-		sequence:  sequence,
 	}, nil
 }
 
@@ -104,25 +80,11 @@ func NewFileConfig(config FileConfig) (EventLog, error) {
 	return NewFileEventLog(config)
 }
 
-// append writes an entry to the event log.
-// Entries are written in JSON Lines format with atomic appends.
-func (e *FileEventLog) append(checkpointID string, agentID string, entryType EventType, data map[string]any) error {
+func (e *FileEventLog) AppendEvent(ctx context.Context, event *proto.Event) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	entry := Entry{
-		Timestamp:    time.Now(),
-		Sequence:     e.sequence,
-		Type:         entryType,
-		CheckpointID: checkpointID,
-		AgentID:      agentID,
-		Data:         data,
-	}
-
-	// Increment sequence for next entry
-	e.sequence++
-
-	jsonData, err := json.Marshal(entry)
+	jsonData, err := protojson.Marshal(event)
 	if err != nil {
 		return fmt.Errorf("failed to marshal entry: %w", err)
 	}
@@ -143,23 +105,51 @@ func (e *FileEventLog) append(checkpointID string, agentID string, entryType Eve
 	return nil
 }
 
-// AppendContent writes a content message to the event log with a checkpoint UUID.
-func (e *FileEventLog) AppendContent(ctx context.Context, checkpointID string, agentID string, content *proto.Content) error {
-	data := map[string]any{
-		"role":     content.Role,
-		"type":     content.Type,
-		"mimetype": content.Mimetype,
-		"data":     content.Data,
-	}
-	return e.append(checkpointID, agentID, EventTypeContent, data)
-}
+func (e *FileEventLog) LoadEvents(ctx context.Context, checkpointID string) ([]*proto.Event, proto.State, error) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
 
-func (e *FileEventLog) AppendState(ctx context.Context, state proto.State) error {
-	switch state {
-	case proto.State_STATE_FAILED:
-		return e.append("", "", EventTypeSessionFailed, nil)
+	var state proto.State
+	if err := e.writer.Flush(); err != nil {
+		return nil, 0, fmt.Errorf("failed to flush before reading: %w", err)
 	}
-	return errors.New("only COMPLETED and FAILED states are supported")
+
+	f, err := os.Open(e.filePath)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to open event log file for reading: %w", err)
+	}
+	defer f.Close()
+
+	var events []*proto.Event
+	scanner := bufio.NewScanner(f)
+	checkpointFound := false
+
+	for scanner.Scan() {
+		line := scanner.Bytes()
+
+		var e proto.Event
+		if err := protojson.Unmarshal(line, &e); err != nil {
+			return nil, 0, fmt.Errorf("failed to unmarshal event: %w", err)
+		}
+
+		switch x := e.Kind.(type) {
+		case *proto.Event_SessionStateEvent:
+			state = x.SessionStateEvent.State
+		}
+		events = append(events, &e)
+		if checkpointID != "" && e.CheckpointId == checkpointID {
+			checkpointFound = true
+			break
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, 0, fmt.Errorf("error reading event log file: %w", err)
+	}
+	if checkpointID != "" && !checkpointFound {
+		return nil, 0, fmt.Errorf("checkpoint ID %s not found in event log", checkpointID)
+	}
+
+	return events, state, nil
 }
 
 // Close closes the event log file.
@@ -185,73 +175,4 @@ func (e *FileEventLog) FilePath() string {
 // SessionID returns the session ID for this event log.
 func (e *FileEventLog) SessionID() string {
 	return e.sessionID
-}
-
-// Load reads and returns all entries from the event log file.
-// If checkpointID is provided, returns entries up to and including that checkpoint.
-// Returns entries in order.
-func (e *FileEventLog) Load(ctx context.Context, checkpointID string) ([]Entry, proto.State, error) {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-
-	var state proto.State
-
-	// Flush any pending writes first
-	if err := e.writer.Flush(); err != nil {
-		return nil, 0, fmt.Errorf("failed to flush before reading: %w", err)
-	}
-
-	// Check if file exists
-	if _, err := os.Stat(e.filePath); os.IsNotExist(err) {
-		return nil, 0, fmt.Errorf("event log file does not exist")
-	}
-
-	// Open file for reading
-	readFile, err := os.Open(e.filePath)
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to open event log file for reading: %w", err)
-	}
-	defer readFile.Close()
-
-	var entries []Entry
-	scanner := bufio.NewScanner(readFile)
-
-	lineNum := 0
-	var expectedSequence int64 = 0
-	checkpointFound := false
-
-	for scanner.Scan() {
-		lineNum++
-		line := scanner.Bytes()
-
-		var entry Entry
-		if err := json.Unmarshal(line, &entry); err != nil {
-			return nil, 0, fmt.Errorf("failed to unmarshal entry at line %d: %w", lineNum, err)
-		}
-
-		// Validate sequence number
-		if entry.Sequence != expectedSequence {
-			return nil, 0, fmt.Errorf("sequence number mismatch at line %d: expected %d, got %d", lineNum, expectedSequence, entry.Sequence)
-		}
-
-		expectedSequence++
-		entries = append(entries, entry)
-
-		// Check if this entry matches the target checkpoint
-		if checkpointID != "" && entry.CheckpointID == checkpointID {
-			checkpointFound = true
-			break
-		}
-	}
-
-	if err := scanner.Err(); err != nil {
-		return nil, 0, fmt.Errorf("error reading event log file: %w", err)
-	}
-
-	// Validate checkpoint was found if specified
-	if checkpointID != "" && !checkpointFound {
-		return nil, 0, fmt.Errorf("checkpoint ID %s not found in event log", checkpointID)
-	}
-
-	return entries, state, nil
 }

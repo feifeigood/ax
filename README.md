@@ -219,17 +219,7 @@ gar trigger --session session123 \
 
 ### Event Log Format
 
-Event logs use JSON Lines format (one JSON object per line). Each entry includes the session ID, a monotonic sequence number, and checkpoint ID (for content events) for traceability:
-
-```json
-{"type": "CONTENT", "timestamp": "2026-01-02T10:30:00Z", "seq": 0, "checkpoint_id": "550e8400-e29b-41d4-a716-446655440000", "data": {...}}
-{"type": "CONTENT", "timestamp": "2026-01-02T10:30:01Z", "seq": 1,"checkpoint_id": "6ba7b810-9dad-11d1-80b4-00c04fd430c8", "data": {...}}
-{"type": "SESSION_FAILED", "timestamp": "2026-01-02T10:30:02Z", "seq": 2, "data": {...}}
-```
-
-**Event Types:**
-- `CONTENT`: Incoming or outgoing content from user or agent (optionally includes `checkpoint_id`).
-- `SESSION_FAILED`: Session state has failed and session is not resumable.
+Event logs use the `Event` message available in the protobuf.
 
 ## Building Custom Agents
 

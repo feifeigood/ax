@@ -128,14 +128,7 @@ func (d *Controller) TriggerSession(ctx context.Context, sessionID string, input
 		return fmt.Errorf("session has failed and cannot continue")
 	}
 
-	// Write input content to session
-	for _, content := range inputs {
-		if _, err := sess.WriteContentIn(ctx, "", content); err != nil {
-			return fmt.Errorf("failed to write input content: %w", err)
-		}
-	}
-
-	if err := d.loopExecutor.Execute(ctx, sess, handler); err != nil {
+	if err := d.loopExecutor.Execute(ctx, sess, inputs, handler); err != nil {
 		return fmt.Errorf("loop execution failed: %w", err)
 	}
 	return nil

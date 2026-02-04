@@ -18,11 +18,10 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/google/gar/internal/eventlog"
 	"github.com/google/gar/proto"
-	"github.com/google/uuid"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // Session represents an agentic loop execution session.
@@ -32,14 +31,10 @@ type Session struct {
 
 	mu             sync.RWMutex
 	eventLog       eventlog.EventLog
-	currentStep    int
 	state          proto.State
-	activeAgents   []string
 	messageHistory []*proto.Content
-	checkpointIDs  []string // Ordered list of checkpoint UUIDs
-
-	createdAt time.Time
-	updatedAt time.Time
+	waitingAgents  map[string][]*proto.Content // by agent ID
+	checkpointIDs  map[string]struct{}         // checkpoint UUIDs
 }
 
 // SessionManager manages multiple sessions.
@@ -73,16 +68,12 @@ func (sm *SessionManager) NewSession(sessionID string) (*Session, error) {
 		return nil, fmt.Errorf("failed to create event log: %w", err)
 	}
 
-	now := time.Now()
 	session := &Session{
 		id:             sessionID,
 		state:          proto.State_STATE_UNSPECIFIED,
-		currentStep:    0,
-		activeAgents:   []string{},
 		messageHistory: []*proto.Content{},
-		checkpointIDs:  []string{},
-		createdAt:      now,
-		updatedAt:      now,
+		waitingAgents:  make(map[string][]*proto.Content),
+		checkpointIDs:  make(map[string]struct{}),
 		eventLog:       el,
 	}
 
@@ -106,13 +97,12 @@ func (sm *SessionManager) LoadSessionFromCheckpoint(ctx context.Context, session
 	delete(sm.sessions, sessionID)
 
 	// Open event log for replay using the factory
-	replayLog, err := sm.eventLogFactory(sessionID)
+	el, err := sm.eventLogFactory(sessionID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open event log for replay: %w", err)
 	}
-	defer replayLog.Close()
 
-	entries, state, err := replayLog.Load(ctx, checkpointID)
+	events, state, err := el.LoadEvents(ctx, checkpointID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get event log entries: %w", err)
 	}
@@ -121,41 +111,49 @@ func (sm *SessionManager) LoadSessionFromCheckpoint(ctx context.Context, session
 	session := &Session{
 		id:             sessionID,
 		state:          state,
-		currentStep:    0,
-		activeAgents:   []string{},
+		eventLog:       el,
+		waitingAgents:  make(map[string][]*proto.Content),
 		messageHistory: []*proto.Content{},
-		checkpointIDs:  []string{},
-		createdAt:      time.Now(),
-		updatedAt:      time.Now(),
+		checkpointIDs:  make(map[string]struct{}),
 	}
 
 	// Replay entries to rebuild state
-	for _, entry := range entries {
-		switch entry.Type {
-		case eventlog.EventTypeContent:
-			content := &proto.Content{
-				Role:     getStringFromData(entry.Data, "role"),
-				Type:     getStringFromData(entry.Data, "type"),
-				Mimetype: getStringFromData(entry.Data, "mimetype"),
-				Data:     getStringFromData(entry.Data, "data"),
-			}
-			session.messageHistory = append(session.messageHistory, content)
+	for _, e := range events {
+		switch x := e.Kind.(type) {
+		case *proto.Event_AgentCallEvent:
+			event := x.AgentCallEvent
+			if event.AwaitingMore {
+				session.waitingAgents[event.Sender] = append(
+					session.waitingAgents[event.Sender], event.Contents...)
+			} else {
+				// If buffer already exists, append it to the history first.
+				// Then merge the new contents to the message history.
+				// Once we don't wait for new contents from an agent,
+				// we don't care about the origin of the contents anymore.
+				if len(session.waitingAgents[event.Sender]) > 0 {
+					session.messageHistory = append(
+						session.messageHistory, session.waitingAgents[event.Sender]...)
+				}
+				session.messageHistory = append(
+					session.messageHistory, event.Contents...)
 
-			// Track checkpoint ID if present
-			if entry.CheckpointID != "" {
-				session.checkpointIDs = append(session.checkpointIDs, entry.CheckpointID)
+				// Cleanup the waiting buffer, it's now a part of the overall history.
+				delete(session.waitingAgents, event.Sender)
 			}
+		case *proto.Event_SessionStateEvent:
+			session.state = x.SessionStateEvent.State
+		case *proto.Event_HandoffEvent:
+			return nil, fmt.Errorf("HandoffEvent is not yet supported")
+		case *proto.Event_ContentEvent:
+			session.messageHistory = append(session.messageHistory, x.ContentEvent.Contents...)
+		default:
+			return nil, fmt.Errorf("unknown event kind: %v", e.Kind)
 		}
 
-		session.updatedAt = entry.Timestamp
+		if e.CheckpointId != "" {
+			session.checkpointIDs[e.CheckpointId] = struct{}{}
+		}
 	}
-
-	// Reopen event log for appending using the factory
-	el, err := sm.eventLogFactory(sessionID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to reopen event log: %w", err)
-	}
-	session.eventLog = el
 
 	sm.sessions[sessionID] = session
 	return session, nil
@@ -206,9 +204,9 @@ func (sm *SessionManager) CloseAll() {
 	}
 }
 
-// WriteContentIn appends an incoming content message to the session.
+// WriteContent appends an incoming content message to the session.
 // Creates a checkpoint only if checkpoint_id is provided in the content.
-func (s *Session) WriteContentIn(ctx context.Context, agentID string, content *proto.Content) (string, error) {
+func (s *Session) WriteContent(ctx context.Context, sender string, content *proto.Content) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -216,42 +214,33 @@ func (s *Session) WriteContentIn(ctx context.Context, agentID string, content *p
 	checkpointID := content.CheckpointId
 
 	if checkpointID != "" {
-		// TODO(jbd): Optimize the lookup.
-		for _, existingID := range s.checkpointIDs {
-			if existingID == checkpointID {
-				return "", fmt.Errorf("checkpoint %s already exists", checkpointID)
-			}
+		if _, ok := s.checkpointIDs[checkpointID]; ok {
+			return fmt.Errorf("checkpoint %s already exists", checkpointID)
 		}
 	}
 
-	if err := s.eventLog.AppendContent(ctx, checkpointID, agentID, content); err != nil {
-		return "", err
+	if err := s.eventLog.AppendEvent(ctx, &proto.Event{
+		SessionId:           s.id,
+		CheckpointId:        checkpointID,
+		SenderId:            sender,
+		Timestamp:           timestamppb.Now(),
+		ControllerTimestamp: timestamppb.Now(),
+		Kind: &proto.Event_ContentEvent{
+			ContentEvent: &proto.ContentEvent{
+				Contents: []*proto.Content{
+					content,
+				},
+			},
+		},
+	}); err != nil {
+		return err
 	}
 
 	s.messageHistory = append(s.messageHistory, content)
 	if checkpointID != "" {
-		s.checkpointIDs = append(s.checkpointIDs, checkpointID)
+		s.checkpointIDs[checkpointID] = struct{}{}
 	}
-	s.updatedAt = time.Now()
-	return checkpointID, nil
-}
-
-// WriteContentOut appends an outgoing content message to the session with a new checkpoint.
-func (s *Session) WriteContentOut(ctx context.Context, agentID string, content *proto.Content) (string, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	// Generate a new checkpoint UUID
-	checkpointID := uuid.New().String()
-
-	if err := s.eventLog.AppendContent(ctx, checkpointID, agentID, content); err != nil {
-		return "", err
-	}
-
-	s.messageHistory = append(s.messageHistory, content)
-	s.checkpointIDs = append(s.checkpointIDs, checkpointID)
-	s.updatedAt = time.Now()
-	return checkpointID, nil
+	return nil
 }
 
 // SetState updates the session state.
@@ -259,13 +248,39 @@ func (s *Session) SetState(ctx context.Context, state proto.State) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if err := s.eventLog.AppendState(ctx, state); err != nil {
-		return fmt.Errorf("failed to append state: %w", err)
+	if err := s.eventLog.AppendEvent(ctx, &proto.Event{
+		SessionId:           s.id,
+		Timestamp:           timestamppb.Now(),
+		ControllerTimestamp: timestamppb.Now(),
+		Kind: &proto.Event_SessionStateEvent{
+			SessionStateEvent: &proto.SessionStateEvent{
+				State: state,
+			},
+		},
+	}); err != nil {
+		return err
 	}
 
 	s.state = state
-	s.updatedAt = time.Now()
 	return nil
+}
+
+func (s *Session) WaitingAgents() []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var agents []string
+	for agentID := range s.waitingAgents {
+		agents = append(agents, agentID)
+	}
+	return agents
+}
+
+func (s *Session) WaitingBuffer(agentID string) []*proto.Content {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return s.waitingAgents[agentID]
 }
 
 func (s *Session) ID() string {
@@ -279,13 +294,6 @@ func (s *Session) State() proto.State {
 	return s.state
 }
 
-func (s *Session) ActiveAgents() []string {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	return s.activeAgents
-}
-
 func (s *Session) History() []*proto.Content {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -297,29 +305,12 @@ func (s *Session) CheckpointIDs() []string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	return s.checkpointIDs
-}
+	// TODO(jbd): Not ordered, but is still useful
+	// for introspection capabilities.
 
-func (s *Session) CreatedAt() time.Time {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	return s.createdAt
-}
-
-func (s *Session) UpdatedAt() time.Time {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	return s.updatedAt
-}
-
-// Helper function to extract string from map[string]any
-func getStringFromData(data map[string]any, key string) string {
-	if val, ok := data[key]; ok {
-		if str, ok := val.(string); ok {
-			return str
-		}
+	var checkpointIDs []string
+	for checkpointID := range s.checkpointIDs {
+		checkpointIDs = append(checkpointIDs, checkpointID)
 	}
-	return ""
+	return checkpointIDs
 }

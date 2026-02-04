@@ -18,43 +18,19 @@ package eventlog
 
 import (
 	"context"
-	"time"
 
 	"github.com/google/gar/proto"
 )
 
-// EventType represents the type of event stored in the event log.
-type EventType string
-
-const (
-	EventTypeContent       EventType = "CONTENT"
-	EventTypeSessionFailed EventType = "SESSION_FAILED" // cannot resume
-	// TODO(jbd): Add EventTypeCompaction.
-	// TODO(jbd): Events for agent call lifecycle.
-)
-
-// Entry represents a single entry in the event log.
-type Entry struct {
-	Type         EventType      `json:"type"`
-	CheckpointID string         `json:"checkpoint_id,omitempty"` // UUID for checkpoint tracking
-	AgentID      string         `json:"agent_id,omitempty"`      // Associated agent ID, could be empty
-	Sequence     int64          `json:"seq"`                     // Monotonic sequence number
-	Timestamp    time.Time      `json:"timestamp"`
-	Data         map[string]any `json:"data"`
-}
-
 // EventLog is the interface that all event log implementations must satisfy.
 // It provides methods for appending events, reading entries, and managing the log lifecycle.
 type EventLog interface {
-	// AppendContent appends a content message to the event log with a checkpoint UUID.
-	AppendContent(ctx context.Context, checkpointID string, agentID string, content *proto.Content) error
+	// AppendEvent appends an event to the log.
+	AppendEvent(ctx context.Context, e *proto.Event) error
 
-	// AppendState appends a state to the event log.
-	AppendState(ctx context.Context, s proto.State) error
-
-	// Load returns all entries from the event log in order.
-	// If checkpointID is provided, returns entries up to and including that checkpoint.
-	Load(ctx context.Context, checkpointID string) ([]Entry, proto.State, error)
+	// LoadEvents loads all events up to the checkpoint.
+	// If no checkpoint is provided, it returns all events recorded.
+	LoadEvents(ctx context.Context, checkpointID string) ([]*proto.Event, proto.State, error)
 
 	// Close closes the event log and releases any resources.
 	Close() error

@@ -31,6 +31,55 @@ message Content {
   // TODO: Replace Content with Interactions Content.
 }
 
+message SessionStateEvent {
+  State state = 1;
+}
+
+message AgentCallEvent {
+  reserved 1, 2;
+
+  string sender = 3;
+
+  repeated Content contents = 4;
+
+  // Whether the caller is awaiting additional AgentCallEvents.
+  bool awaiting_more = 5;
+
+  // TODO(jbd): Support pauses and async calls.
+}
+
+message HandoffEvent {
+  reserved 1, 2;
+
+  string source_agent_id = 3;
+
+  string target_agent_id = 4;
+
+  repeated Content contents = 5;
+}
+
+message ContentEvent {
+  repeated Content contents = 1;
+}
+
+message Event {
+  string session_id = 1;
+  string checkpoint_id = 2;
+
+  string sender_name = 3;
+  string sender_id = 4;
+
+  google.protobuf.Timestamp timestamp = 5;
+  google.protobuf.Timestamp controller_timestamp = 6;
+
+  oneof kind {
+    SessionStateEvent session_state_event = 7;
+    AgentCallEvent agent_call_event = 8;
+    HandoffEvent handoff_event = 9;
+    ContentEvent content_event = 10;
+  }
+}
+
 // HealthCheckRequest for agent health checks
 message HealthCheckRequest {}
 

@@ -26,6 +26,8 @@ import (
 // It is called for each piece of content the agent generates.
 type OutputHandler func(content *proto.Content) error
 
+// TODO(jbd): Allow OutputHandler to provide an awaitingMore as a boolean.
+
 // Agent defines the common interface for both local and remote agents.
 // Agents process content using callback handlers.
 type Agent interface {

@@ -22,7 +22,6 @@ import (
 	"net"
 
 	"google.golang.org/grpc"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/google/gar/agent"
 	"github.com/google/gar/internal/config"
@@ -92,9 +91,6 @@ func (s *Server) GetSession(ctx context.Context, req *proto.GetSessionRequest) (
 	return &proto.GetSessionResponse{
 		Session: &proto.SessionInfo{
 			State:         session.State(),
-			ActiveAgents:  session.ActiveAgents(),
-			CreatedAt:     timestamppb.New(session.CreatedAt()),
-			UpdatedAt:     timestamppb.New(session.UpdatedAt()),
 			CheckpointIds: session.CheckpointIDs(),
 		},
 	}, nil
