@@ -55,6 +55,27 @@ make test
 make run-local
 ```
 
+### Install the gar CLI
+
+```bash
+make install
+```
+
+Ensure that $GOPATH/bin is in your $PATH.
+
+```bash
+export PATH="$PATH:$(go env GOPATH)/bin"
+```
+
+If you have the `GOBIN` environment variable set, it will be installed there instead.
+Make sure the installation directory is in your `$PATH`.
+
+To add the default location to your `PATH` for the current session, run:
+
+```bash
+export PATH="$PATH:$(go env GOPATH)/bin"
+```
+
 ### Creating a pull request
 
 First, clone the repo:
