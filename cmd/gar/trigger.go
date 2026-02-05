@@ -114,8 +114,10 @@ func runTrigger(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("error receiving response: %w", err)
 		}
 
-		if resp.Output != nil {
-			fmt.Printf("[%s] %s\n", resp.State, resp.Output.Data)
+		if resp.Outputs != nil {
+			for _, output := range resp.Outputs {
+				fmt.Printf("[%s] %s\n", resp.State, output.Data)
+			}
 		}
 	}
 	return nil

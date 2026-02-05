@@ -83,30 +83,34 @@ func main() {
 	}
 	log.Printf("Session ID: %s\n", sessionID)
 
-	handler := agent.OutputHandler(func(content *proto.Content) error {
-		fmt.Printf("Output received: %s\n", content.Data)
+	handler := agent.OutputHandler(func(outgoing *proto.ProcessResponse) error {
+		for _, c := range outgoing.Contents {
+			fmt.Printf("Output received: %s\n", c.Data)
+		}
 		return nil
 	})
-	if err := c.TriggerSession(ctx, sessionID, inputs, handler); err != nil {
+	if err := c.TriggerSession(ctx, sessionID, &proto.ProcessRequest{
+		Contents: inputs,
+	}, handler); err != nil {
 		log.Fatalf("Error triggering session: %v\n", err)
 	}
 }
 
 // createEchoAgent creates a simple echo agent that repeats input with a prefix.
 func createEchoAgent() (*agent.LocalAgent, error) {
-	processFunc := func(ctx context.Context, sessionID string, inputs []*proto.Content, handler agent.OutputHandler) error {
+	processFunc := func(ctx context.Context, sessionID string, incoming *proto.ProcessRequest, handler agent.OutputHandler) error {
 		// Process each input and call handler with response
-		for _, content := range inputs {
-			// Echo the content back with a prefix
-			response := &proto.Content{
-				Role:     "assistant",
-				Type:     content.Type,
-				Mimetype: content.Mimetype,
-				Data:     strings.ToUpper(content.Data),
-			}
-
-			// Call handler with the response
-			if err := handler(response); err != nil {
+		for _, content := range incoming.Contents {
+			if err := handler(&proto.ProcessResponse{
+				Contents: []*proto.Content{
+					{
+						Role:     "assistant",
+						Type:     content.Type,
+						Mimetype: content.Mimetype,
+						Data:     strings.ToUpper(content.Data),
+					},
+				},
+			}); err != nil {
 				return err
 			}
 

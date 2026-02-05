@@ -20,13 +20,25 @@ import "google/protobuf/timestamp.proto";
 
 option go_package = "github.com/google/gar/proto";
 
+message ProcessRequest {
+  string checkpoint_id = 1;
+
+  repeated Content contents = 2;
+}
+
+message ProcessResponse {
+  string checkpoint_id = 1;
+
+  repeated Content contents = 2;
+}
+
+
 // Content represents a message with role, type, mimetype, and data fields
 message Content {
-  string checkpoint_id = 1; // Optional: Checkpoint ID for this content
-  string role = 2;          // The role of the content (e.g., "user", "assistant", "system")
-  string type = 3;          // The type of content (e.g., "text", "image")
-  string mimetype = 4;      // MIME type of the data (e.g., "text/plain", "image/png")
-  string data = 5;          // The actual content data
+  string role = 1;          // The role of the content (e.g., "user", "assistant", "system")
+  string type = 2;          // The type of content (e.g., "text", "image")
+  string mimetype = 3;      // MIME type of the data (e.g., "text/plain", "image/png")
+  string data = 4;          // The actual content data
 
   // TODO: Replace Content with Interactions Content.
 }
@@ -92,7 +104,7 @@ message HealthCheckResponse {
 // AgentService defines the gRPC service for agent communication
 service AgentService {
   // Process handles bidirectional streaming of content between controller and agent
-  rpc Process(stream Content) returns (stream Content);
+  rpc Process(stream ProcessRequest) returns (stream ProcessResponse);
 
   // HealthCheck checks if the agent is healthy and responsive
   rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
@@ -118,9 +130,10 @@ message TriggerSessionRequest {
 
 // TriggerSessionResponse contains the result of triggering a session
 message TriggerSessionResponse {
-  string session_id = 1;  // Session ID (in case it was generated or modified by server)
-  State state = 2;        // Session state
-  Content output = 3;     // Output content
+  string session_id = 1;          // Session ID (in case it was generated or modified by server)
+  string checkpoint_id = 2;       // Current checkpoint ID
+  repeated Content outputs = 3;   // Output content
+  State state = 4;                // Session state
 }
 
 // GetSessionRequest for retrieving session details

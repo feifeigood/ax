@@ -75,13 +75,13 @@ func NewLoopExecutor(ctx context.Context, config LoopConfig) (*LoopExecutor, err
 }
 
 // Execute starts a new agentic loop execution for the given session.
-func (e *LoopExecutor) Execute(ctx context.Context, session *Session, inputs []*proto.Content, handler agent.OutputHandler) error {
-	return e.runLoop(ctx, session, inputs, handler)
+func (e *LoopExecutor) Execute(ctx context.Context, session *Session, incoming *proto.ProcessRequest, handler agent.OutputHandler) error {
+	return e.runLoop(ctx, session, incoming, handler)
 }
 
 // runLoop executes the main agentic loop.
 // It runs up to maxSteps iterations per trigger/resume invocation.
-func (e *LoopExecutor) runLoop(ctx context.Context, session *Session, inputs []*proto.Content, handler agent.OutputHandler) error {
+func (e *LoopExecutor) runLoop(ctx context.Context, session *Session, incoming *proto.ProcessRequest, handler agent.OutputHandler) error {
 	steps := 0
 
 	for _, agentID := range session.WaitingAgents() {
@@ -92,10 +92,8 @@ func (e *LoopExecutor) runLoop(ctx context.Context, session *Session, inputs []*
 	}
 
 	// Write the new inputs to the event log.
-	for _, content := range inputs {
-		if err := session.WriteContent(ctx, "", content); err != nil {
-			return fmt.Errorf("failed to write input content: %w", err)
-		}
+	if err := session.WriteContent(ctx, "", incoming.CheckpointId, incoming.Contents); err != nil {
+		return fmt.Errorf("failed to write input content: %w", err)
 	}
 
 	for steps < e.maxSteps {
@@ -135,11 +133,11 @@ func (e *LoopExecutor) runLoop(ctx context.Context, session *Session, inputs []*
 
 func (e *LoopExecutor) runTask(ctx context.Context, session *Session, task *Task, handler agent.OutputHandler) error {
 	// TODO(jbd): Log task start and task end to allow resuming dangling tasks.
-	taskOutputHandler := func(content *proto.Content) error {
-		if err := session.WriteContent(ctx, task.AgentID, content); err != nil {
+	taskOutputHandler := func(outgoing *proto.ProcessResponse) error {
+		if err := session.WriteContent(ctx, task.AgentID, outgoing.CheckpointId, outgoing.Contents); err != nil {
 			return fmt.Errorf("failed to write output content: %w", err)
 		}
-		return handler(content)
+		return handler(outgoing)
 	}
 
 	ag, err := e.registry.Get(task.AgentID)
@@ -147,7 +145,9 @@ func (e *LoopExecutor) runTask(ctx context.Context, session *Session, task *Task
 		return fmt.Errorf("failed to get agent: %w", err)
 	}
 
-	if err := ag.Process(ctx, session.ID(), task.Inputs, taskOutputHandler); err != nil {
+	if err := ag.Process(ctx, session.ID(), &proto.ProcessRequest{
+		Contents: task.Inputs,
+	}, taskOutputHandler); err != nil {
 		return fmt.Errorf("agent process failed: %w", err)
 	}
 	return nil

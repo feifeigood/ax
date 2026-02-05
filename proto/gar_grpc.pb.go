@@ -44,7 +44,7 @@ const (
 // AgentService defines the gRPC service for agent communication
 type AgentServiceClient interface {
 	// Process handles bidirectional streaming of content between controller and agent
-	Process(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[Content, Content], error)
+	Process(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ProcessRequest, ProcessResponse], error)
 	// HealthCheck checks if the agent is healthy and responsive
 	HealthCheck(ctx context.Context, in *HealthCheckRequest, opts ...grpc.CallOption) (*HealthCheckResponse, error)
 }
@@ -57,18 +57,18 @@ func NewAgentServiceClient(cc grpc.ClientConnInterface) AgentServiceClient {
 	return &agentServiceClient{cc}
 }
 
-func (c *agentServiceClient) Process(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[Content, Content], error) {
+func (c *agentServiceClient) Process(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ProcessRequest, ProcessResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	stream, err := c.cc.NewStream(ctx, &AgentService_ServiceDesc.Streams[0], AgentService_Process_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &grpc.GenericClientStream[Content, Content]{ClientStream: stream}
+	x := &grpc.GenericClientStream[ProcessRequest, ProcessResponse]{ClientStream: stream}
 	return x, nil
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type AgentService_ProcessClient = grpc.BidiStreamingClient[Content, Content]
+type AgentService_ProcessClient = grpc.BidiStreamingClient[ProcessRequest, ProcessResponse]
 
 func (c *agentServiceClient) HealthCheck(ctx context.Context, in *HealthCheckRequest, opts ...grpc.CallOption) (*HealthCheckResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
@@ -87,7 +87,7 @@ func (c *agentServiceClient) HealthCheck(ctx context.Context, in *HealthCheckReq
 // AgentService defines the gRPC service for agent communication
 type AgentServiceServer interface {
 	// Process handles bidirectional streaming of content between controller and agent
-	Process(grpc.BidiStreamingServer[Content, Content]) error
+	Process(grpc.BidiStreamingServer[ProcessRequest, ProcessResponse]) error
 	// HealthCheck checks if the agent is healthy and responsive
 	HealthCheck(context.Context, *HealthCheckRequest) (*HealthCheckResponse, error)
 	mustEmbedUnimplementedAgentServiceServer()
@@ -100,7 +100,7 @@ type AgentServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedAgentServiceServer struct{}
 
-func (UnimplementedAgentServiceServer) Process(grpc.BidiStreamingServer[Content, Content]) error {
+func (UnimplementedAgentServiceServer) Process(grpc.BidiStreamingServer[ProcessRequest, ProcessResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method Process not implemented")
 }
 func (UnimplementedAgentServiceServer) HealthCheck(context.Context, *HealthCheckRequest) (*HealthCheckResponse, error) {
@@ -128,11 +128,11 @@ func RegisterAgentServiceServer(s grpc.ServiceRegistrar, srv AgentServiceServer)
 }
 
 func _AgentService_Process_Handler(srv interface{}, stream grpc.ServerStream) error {
-	return srv.(AgentServiceServer).Process(&grpc.GenericServerStream[Content, Content]{ServerStream: stream})
+	return srv.(AgentServiceServer).Process(&grpc.GenericServerStream[ProcessRequest, ProcessResponse]{ServerStream: stream})
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type AgentService_ProcessServer = grpc.BidiStreamingServer[Content, Content]
+type AgentService_ProcessServer = grpc.BidiStreamingServer[ProcessRequest, ProcessResponse]
 
 func _AgentService_HealthCheck_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(HealthCheckRequest)

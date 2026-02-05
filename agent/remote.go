@@ -94,7 +94,7 @@ func (a *RemoteAgent) connect() error {
 }
 
 // Process handles processing of input content with the remote agent.
-func (a *RemoteAgent) Process(ctx context.Context, sessionID string, inputs []*proto.Content, handler OutputHandler) error {
+func (a *RemoteAgent) Process(ctx context.Context, sessionID string, incoming *proto.ProcessRequest, handler OutputHandler) error {
 	// Add session_id to gRPC metadata
 	md := metadata.Pairs("session-id", sessionID)
 	ctx = metadata.NewOutgoingContext(ctx, md)
@@ -105,10 +105,11 @@ func (a *RemoteAgent) Process(ctx context.Context, sessionID string, inputs []*p
 	}
 
 	// Send all inputs to the remote agent
-	for _, content := range inputs {
-		if err := stream.Send(content); err != nil {
-			return fmt.Errorf("failed to send content: %w", err)
-		}
+	if err := stream.Send(&proto.ProcessRequest{
+		CheckpointId: incoming.CheckpointId,
+		Contents:     incoming.Contents,
+	}); err != nil {
+		return fmt.Errorf("failed to send content: %w", err)
 	}
 
 	// Close the send direction to signal we're done sending
@@ -118,7 +119,7 @@ func (a *RemoteAgent) Process(ctx context.Context, sessionID string, inputs []*p
 
 	// Receive outputs and call handler for each
 	for {
-		content, err := stream.Recv()
+		resp, err := stream.Recv()
 		if err == io.EOF {
 			// Stream completed successfully
 			return nil
@@ -128,7 +129,7 @@ func (a *RemoteAgent) Process(ctx context.Context, sessionID string, inputs []*p
 		}
 
 		// Call the handler with the received content
-		if err := handler(content); err != nil {
+		if err := handler(resp); err != nil {
 			return fmt.Errorf("handler error: %w", err)
 		}
 

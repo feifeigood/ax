@@ -39,7 +39,7 @@ type server struct {
 func (s *server) Process(stream proto.AgentService_ProcessServer) error {
 	for {
 		// Receive input content from gar controller
-		content, err := stream.Recv()
+		incoming, err := stream.Recv()
 		if err == io.EOF {
 			return nil
 		}
@@ -47,20 +47,20 @@ func (s *server) Process(stream proto.AgentService_ProcessServer) error {
 			return err
 		}
 
-		// Process the content (simple uppercase echo)
-		response := &proto.Content{
-			Role:     "assistant",
-			Type:     content.Type,
-			Mimetype: content.Mimetype,
-			Data:     fmt.Sprintf("Remote Echo: %s", strings.ToUpper(content.Data)),
+		var contents []*proto.Content
+		for _, input := range incoming.Contents {
+			contents = append(contents, &proto.Content{
+				Role:     "assistant",
+				Type:     input.Type,
+				Mimetype: input.Mimetype,
+				Data:     strings.ToUpper(input.Data),
+			})
 		}
-
-		// Send response back to gar controller
-		if err := stream.Send(response); err != nil {
+		if err := stream.Send(&proto.ProcessResponse{
+			Contents: contents,
+		}); err != nil {
 			return err
 		}
-
-		log.Printf("Sent to controller: %s", response.Data)
 	}
 }
 

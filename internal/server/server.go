@@ -58,18 +58,25 @@ func (s *Server) TriggerSession(req *proto.TriggerSessionRequest, stream grpc.Se
 	}
 
 	// Create output handler to stream outputs back to client
-	outputHandler := agent.OutputHandler(func(content *proto.Content) error {
+	outputHandler := agent.OutputHandler(func(outgoing *proto.ProcessResponse) error {
 		return stream.Send(&proto.TriggerSessionResponse{
-			SessionId: sessionID,
-			State:     proto.State_STATE_RUNNING,
-			Output:    content,
+			SessionId:    sessionID,
+			CheckpointId: outgoing.CheckpointId,
+			Outputs:      outgoing.Contents,
+			State:        proto.State_STATE_RUNNING,
 		})
 	})
 
-	if checkpointID == "" {
-		return s.controller.TriggerSession(stream.Context(), sessionID, inputs, outputHandler)
+	incoming := &proto.ProcessRequest{
+		CheckpointId: req.CheckpointId,
+		Contents:     inputs,
 	}
-	return s.controller.TriggerForkedSession(stream.Context(), sessionID, checkpointID, inputs, outputHandler)
+	if checkpointID == "" {
+		return s.controller.TriggerSession(
+			stream.Context(), sessionID, incoming, outputHandler)
+	}
+	return s.controller.TriggerForkedSession(
+		stream.Context(), sessionID, incoming, outputHandler)
 }
 
 // GetSession retrieves session details.

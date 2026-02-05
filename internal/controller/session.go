@@ -213,12 +213,9 @@ func (sm *SessionManager) CloseAll() {
 
 // WriteContent appends an incoming content message to the session.
 // Creates a checkpoint only if checkpoint_id is provided in the content.
-func (s *Session) WriteContent(ctx context.Context, sender string, content *proto.Content) error {
+func (s *Session) WriteContent(ctx context.Context, sender string, checkpointID string, contents []*proto.Content) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
-	// Use checkpoint_id from content if provided
-	checkpointID := content.CheckpointId
 
 	if checkpointID != "" {
 		if _, ok := s.checkpointIDs[checkpointID]; ok {
@@ -234,16 +231,14 @@ func (s *Session) WriteContent(ctx context.Context, sender string, content *prot
 		ControllerTimestamp: timestamppb.Now(),
 		Kind: &proto.Event_ContentEvent{
 			ContentEvent: &proto.ContentEvent{
-				Contents: []*proto.Content{
-					content,
-				},
+				Contents: contents,
 			},
 		},
 	}); err != nil {
 		return err
 	}
 
-	s.messageHistory = append(s.messageHistory, content)
+	s.messageHistory = append(s.messageHistory, contents...)
 	if checkpointID != "" {
 		s.checkpointIDs[checkpointID] = struct{}{}
 	}

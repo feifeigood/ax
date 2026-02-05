@@ -24,9 +24,7 @@ import (
 
 // OutputHandler is a callback function that handles output content from an agent.
 // It is called for each piece of content the agent generates.
-type OutputHandler func(content *proto.Content) error
-
-// TODO(jbd): Allow OutputHandler to provide an awaitingMore as a boolean.
+type OutputHandler func(outgoing *proto.ProcessResponse) error
 
 // Agent defines the common interface for both local and remote agents.
 // Agents process content using callback handlers.
@@ -34,7 +32,7 @@ type Agent interface {
 	// Process handles processing of input content.
 	// It calls the output handler for each piece of content generated.
 	// The handler may be called multiple times during processing.
-	Process(ctx context.Context, sessionID string, inputs []*proto.Content, handler OutputHandler) error
+	Process(ctx context.Context, sessionID string, incoming *proto.ProcessRequest, handler OutputHandler) error
 
 	// HealthCheck checks if the agent is healthy and responsive.
 	// Returns an error if the agent is unhealthy or unreachable.
