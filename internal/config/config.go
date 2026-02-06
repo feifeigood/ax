@@ -34,9 +34,14 @@ type Config struct {
 	RemoteAgents []RemoteAgentConfig `yaml:"remote_agents,omitempty"` // List of remote agents to register
 }
 
-// PlannerConfig configures the planner.
-type PlannerConfig struct {
-	Gemini GeminiPlannerConfig `yaml:"gemini"`
+// HealthCheckConfig defines the configuration for agent health checks.
+// When enabled, the controller will perform active polling to check the health of registered agents and
+// flip the health status of agents that are not responsive. When disabled, the controller will not perform
+// any health checks and will assume all agents are healthy.
+// TODO(lhuan): Add passive health checks and discovery rules.
+type HealthCheckConfig struct {
+	Enabled  bool          `yaml:"enabled"`  // default: false (no active polling)
+	Interval time.Duration `yaml:"interval"` // default: 30s
 }
 
 // ServerConfig configures the gRPC server.
@@ -49,8 +54,9 @@ type EventLogConfig struct {
 	Dir string `yaml:"dir"` // Directory for event log files
 }
 
-type HealthCheckConfig struct {
-	Interval time.Duration `yaml:"interval"` // Interval between health checks
+// PlannerConfig configures the planner.
+type PlannerConfig struct {
+	Gemini GeminiPlannerConfig `yaml:"gemini"`
 }
 
 // GeminiPlannerConfig configures the Gemini-based planner.
@@ -116,8 +122,8 @@ func (c *Config) setDefaults() {
 	if c.MaxSteps == 0 {
 		c.MaxSteps = 100
 	}
-
-	if c.HealthCheck.Interval == 0 {
+	// HealthCheck defaults
+	if c.HealthCheck.Enabled && c.HealthCheck.Interval == 0 {
 		c.HealthCheck.Interval = 30 * time.Second
 	}
 }
@@ -133,8 +139,13 @@ func (c *Config) Validate() error {
 	if c.MaxSteps <= 0 {
 		return fmt.Errorf("max_steps must be positive")
 	}
-	if c.HealthCheck.Interval <= 0 {
-		return fmt.Errorf("health_check.interval must be positive")
+
+	// Validate health check
+	if c.HealthCheck.Enabled {
+		if c.HealthCheck.Interval <= 0 {
+			return fmt.Errorf("health_check.interval must be positive when enabled")
+		}
 	}
+
 	return nil
 }

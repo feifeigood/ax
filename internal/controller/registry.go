@@ -46,32 +46,28 @@ type AgentInfo struct {
 // Registry manages a collection of local and remote agents.
 // It provides agent discovery, health monitoring, and load balancing.
 type Registry struct {
-	mu                sync.RWMutex
-	agents            map[string]agent.Agent
-	agentInfo         map[string]*AgentInfo
-	healthCheckTicker *time.Ticker
-	stopHealthCheck   chan struct{}
+	mu        sync.RWMutex
+	agents    map[string]agent.Agent
+	agentInfo map[string]*AgentInfo
+	monitor   *HealthMonitor
 }
 
 // NewRegistry creates a new agent registry.
-func NewRegistry(healthCheckInterval time.Duration) *Registry {
-	if healthCheckInterval == 0 {
-		healthCheckInterval = 30 * time.Second
+func NewRegistry(healthCheckConfig config.HealthCheckConfig) (*Registry, error) {
+	if healthCheckConfig.Enabled && healthCheckConfig.Interval <= 0 {
+		return nil, fmt.Errorf("invalid health check interval: %v", healthCheckConfig.Interval)
 	}
 
 	r := &Registry{
-		agents:          make(map[string]agent.Agent),
-		agentInfo:       make(map[string]*AgentInfo),
-		stopHealthCheck: make(chan struct{}),
+		agents:    make(map[string]agent.Agent),
+		agentInfo: make(map[string]*AgentInfo),
+	}
+	if healthCheckConfig.Enabled {
+		r.monitor = NewHealthMonitor(healthCheckConfig, r)
+		r.monitor.Start()
 	}
 
-	// Start background health check if interval is positive
-	if healthCheckInterval > 0 {
-		r.healthCheckTicker = time.NewTicker(healthCheckInterval)
-		go r.runHealthChecks()
-	}
-
-	return r
+	return r, nil
 }
 
 // RegisterLocal registers a local (in-process) agent.
@@ -102,6 +98,8 @@ func (r *Registry) RegisterRemote(cfg config.RemoteAgentConfig) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	// TODO(lhuan): Consider enforcing health check during registration. Only allow registration if the agent is reachable and healthy.
+
 	if _, ok := r.agents[cfg.ID]; ok {
 		return fmt.Errorf("agent %s already registered", cfg.ID)
 	}
@@ -122,7 +120,7 @@ func (r *Registry) RegisterRemote(cfg config.RemoteAgentConfig) error {
 		Name:            cfg.Name,
 		Description:     cfg.Description,
 		Type:            AgentTypeRemote,
-		Healthy:         false, // Will be checked by health monitor
+		Healthy:         (r.monitor == nil), // Optimistic if no health check, pessimistic if health check is enabled
 		LastHealthCheck: time.Time{},
 		Metadata:        cfg.Metadata,
 	}
@@ -169,8 +167,8 @@ func (r *Registry) GetInfo(id string) (*AgentInfo, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	info, exists := r.agentInfo[id]
-	if !exists {
+	info, ok := r.agentInfo[id]
+	if !ok {
 		return nil, fmt.Errorf("agent %s not found", id)
 	}
 
@@ -205,6 +203,7 @@ func (r *Registry) ListHealthy() []string {
 	return ids
 }
 
+
 // healthCheck performs a health check on a specific agent.
 func (r *Registry) healthCheck(id string) error {
 	a, err := r.Get(id)
@@ -229,37 +228,17 @@ func (r *Registry) healthCheck(id string) error {
 	return err
 }
 
-// runHealthChecks runs periodic health checks on all agents.
-func (r *Registry) runHealthChecks() {
-	for {
-		select {
-		case <-r.healthCheckTicker.C:
-			r.performHealthChecks()
-		case <-r.stopHealthCheck:
-			return
-		}
-	}
-}
-
-// performHealthChecks checks the health of all registered agents.
-func (r *Registry) performHealthChecks() {
-	ids := r.List()
-	for _, id := range ids {
-		// Run health check (ignore errors, status is updated in HealthCheck method)
-		_ = r.healthCheck(id)
-	}
-}
 
 // Close stops the registry and closes all agents.
 func (r *Registry) Close() error {
+	// Stop health checks before acquiring the lock to avoid deadlock
+	// (monitor.Stop waits for background routines that might need the lock)
+	if r.monitor != nil {
+		r.monitor.Stop()
+	}
+
 	r.mu.Lock()
 	defer r.mu.Unlock()
-
-	// Stop health checks
-	if r.healthCheckTicker != nil {
-		r.healthCheckTicker.Stop()
-		close(r.stopHealthCheck)
-	}
 
 	// Close all agents
 	var firstErr error

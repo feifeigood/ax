@@ -112,10 +112,10 @@ func newControllerFromConfig(ctx context.Context, cfg *config.Config) (*controll
 
 	// Build controller config
 	controllerConfig := controller.Config{
-		EventLogFactory:     eventLogFactory,
-		PlannerFactory:      plannerFactory,
-		MaxSteps:            cfg.MaxSteps,
-		HealthCheckInterval: cfg.HealthCheck.Interval,
+		EventLogFactory: eventLogFactory,
+		PlannerFactory:  plannerFactory,
+		MaxSteps:        cfg.MaxSteps,
+		HealthCheck:     cfg.HealthCheck,
 	}
 
 	// Create controller

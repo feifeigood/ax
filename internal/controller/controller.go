@@ -20,9 +20,9 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/google/gar/agent"
+	"github.com/google/gar/internal/config"
 	"github.com/google/gar/internal/eventlog"
 	"github.com/google/gar/proto"
 )
@@ -32,7 +32,6 @@ import (
 type Controller struct {
 	inFlightSessionsMu sync.Mutex
 	inFlightSessions   map[string]struct{}
-
 	sessionManager *SessionManager
 	registry       *Registry
 	loopExecutor   *LoopExecutor
@@ -46,8 +45,8 @@ type Config struct {
 	EventLogFactory eventlog.EventLogFactory
 	PlannerFactory  PlannerFactory
 	// TODO(jbd): Add CompactionFunc.
-	HealthCheckInterval time.Duration
-	MaxSteps            int
+	HealthCheck config.HealthCheckConfig
+	MaxSteps    int
 }
 
 // New creates a new controller instance.
@@ -55,9 +54,7 @@ func New(ctx context.Context, config Config) (*Controller, error) {
 	if config.MaxSteps == 0 {
 		config.MaxSteps = 100
 	}
-	if config.HealthCheckInterval == 0 {
-		config.HealthCheckInterval = 30 * time.Second
-	}
+
 	if config.EventLogFactory == nil {
 		config.EventLogFactory = func(sessionID string) (eventlog.EventLog, error) {
 			return eventlog.NewFileEventLog(eventlog.FileConfig{
@@ -71,7 +68,10 @@ func New(ctx context.Context, config Config) (*Controller, error) {
 	sessionManager := NewSessionManager(config.EventLogFactory)
 
 	// Initialize agent registry
-	registry := NewRegistry(config.HealthCheckInterval)
+	registry, err := NewRegistry(config.HealthCheck)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create registry: %w", err)
+	}
 
 	// Determine plan function
 	// If no planner factory is provided, use the default Gemini planner.

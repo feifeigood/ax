@@ -140,6 +140,7 @@ func agentsToTools(registry *Registry) ([]*genai.Tool, error) {
 	}
 
 	var tools []*genai.Tool
+	// TODO(lhuan): Check if agentsToTools returns an error or empty list and return a friendly "no agent available, try later" error.
 	for _, id := range healthyAgents {
 		info, err := registry.GetInfo(id)
 		if err != nil {

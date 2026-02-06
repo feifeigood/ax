@@ -26,7 +26,9 @@ eventlog:
 max_steps: 50
 
 health_check:
-  # Health check interval for agents (e.g., "30s", "1m")
+  # Whether to enable active health checking
+  enabled: true
+  # Active health check interval for agents (e.g., "30s", "1m")
   interval: 30s
 
 # Planner configuration (optional)

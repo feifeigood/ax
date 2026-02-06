@@ -145,6 +145,8 @@ func (e *LoopExecutor) runTask(ctx context.Context, session *Session, task *Task
 		return fmt.Errorf("failed to get agent: %w", err)
 	}
 
+	// TODO(lhuan): Handle scenario where agent is marked healthy (optimistic) but fails to respond (e.g. still starting up).
+	// Return "agent internal error, try again later" to the user.
 	if err := ag.Process(ctx, session.ID(), &proto.ProcessRequest{
 		Contents: task.Inputs,
 	}, taskOutputHandler); err != nil {

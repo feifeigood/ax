@@ -47,8 +47,11 @@ func main() {
 	}
 
 	c, err := controller.New(ctx, controller.Config{
-		MaxSteps:            10,
-		HealthCheckInterval: 30 * time.Second,
+		MaxSteps: 10,
+		HealthCheck: config.HealthCheckConfig{
+			Enabled:  true,
+			Interval: 30 * time.Second,
+		},
 	})
 	if err != nil {
 		log.Fatalf("Error creating controller: %v\n", err)
