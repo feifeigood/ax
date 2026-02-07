@@ -57,7 +57,6 @@ health_check:
 # Remote agents configuration (optional)
 # List of remote agents to register on startup.
 # Remote agents run as separate gRPC servers.
-#
 # remote_agents:
 #   - id: "python-agent"
 #     name: "Python Agent"

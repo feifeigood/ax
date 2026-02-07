@@ -120,7 +120,7 @@ func (r *Registry) RegisterRemote(cfg config.RemoteAgentConfig) error {
 		Name:            cfg.Name,
 		Description:     cfg.Description,
 		Type:            AgentTypeRemote,
-		Healthy:         (r.monitor == nil), // Optimistic if no health check, pessimistic if health check is enabled
+		Healthy:         true, // default to healthy with an assumption that the agent is healthy when it's registered.
 		LastHealthCheck: time.Time{},
 		Metadata:        cfg.Metadata,
 	}
@@ -203,7 +203,6 @@ func (r *Registry) ListHealthy() []string {
 	return ids
 }
 
-
 // healthCheck performs a health check on a specific agent.
 func (r *Registry) healthCheck(id string) error {
 	a, err := r.Get(id)
@@ -227,7 +226,6 @@ func (r *Registry) healthCheck(id string) error {
 
 	return err
 }
-
 
 // Close stops the registry and closes all agents.
 func (r *Registry) Close() error {

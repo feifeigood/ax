@@ -22,6 +22,8 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/google/gar/agent"
+	"github.com/google/gar/internal/config"
 	"github.com/google/gar/proto"
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
@@ -32,6 +34,8 @@ var (
 	triggerInput      string
 	triggerCheckpoint string
 	triggerServerAddr string
+	triggerHeadless   bool
+	triggerConfigFile string
 )
 
 var triggerCmd = &cobra.Command{
@@ -44,13 +48,12 @@ Use --checkpoint to resume from a specific checkpoint.`,
 }
 
 func init() {
-	// TODO(jbd): Enable a -headless option that can run
-	// the controller without a gar server.
-
 	triggerCmd.Flags().StringVar(&triggerSessionID, "session", "", "Session ID (optional, generates UUID if not provided)")
 	triggerCmd.Flags().StringVar(&triggerInput, "input", "", "Input message to send (required)")
 	triggerCmd.Flags().StringVar(&triggerCheckpoint, "checkpoint", "", "Resume from specific checkpoint UUID (empty for latest)")
 	triggerCmd.Flags().StringVar(&triggerServerAddr, "server", "localhost:8494", "gRPC controller server address (default: localhost:8494)")
+	triggerCmd.Flags().BoolVar(&triggerHeadless, "headless", false, "Run in headless mode with a built-in Controller")
+	triggerCmd.Flags().StringVar(&triggerConfigFile, "config", "gar.yaml", "Path to YAML configuration file (only used in headless mode)")
 	triggerCmd.MarkFlagRequired("input")
 }
 
@@ -88,6 +91,10 @@ func runTrigger(cmd *cobra.Command, args []string) error {
 		cancel()
 	}()
 
+	if triggerHeadless {
+		return runHeadless(ctx, triggerSessionID, inputs)
+	}
+
 	conn, err := connect(triggerServerAddr)
 	if err != nil {
 		return err
@@ -120,5 +127,46 @@ func runTrigger(cmd *cobra.Command, args []string) error {
 			}
 		}
 	}
+	return nil
+}
+
+func runHeadless(ctx context.Context, sessionID string, inputs []*proto.Content) error {
+	// Load configuration from YAML file
+	cfg, err := config.LoadFromFile(triggerConfigFile)
+	if err != nil {
+		return fmt.Errorf("error loading config file '%s': %w", triggerConfigFile, err)
+	}
+
+	// Validate configuration
+	if err := cfg.Validate(); err != nil {
+		return fmt.Errorf("invalid configuration: %w", err)
+	}
+
+	c, err := newControllerFromConfig(ctx, cfg)
+	if err != nil {
+		return fmt.Errorf("error creating controller: %w", err)
+	}
+	defer c.Close()
+
+	// TODO(lhuan): Allow a default local agent to be registered in headless mode.
+	
+	// Create output handler to print streaming results to stdout
+	outputHandler := agent.OutputHandler(func(resp *proto.ProcessResponse) error {
+		for _, content := range resp.Contents {
+			fmt.Printf("[RUNNING] %s\n", content.Data)
+		}
+		return nil
+	})
+
+	req := &proto.ProcessRequest{
+		Contents:     inputs,
+		CheckpointId: triggerCheckpoint,
+	}
+
+	if err := c.TriggerSession(ctx, sessionID, req, outputHandler); err != nil {
+		return fmt.Errorf("error triggering session in headless mode: %w", err)
+	}
+
+	fmt.Println("[COMPLETED]")
 	return nil
 }

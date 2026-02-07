@@ -54,22 +54,22 @@ go run examples/local_agent/main.go
 
 ### 2. Run Remote Agent with GAR Server
 
-This example demonstrates how the gar server triggers remote agents through the
-AgentService.Process RPC.
+This example demonstrates how the GAR server triggers remote agents through the `AgentService.Process` RPC. You can run this in two ways:
+
+#### [Option A] Client-Server Mode
+This is the standard way to run GAR, separating the controller from the trigger client.
 
 **Terminal 1** - Start the remote agent server:
 ```bash
 go run examples/remote_agent/main.go
 ```
+The remote agent runs as a gRPC server implementing `AgentService` on port `:50051`.
 
-The remote agent runs as a gRPC server implementing AgentService on port :50051.
-
-**Terminal 2** - Start the gar controller server:
+**Terminal 2** - Start the GAR controller server:
 ```bash
 gar serve
 ```
-
-The gar server exposes the GARService on port :8494.
+The GAR server exposes the `GARService` on port `:8494`.
 
 **Terminal 3** - Register the remote agent and trigger a session:
 ```bash
@@ -80,7 +80,7 @@ gar register \
     --agent-description "Echoes input in uppercase" \
     --agent-addr localhost:50051
 
-# Trigger a session - gar will trigger the remote agent via Process RPC
+# Trigger a session - gar will coordinate the remote agent via Process RPC
 gar trigger \
     --session session123 \
     --input "Hello remote agent"
@@ -88,6 +88,26 @@ gar trigger \
 # Inspect session details
 gar inspect --session session123
 ```
+
+#### [Option B] Headless Mode (Simplified)
+Run everything in a single command. The trigger starts its own internal controller.
+
+**Terminal 1** - Start the remote agent server:
+```bash
+go run examples/remote_agent/main.go
+```
+(Same as Option A, the agent must be running to receive requests)
+
+**Terminal 2** - Trigger directly:
+```bash
+# Using default gar.yaml
+gar trigger --headless --input "Hello from headless mode"
+
+# Using a custom configuration
+gar trigger --headless --input "Hello" --config my-config.yaml
+
+```
+The `trigger` command starts its own internal controller, reads the specified configuration file (default: `gar.yaml`) to discover agents, and executes the session locally.
 
 ## Usage
 
@@ -112,6 +132,8 @@ Options:
 - `--session`: Unique session identifier (optional, generates UUID if not provided, or resumes if exists)
 - `--checkpoint`: Resume from specific checkpoint (empty for latest)
 - `--server`: gRPC controller server address (default: "localhost:8494")
+- `--headless`: Run in headless mode with a built-in GAR server
+- `--config`: Path to YAML configuration file (only used in headless mode, default: "gar.yaml")
 
 **Examples:**
 
@@ -126,6 +148,9 @@ gar trigger --session abc123 --input "Continue processing"
 gar trigger --session abc123 \
     --checkpoint "550e8400-e29b-41d4-a716-446655440000" \
     --input "Try a different approach"
+
+# Trigger using headless mode (local controller)
+gar trigger --headless --input "Quick test to upper case"
 ```
 
 #### Inspect a Session
