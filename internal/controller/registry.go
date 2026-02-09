@@ -75,6 +75,10 @@ func (r *Registry) RegisterLocal(cfg config.LocalAgentConfig) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	if err := validateID(cfg.ID); err != nil {
+		return err
+	}
+
 	if _, ok := r.agents[cfg.ID]; ok {
 		return fmt.Errorf("agent %s already registered", cfg.ID)
 	}
@@ -98,8 +102,11 @@ func (r *Registry) RegisterRemote(cfg config.RemoteAgentConfig) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	// TODO(lhuan): Consider enforcing health check during registration. Only allow registration if the agent is reachable and healthy.
+	if err := validateID(cfg.ID); err != nil {
+		return err
+	}
 
+	// TODO(lhuan): Consider enforcing health check during registration. Only allow registration if the agent is reachable and healthy.
 	if _, ok := r.agents[cfg.ID]; ok {
 		return fmt.Errorf("agent %s already registered", cfg.ID)
 	}
