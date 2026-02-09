@@ -405,7 +405,6 @@ gar trigger \
 - [ ] Rehydrate dangling agent invocations by appending agent events to the event log
 - [ ] Observability and trajectory collection
 - [ ] TLS support for remote agents
-- [ ] gar deploy from container
 - [ ] Fork session when resuming from a checkpoint that isn't the latest
 - [ ] Create a package of local agents (listing files, reading files, grep'ing the directory)
 - [ ] Web UI
