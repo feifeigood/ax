@@ -259,15 +259,15 @@ import (
 )
 
 // Define your process function using callback handler
-processFunc := func(ctx context.Context, sessionID string, inputs []*proto.Content, handler agent.OutputHandler) error {
-    for _, content := range inputs {
+processFunc := func(ctx context.Context, sessionID string, incoming *proto.ProcessRequest, handler agent.OutputHandler) error {
+    for _, content := range incoming.Contents {
         output := &proto.Content{
             Role:     "assistant",
             Type:     "text",
             Mimetype: "text/plain",
             Data:     "Your response: " + content.Data,
         }
-        if err := handler(output); err != nil {
+        if err := handler(&proto.ProcessResponse{Contents: []*proto.Content{output}}); err != nil {
             return err
         }
     }
@@ -317,7 +317,7 @@ func (s *server) Process(stream proto.AgentService_ProcessServer) error {
         }
 
         // Send response back to gar controller
-        if err := stream.Send(output); err != nil {
+        if err := stream.Send(&proto.ProcessResponse{Contents: []*proto.Content{output}}); err != nil {
             return err
         }
     }
