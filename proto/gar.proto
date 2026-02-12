@@ -20,26 +20,37 @@ import "google/protobuf/timestamp.proto";
 
 option go_package = "github.com/google/gar/proto";
 
+// ProcessRequest is an input to an agent.
 message ProcessRequest {
+  // Checkpoint is the optional checkpoint associated with
+  // the contents.
   string checkpoint_id = 1;
+
+  // Contents as input.
   repeated Content contents = 2;
 }
 
+// ProcessResponse is an output from an agent.
+// It can be returned in a streaming fashion.
 message ProcessResponse {
+  // Checkpoint is the optional checkpoint associated with
+  // the contents.
   string checkpoint_id = 1;
+
+  // Contents as output.
   repeated Content contents = 2;
+
+  // Optional agent handoff. If set controller, hands off the
+  // execution to the provided agent.
   string agent_handoff = 3;
 }
 
+// TextContent represents a text content.
 message TextContent {
-  reserved 1;
-
+  reserved 1, 2;
   reserved "type";
-
-  // The text content.
   string text = 3;
 }
-
 
 // Content represents a message with role, type, mimetype, and data fields
 message Content {
@@ -49,41 +60,49 @@ message Content {
     TextContent text = 10;
   }
 
-  string role = 1000;          // The role of the content (e.g., "user", "assistant", "system")
-  // TODO: Replace Content with Interactions Content.
+  string role = 1000; // The role of the content (e.g., "user", "assistant", "system")
+
+  // TODO: Bring other types to the oneof to be
+  // fully compatible with the Interactions Content message.
 }
 
+// Event that represents a session state change.
+// Some sessions may not be resumable based on their latest state.
+// For example, controller doesn't continue a session once
+// the state is set to STATE_FAILED.
 message SessionStateEvent {
   State state = 1;
 }
 
+// AgentCallEvent represents an agent call.
 message AgentCallEvent {
   reserved 1, 2;
-
   string sender = 3;
-
   repeated Content contents = 4;
-
-  // Whether the caller is awaiting additional AgentCallEvents.
   bool awaiting_more = 5;
 
   // TODO(jbd): Support pauses and async calls.
 }
 
+// HandoffEvent represents an agent handoff.
+// Controller records the agent handoff with
+// associated content.
 message HandoffEvent {
   reserved 1, 2;
-
   string source_agent_id = 3;
-
   string target_agent_id = 4;
-
   repeated Content contents = 5;
 }
 
+// Content changes such as user inputs are recorded
+// as content events.
 message ContentEvent {
   repeated Content contents = 1;
 }
 
+// Event is the entry in the event log. Events are used
+// to record the actions taken place in the GAR controller.
+// GAR controller can replay the events for resumability.
 message Event {
   string session_id = 1;
   string checkpoint_id = 2;
@@ -146,12 +165,12 @@ message TriggerSessionResponse {
   State state = 4;                // Session state
 }
 
-// GetSessionRequest for retrieving session details
+// GetSessionRequest for retrieving session details.
 message GetSessionRequest {
   string session_id = 1;
 }
 
-// SessionInfo contains session details
+// SessionInfo contains session details.
 message SessionInfo {
   State state = 1;
   repeated string active_agents = 2;
@@ -160,7 +179,7 @@ message SessionInfo {
   google.protobuf.Timestamp updated_at = 5;  // Last update time
 }
 
-// GetSessionResponse contains session information
+// GetSessionResponse contains session information.
 message GetSessionResponse {
   SessionInfo session = 1;
 }
