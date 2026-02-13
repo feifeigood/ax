@@ -177,7 +177,6 @@ var AgentService_ServiceDesc = grpc.ServiceDesc{
 
 const (
 	GARService_TriggerSession_FullMethodName  = "/proto.GARService/TriggerSession"
-	GARService_GetSession_FullMethodName      = "/proto.GARService/GetSession"
 	GARService_RegisterAgent_FullMethodName   = "/proto.GARService/RegisterAgent"
 	GARService_UnregisterAgent_FullMethodName = "/proto.GARService/UnregisterAgent"
 )
@@ -191,8 +190,6 @@ type GARServiceClient interface {
 	// TriggerSession triggers a new agentic loop session or resumes an existing one with streaming responses
 	// If the session_id already exists, it will be resumed from the last checkpoint
 	TriggerSession(ctx context.Context, in *TriggerSessionRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[TriggerSessionResponse], error)
-	// GetSession retrieves session details
-	GetSession(ctx context.Context, in *GetSessionRequest, opts ...grpc.CallOption) (*GetSessionResponse, error)
 	// RegisterAgent registers a new agent with the controller
 	RegisterAgent(ctx context.Context, in *RegisterAgentRequest, opts ...grpc.CallOption) (*RegisterAgentResponse, error)
 	// UnregisterAgent removes an agent from the controller
@@ -226,16 +223,6 @@ func (c *gARServiceClient) TriggerSession(ctx context.Context, in *TriggerSessio
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type GARService_TriggerSessionClient = grpc.ServerStreamingClient[TriggerSessionResponse]
 
-func (c *gARServiceClient) GetSession(ctx context.Context, in *GetSessionRequest, opts ...grpc.CallOption) (*GetSessionResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetSessionResponse)
-	err := c.cc.Invoke(ctx, GARService_GetSession_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *gARServiceClient) RegisterAgent(ctx context.Context, in *RegisterAgentRequest, opts ...grpc.CallOption) (*RegisterAgentResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(RegisterAgentResponse)
@@ -265,8 +252,6 @@ type GARServiceServer interface {
 	// TriggerSession triggers a new agentic loop session or resumes an existing one with streaming responses
 	// If the session_id already exists, it will be resumed from the last checkpoint
 	TriggerSession(*TriggerSessionRequest, grpc.ServerStreamingServer[TriggerSessionResponse]) error
-	// GetSession retrieves session details
-	GetSession(context.Context, *GetSessionRequest) (*GetSessionResponse, error)
 	// RegisterAgent registers a new agent with the controller
 	RegisterAgent(context.Context, *RegisterAgentRequest) (*RegisterAgentResponse, error)
 	// UnregisterAgent removes an agent from the controller
@@ -283,9 +268,6 @@ type UnimplementedGARServiceServer struct{}
 
 func (UnimplementedGARServiceServer) TriggerSession(*TriggerSessionRequest, grpc.ServerStreamingServer[TriggerSessionResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method TriggerSession not implemented")
-}
-func (UnimplementedGARServiceServer) GetSession(context.Context, *GetSessionRequest) (*GetSessionResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetSession not implemented")
 }
 func (UnimplementedGARServiceServer) RegisterAgent(context.Context, *RegisterAgentRequest) (*RegisterAgentResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RegisterAgent not implemented")
@@ -324,24 +306,6 @@ func _GARService_TriggerSession_Handler(srv interface{}, stream grpc.ServerStrea
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type GARService_TriggerSessionServer = grpc.ServerStreamingServer[TriggerSessionResponse]
-
-func _GARService_GetSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetSessionRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(GARServiceServer).GetSession(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: GARService_GetSession_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GARServiceServer).GetSession(ctx, req.(*GetSessionRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
 
 func _GARService_RegisterAgent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RegisterAgentRequest)
@@ -386,10 +350,6 @@ var GARService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "proto.GARService",
 	HandlerType: (*GARServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
-		{
-			MethodName: "GetSession",
-			Handler:    _GARService_GetSession_Handler,
-		},
 		{
 			MethodName: "RegisterAgent",
 			Handler:    _GARService_RegisterAgent_Handler,

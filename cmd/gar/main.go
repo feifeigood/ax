@@ -14,7 +14,7 @@
 
 // Gar is a CLI tool for managing agent orchestrator sessions.
 // It provides commands to trigger sessions, resume from checkpoints,
-// inspect session state, register agents, and run the controller server.
+// register agents, and run the controller server.
 package main
 
 import (
@@ -38,13 +38,12 @@ var rootCmd = &cobra.Command{
 	Short: "GAR - Google Agent Runtime CLI",
 	Long: `Gar is a CLI tool for managing agent orchestrator sessions.
 It provides commands to trigger sessions, resume from checkpoints,
-inspect session state, register agents, and run the controller server.`,
+register agents, and run the controller server.`,
 }
 
 func init() {
 	// Add subcommands
 	rootCmd.AddCommand(triggerCmd)
-	rootCmd.AddCommand(inspectCmd)
 	rootCmd.AddCommand(registerCmd)
 	rootCmd.AddCommand(serveCmd)
 }
