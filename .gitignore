@@ -1,5 +1,6 @@
 bin/*
 eventlog/*
-./gar
-./local_agent
-./remote_agent
+/gar
+local_agent
+remote_agent
+*.log

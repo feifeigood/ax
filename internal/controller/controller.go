@@ -116,11 +116,15 @@ func (d *Controller) TriggerSession(ctx context.Context, sessionID string, incom
 
 	d.inFlightSessionsMu.Lock()
 	_, ok := d.inFlightSessions[sessionID]
+	if !ok {
+		d.inFlightSessions[sessionID] = struct{}{}
+	}
 	d.inFlightSessionsMu.Unlock()
 
 	if ok {
 		return fmt.Errorf("session is already in flight")
 	}
+
 	defer func() {
 		d.inFlightSessionsMu.Lock()
 		delete(d.inFlightSessions, sessionID)
@@ -148,16 +152,40 @@ func (d *Controller) TriggerSession(ctx context.Context, sessionID string, incom
 	return nil
 }
 
-func (d *Controller) TriggerForkedSession(ctx context.Context, sessionID string, incoming *proto.ProcessRequest, handler agent.OutputHandler) error {
-	if sessionID == "" {
-		return fmt.Errorf("session_id is required")
+// ForkSession forks a session from a source session.
+// If checkpointId is provided, fork til the checkpoint. Otherwise, fork the whole session.
+func (d *Controller) ForkSession(ctx context.Context, sourceSessionID, sourceCheckpoint, destSessionID string) error {
+	if sourceSessionID == "" {
+		return fmt.Errorf("source_session_id is required")
 	}
-	if incoming.CheckpointId == "" {
-		return fmt.Errorf("checkpoint_id is required")
+	if destSessionID == "" {
+		return fmt.Errorf("new_session_id is required")
 	}
-	// TODO(jbd): Fork a new session by copying all content to
-	// the provided checkpoint ID, and execute the loop executor.
-	panic("not yet implemented")
+
+	d.inFlightSessionsMu.Lock()
+	_, ok := d.inFlightSessions[destSessionID]
+	if !ok {
+		d.inFlightSessions[destSessionID] = struct{}{}
+	}
+	d.inFlightSessionsMu.Unlock()
+
+	if ok {
+		return fmt.Errorf("newly generated session ID collision")
+	}
+
+	defer func() {
+		d.inFlightSessionsMu.Lock()
+		delete(d.inFlightSessions, destSessionID)
+		d.inFlightSessionsMu.Unlock()
+	}()
+
+	// Fork the session
+	_, err := d.sessionManager.ForkSession(ctx, sourceSessionID, sourceCheckpoint, destSessionID)
+	if err != nil {
+		return fmt.Errorf("failed to fork session: %w", err)
+	}
+
+	return nil
 }
 
 // LoadSession loads a session from event log.

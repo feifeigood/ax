@@ -30,12 +30,13 @@ import (
 )
 
 var (
-	triggerSessionID  string
-	triggerInput      string
-	triggerCheckpoint string
-	triggerServerAddr string
-	triggerHeadless   bool
-	triggerConfigFile string
+	triggerSessionID     string
+	triggerInput         string
+	triggerCheckpoint    string
+	triggerDestSessionID string
+	triggerServerAddr    string
+	triggerHeadless      bool
+	triggerConfigFile    string
 )
 
 var triggerCmd = &cobra.Command{
@@ -51,6 +52,7 @@ func init() {
 	triggerCmd.Flags().StringVar(&triggerSessionID, "session", "", "Session ID (optional, generates UUID if not provided)")
 	triggerCmd.Flags().StringVar(&triggerInput, "input", "", "Input message to send (required)")
 	triggerCmd.Flags().StringVar(&triggerCheckpoint, "checkpoint", "", "Resume from specific checkpoint UUID (empty for latest)")
+	triggerCmd.Flags().StringVar(&triggerDestSessionID, "destination_session", "", "Destination Session ID when forking from checkpoint (optional)")
 	triggerCmd.Flags().StringVar(&triggerServerAddr, "server", "localhost:8494", "gRPC controller server address (default: localhost:8494)")
 	triggerCmd.Flags().BoolVar(&triggerHeadless, "headless", false, "Run in headless mode with a built-in Controller")
 	triggerCmd.Flags().StringVar(&triggerConfigFile, "config", "gar.yaml", "Path to YAML configuration file (only used in headless mode)")
@@ -104,10 +106,24 @@ func runTrigger(cmd *cobra.Command, args []string) error {
 	defer conn.Close()
 
 	client := proto.NewGARServiceClient(conn)
+
+	// If checkpoint is provided, we fork the session first
+	if triggerCheckpoint != "" {
+		if triggerDestSessionID == "" {
+			triggerDestSessionID = uuid.New().String()
+			fmt.Printf("Generated new session ID: %s\n", triggerDestSessionID)
+		}
+		
+		forkedID, err := ForkSession(ctx, client, triggerSessionID, triggerCheckpoint, triggerDestSessionID)
+		if err != nil {
+			return err
+		}
+		triggerSessionID = forkedID
+	}
+
 	stream, err := client.TriggerSession(ctx, &proto.TriggerSessionRequest{
 		SessionId:    triggerSessionID,
 		Inputs:       inputs,
-		CheckpointId: triggerCheckpoint,
 	})
 	if err != nil {
 		return fmt.Errorf("error triggering session: %w", err)
@@ -121,6 +137,10 @@ func runTrigger(cmd *cobra.Command, args []string) error {
 		}
 		if err != nil {
 			return fmt.Errorf("error receiving response: %w", err)
+		}
+
+		if resp.CheckpointId != "" {
+			fmt.Printf("Checkpoint ID: %s\n", resp.CheckpointId)
 		}
 
 		if resp.Outputs != nil {
@@ -157,8 +177,8 @@ func runHeadless(ctx context.Context, sessionID string, inputs []*proto.Content)
 	})
 
 	req := &proto.ProcessRequest{
-		Contents:     inputs,
 		CheckpointId: triggerCheckpoint,
+		Contents:     inputs,
 	}
 
 	if err := c.TriggerSession(ctx, sessionID, req, outputHandler); err != nil {

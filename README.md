@@ -119,6 +119,7 @@ gar trigger \
     --input <text> \
     [--session <id>] \
     [--checkpoint <uuid>] \
+    [--destination_session <id>] \
     [--server <address>]
 ```
 
@@ -128,6 +129,7 @@ Options:
 - `--input`: Input message to send to agents (required)
 - `--session`: Unique session identifier (optional, generates UUID if not provided, or resumes if exists)
 - `--checkpoint`: Resume from specific checkpoint (empty for latest)
+- `--destination_session`: New Session ID when resuming from a checkpoint (optional, auto-generated if empty).
 - `--server`: gRPC controller server address (default: "localhost:8494")
 - `--headless`: Run in headless mode with a built-in GAR server
 - `--config`: Path to YAML configuration file (only used in headless mode, default: "gar.yaml")
@@ -148,6 +150,44 @@ gar trigger --session abc123 \
 
 # Trigger using headless mode (local controller)
 gar trigger --headless --input "Quick test to upper case"
+
+# Trigger a session from a specific checkpoint - gar will auto fork the session to a new session id and resume from the checkpoint. User can provide desitination_session to specify the new session id, otherwise it will auto generate one. 
+gar trigger \
+    --session session123 \
+    --checkpoint "550e8400-e29b-41d4-a716-446655440000" \
+    --destination_session session123-fork \
+    --input "Continue processing"
+```
+
+#### Fork a Session
+
+Fork an existing session from a specific checkpoint (or the latest state) into a new session.
+
+```bash
+gar fork \
+    --source_session <id> \
+    [--checkpoint <id>] \
+    [--destination_session <id>] \
+    [--server <address>]
+```
+
+Options:
+- `--source_session`: Source Session ID to fork from (required)
+- `--checkpoint`: Checkpoint ID to fork from (optional, defaults to latest)
+- `--destination_session`: Destination Session ID (optional, generates UUID if not provided)
+- `--server`: gRPC controller server address (default: "localhost:8494")
+
+**Example:**
+
+```bash
+# Fork from the latest state
+gar fork --source_session abc123
+
+# Fork from a specific checkpoint
+gar fork --source_session abc123 --checkpoint "550e..."
+
+# Fork from a specific checkpoint to a new session with a specific new session id
+gar fork --source_session abc123 --checkpoint "550e..." --destination_session new-session-id 
 ```
 
 #### Register a Remote Agent

@@ -65,7 +65,7 @@ func TestValidateSessionID(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			err := validateID(tt.sessionID)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("validateSessionID(%q) error = %v, wantErr %v", tt.sessionID, err, tt.wantErr)
+				t.Errorf("validateID(%q) error = %v, wantErr %v", tt.sessionID, err, tt.wantErr)
 			}
 		})
 	}

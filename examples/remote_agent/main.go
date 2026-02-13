@@ -25,6 +25,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/google/gar/proto"
+	"github.com/google/uuid"
 )
 
 const port = ":50051"
@@ -59,7 +60,8 @@ func (s *server) Process(stream proto.AgentService_ProcessServer) error {
 			})
 		}
 		if err := stream.Send(&proto.ProcessResponse{
-			Contents: contents,
+			Contents:     contents,
+			CheckpointId: uuid.New().String(),
 		}); err != nil {
 			return err
 		}

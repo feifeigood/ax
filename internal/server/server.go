@@ -14,6 +14,7 @@
 
 // Package server implements the gRPC server for GARService,
 // exposing session management and agent registration APIs.
+
 package server
 
 import (
@@ -57,26 +58,76 @@ func (s *Server) TriggerSession(req *proto.TriggerSessionRequest, stream grpc.Se
 		return err
 	}
 
-	// Create output handler to stream outputs back to client
+	incoming := &proto.ProcessRequest{
+		CheckpointId: req.CheckpointId,
+		Contents:     inputs,
+	}
+	if checkpointID == "" {
+		// Create output handler to stream outputs back to client
+		outputHandler := agent.OutputHandler(func(outgoing *proto.ProcessResponse) error {
+			return stream.Send(&proto.TriggerSessionResponse{
+				SessionId:    sessionID,
+				CheckpointId: outgoing.CheckpointId,
+				Outputs:      outgoing.Contents,
+				State:        proto.State_STATE_RUNNING,
+			})
+		})
+		return s.controller.TriggerSession(
+			stream.Context(), sessionID, incoming, outputHandler)
+	}
+
+	return s.TriggerFromCheckpoint(stream.Context(), sessionID, checkpointID, sessionID, incoming, stream)
+}
+
+func (s *Server) TriggerFromCheckpoint(ctx context.Context, sourceSessionID, checkpointID, newSessionID string, incoming *proto.ProcessRequest, stream grpc.ServerStreamingServer[proto.TriggerSessionResponse]) error {
+	// Create output handler
 	outputHandler := agent.OutputHandler(func(outgoing *proto.ProcessResponse) error {
 		return stream.Send(&proto.TriggerSessionResponse{
-			SessionId:    sessionID,
+			SessionId:    newSessionID,
 			CheckpointId: outgoing.CheckpointId,
 			Outputs:      outgoing.Contents,
 			State:        proto.State_STATE_RUNNING,
 		})
 	})
 
-	incoming := &proto.ProcessRequest{
-		CheckpointId: req.CheckpointId,
-		Contents:     inputs,
+    // Fork session
+    if err := s.controller.ForkSession(ctx, sourceSessionID, checkpointID, newSessionID); err != nil {
+        return fmt.Errorf("failed to prepare session from checkpoint: %w", err)
+    }
+
+    // Trigger new session
+    return s.controller.TriggerSession(ctx, newSessionID, incoming, outputHandler)
+}
+
+func (s *Server) ForkSession(ctx context.Context, req *proto.ForkSessionRequest) (*proto.ForkSessionResponse, error) {
+	if err := s.controller.ForkSession(ctx, req.SourceSessionId, req.SourceCheckpointId, req.DestSessionId); err != nil {
+		return nil, err
 	}
-	if checkpointID == "" {
-		return s.controller.TriggerSession(
-			stream.Context(), sessionID, incoming, outputHandler)
+
+	return &proto.ForkSessionResponse{
+		NewSessionId: req.DestSessionId,
+	}, nil
+}
+
+// GetSession retrieves session details.
+func (s *Server) GetSession(ctx context.Context, req *proto.GetSessionRequest) (*proto.GetSessionResponse, error) {
+	if req.SessionId == "" {
+		return nil, fmt.Errorf("session_id is required")
 	}
-	return s.controller.TriggerForkedSession(
-		stream.Context(), sessionID, incoming, outputHandler)
+
+	session, err := s.controller.LoadSession(ctx, req.SessionId)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO(jbd): Populate CreatedAt and UpdatedAt from event log.
+	return &proto.GetSessionResponse{
+		Session: &proto.SessionInfo{
+			State:         session.State(),
+			CheckpointIds: session.CheckpointIDs(),
+			ActiveAgents:  session.WaitingAgents(),
+		},
+	}, nil
 }
 
 // RegisterAgent registers a new remote agent with the controller.

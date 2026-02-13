@@ -21,6 +21,7 @@ import (
 
 	"github.com/google/gar/internal/eventlog"
 	"github.com/google/gar/proto"
+	pbproto "google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -60,7 +61,7 @@ func (sm *SessionManager) NewSession(sessionID string) (*Session, error) {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
-	// Check if session already ok
+	// Check if session already exists
 	if _, ok := sm.sessions[sessionID]; ok {
 		return nil, fmt.Errorf("session %s already exists", sessionID)
 	}
@@ -92,28 +93,19 @@ func (sm *SessionManager) LoadSession(ctx context.Context, sessionID string) (*S
 // LoadSessionFromCheckpoint loads an existing session from event log up to a specific checkpoint.
 // If checkpointID is empty, loads to the latest state.
 // If checkpointID is provided, loads up to and including that checkpoint UUID.
-func (sm *SessionManager) LoadSessionFromCheckpoint(ctx context.Context, sessionID string, checkpointID string) (*Session, error) {
+func (sm *SessionManager) LoadSessionFromCheckpoint(ctx context.Context, sessionID, checkpointID string) (*Session, error) {
 	if err := validateID(sessionID); err != nil {
 		return nil, err
 	}
-	sm.mu.Lock()
-	defer sm.mu.Unlock()
 
-	// Check if already loaded - remove it to reload fresh from checkpoint
-	delete(sm.sessions, sessionID)
-
-	// Open event log for replay using the builder.
-	el, err := sm.eventLogBuilder(sessionID)
+	// 1. Load events from storage (IO) - No Lock
+	// We do this without holding the lock to allow concurrent reads/writes on other sessions.
+	el, events, state, err := sm.loadEvents(ctx, sessionID, checkpointID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open event log for replay: %w", err)
+		return nil, err
 	}
 
-	events, state, err := el.LoadEvents(ctx, checkpointID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get event log entries: %w", err)
-	}
-
-	// Reconstruct session state from event log
+	// 2. Construct session state in memory - No Lock
 	session := &Session{
 		id:             sessionID,
 		state:          state,
@@ -123,46 +115,156 @@ func (sm *SessionManager) LoadSessionFromCheckpoint(ctx context.Context, session
 		checkpointIDs:  make(map[string]struct{}),
 	}
 
-	// Replay entries to rebuild state
+	err = session.reconstructState(events)
+	if err != nil {
+		_ = el.Close()
+		return nil, err
+	}
+
+	// 3. Commit to manager (Write Lock)
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+
+	// Overwrite existing session (atomic switch)
+	// If a session existed, it is replaced by the reloaded version.
+	// The old session instance (if any) is discarded from the map.
+	// Note: We don't explicitly close the session's event log here because it might be in use elsewhere.
+	sm.sessions[sessionID] = session
+	return session, nil
+}
+
+// loadEvents opens the event log and loads events up to the checkpoint.
+func (sm *SessionManager) loadEvents(ctx context.Context, sessionID, checkpointID string) (eventlog.EventLog, []*proto.Event, proto.State, error) {
+	// Open event log for replay using the factory
+	el, err := sm.eventLogBuilder(sessionID)
+	if err != nil {
+		return nil, nil, proto.State_STATE_UNSPECIFIED, fmt.Errorf("failed to open event log for replay: %w", err)
+	}
+
+	events, state, err := el.LoadEvents(ctx, checkpointID)
+	if err != nil {
+		// Clean up potentially opened event log
+		_ = el.Close()
+		return nil, nil, proto.State_STATE_UNSPECIFIED, fmt.Errorf("failed to get event log entries: %w", err)
+	}
+
+	return el, events, state, nil
+}
+
+// ForkSession creates a new session by forking from a source session's checkpoint.
+func (sm *SessionManager) ForkSession(ctx context.Context, sourceSessionID, sourceCheckpointID, newSessionID string) (*Session, error) {
+	if err := validateID(newSessionID); err != nil {
+		return nil, err
+	}
+
+	// 1. Check if session already exists in backend storage
+	newEL, existingEvents, _, err := sm.loadEvents(ctx, newSessionID, "")
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize new session: %w", err)
+	}
+	if len(existingEvents) > 0 {
+		_ = newEL.Close()
+		return nil, fmt.Errorf("session %s already exists in storage", newSessionID)
+	}
+
+	// 2. Load Source Events
+	sourceEL, sourceEvents, _, err := sm.loadEvents(ctx, sourceSessionID, sourceCheckpointID)
+	if err != nil {
+		_ = newEL.Close()
+		return nil, fmt.Errorf("failed to load source events: %w", err)
+	}
+	// Close source EL immediately as we only need the events
+	if sourceEL != nil {
+		_ = sourceEL.Close()
+	}
+
+	// 3. Fork the events
+	newEvents := make([]*proto.Event, 0, len(sourceEvents))
+	for _, e := range sourceEvents {
+		// Deep copy the event
+		newEvent := pbproto.Clone(e).(*proto.Event)
+		// Update SessionId for the new session
+		newEvent.SessionId = newSessionID
+
+		if err := newEL.AppendEvent(ctx, newEvent); err != nil {
+			_ = newEL.Close()
+			return nil, fmt.Errorf("failed to append forked event: %w", err)
+		}
+
+		newEvents = append(newEvents, newEvent)
+	}
+
+	// 4. Construct base session
+	session := &Session{
+		id:             newSessionID,
+		state:          proto.State_STATE_UNSPECIFIED,
+		messageHistory: []*proto.Content{},
+		waitingAgents:  make(map[string][]*proto.Content),
+		checkpointIDs:  make(map[string]struct{}),
+		eventLog:       newEL,
+	}
+
+	// Reconstruct session from new events
+	// Session state will be set to the latest state from events
+	err = session.reconstructState(newEvents)
+	if err != nil {
+		_ = newEL.Close()
+		return nil, err
+	}
+
+	// 5. Add new session to manager
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+
+	_, ok := sm.sessions[newSessionID]
+	if ok {
+		_ = newEL.Close()
+		return nil, fmt.Errorf("failed to add new session to manager: %s", newSessionID)
+	}
+
+	sm.sessions[newSessionID] = session
+	return session, nil
+}
+
+// Replay entries to rebuild state
+func (s *Session) reconstructState(events []*proto.Event) error {
 	for _, e := range events {
 		switch x := e.Kind.(type) {
 		case *proto.Event_AgentCallEvent:
 			event := x.AgentCallEvent
 			if event.AwaitingMore {
-				session.waitingAgents[event.Sender] = append(
-					session.waitingAgents[event.Sender], event.Contents...)
+				s.waitingAgents[event.Sender] = append(
+					s.waitingAgents[event.Sender], event.Contents...)
 			} else {
 				// If buffer already exists, append it to the history first.
 				// Then merge the new contents to the message history.
 				// Once we don't wait for new contents from an agent,
 				// we don't care about the origin of the contents anymore.
-				if len(session.waitingAgents[event.Sender]) > 0 {
-					session.messageHistory = append(
-						session.messageHistory, session.waitingAgents[event.Sender]...)
+				if len(s.waitingAgents[event.Sender]) > 0 {
+					s.messageHistory = append(
+						s.messageHistory, s.waitingAgents[event.Sender]...)
 				}
-				session.messageHistory = append(
-					session.messageHistory, event.Contents...)
+				s.messageHistory = append(
+					s.messageHistory, event.Contents...)
 
 				// Cleanup the waiting buffer, it's now a part of the overall history.
-				delete(session.waitingAgents, event.Sender)
+				delete(s.waitingAgents, event.Sender)
 			}
 		case *proto.Event_SessionStateEvent:
-			session.state = x.SessionStateEvent.State
+			s.state = x.SessionStateEvent.State
 		case *proto.Event_HandoffEvent:
-			return nil, fmt.Errorf("HandoffEvent is not yet supported")
+			return fmt.Errorf("HandoffEvent is not yet supported")
 		case *proto.Event_ContentEvent:
-			session.messageHistory = append(session.messageHistory, x.ContentEvent.Contents...)
+			s.messageHistory = append(s.messageHistory, x.ContentEvent.Contents...)
 		default:
-			return nil, fmt.Errorf("unknown event kind: %v", e.Kind)
+			return fmt.Errorf("unknown event kind: %v", e.Kind)
 		}
 
 		if e.CheckpointId != "" {
-			session.checkpointIDs[e.CheckpointId] = struct{}{}
+			s.checkpointIDs[e.CheckpointId] = struct{}{}
 		}
 	}
-
-	sm.sessions[sessionID] = session
-	return session, nil
+	return nil
 }
 
 // GetSession retrieves a session by ID.

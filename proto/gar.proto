@@ -165,6 +165,35 @@ message TriggerSessionResponse {
   State state = 4;                // Session state
 }
 
+// GetSessionRequest for retrieving session details.
+message GetSessionRequest {
+  string session_id = 1;
+}
+
+// SessionInfo contains session details.
+message SessionInfo {
+  State state = 1;
+  repeated string active_agents = 2;
+  repeated string checkpoint_ids = 3;
+  google.protobuf.Timestamp created_at = 4;  // Session creation time
+  google.protobuf.Timestamp updated_at = 5;  // Last update time
+}
+
+// GetSessionResponse contains session information.
+message GetSessionResponse {
+  SessionInfo session = 1;
+}
+
+message ForkSessionRequest {
+  string source_session_id = 1;
+  string source_checkpoint_id = 2; // Checkpoint ID within the source session to fork from.
+  string dest_session_id = 3; // New session ID. If provided, must not exist.
+}
+
+message ForkSessionResponse {
+  string new_session_id = 1; // New session ID (in case it was generated or modified by server)
+}
+
 // RegisterAgentRequest for registering an agent
 message RegisterAgentRequest {
   string agent_id = 1;
@@ -192,6 +221,12 @@ service GARService {
   // TriggerSession triggers a new agentic loop session or resumes an existing one with streaming responses
   // If the session_id already exists, it will be resumed from the last checkpoint
   rpc TriggerSession(TriggerSessionRequest) returns (stream TriggerSessionResponse);
+
+  // GetSession retrieves session details
+  rpc GetSession(GetSessionRequest) returns (GetSessionResponse);
+
+  // ForkSession forks a session from a specific checkpoint.
+  rpc ForkSession(ForkSessionRequest) returns (ForkSessionResponse);
 
   // RegisterAgent registers a new agent with the controller
   rpc RegisterAgent(RegisterAgentRequest) returns (RegisterAgentResponse);

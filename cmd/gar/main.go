@@ -44,6 +44,8 @@ register agents, and run the controller server.`,
 func init() {
 	// Add subcommands
 	rootCmd.AddCommand(triggerCmd)
+	rootCmd.AddCommand(forkCmd)
+	rootCmd.AddCommand(inspectCmd)
 	rootCmd.AddCommand(registerCmd)
 	rootCmd.AddCommand(serveCmd)
 }
