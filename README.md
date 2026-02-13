@@ -84,9 +84,6 @@ gar register \
 gar trigger \
     --session session123 \
     --input "Hello remote agent"
-
-# Inspect session details
-gar inspect --session session123
 ```
 
 #### [Option B] Headless Mode (Simplified)
@@ -152,16 +149,6 @@ gar trigger --session abc123 \
 # Trigger using headless mode (local controller)
 gar trigger --headless --input "Quick test to upper case"
 ```
-
-#### Inspect a Session
-
-```bash
-gar inspect --session <id> [--server <address>]
-```
-
-Options:
-- `--session`: Session identifier to inspect (required)
-- `--server`: gRPC controller server address (default: "localhost:8494")
 
 #### Register a Remote Agent
 
@@ -233,9 +220,6 @@ Checkpoints provide a mechanism to save and resume session state at specific poi
 **Usage Examples:**
 
 ```bash
-# Inspect a session to see available checkpoints
-gar inspect --session session123
-
 # Resume from a specific checkpoint
 gar trigger --session session123 \
   --checkpoint "550e8400-e29b-41d4-a716-446655440000" \

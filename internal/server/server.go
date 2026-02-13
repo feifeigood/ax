@@ -79,26 +79,6 @@ func (s *Server) TriggerSession(req *proto.TriggerSessionRequest, stream grpc.Se
 		stream.Context(), sessionID, incoming, outputHandler)
 }
 
-// GetSession retrieves session details.
-func (s *Server) GetSession(ctx context.Context, req *proto.GetSessionRequest) (*proto.GetSessionResponse, error) {
-	if req.SessionId == "" {
-		return nil, fmt.Errorf("session_id is required")
-	}
-
-	// Load session if not already loaded
-	session, err := s.controller.LoadSession(ctx, req.SessionId)
-	if err != nil {
-		return nil, fmt.Errorf("error loading session: %w", err)
-	}
-
-	return &proto.GetSessionResponse{
-		Session: &proto.SessionInfo{
-			State:         session.State(),
-			CheckpointIds: session.CheckpointIDs(),
-		},
-	}, nil
-}
-
 // RegisterAgent registers a new remote agent with the controller.
 func (s *Server) RegisterAgent(ctx context.Context, req *proto.RegisterAgentRequest) (*proto.RegisterAgentResponse, error) {
 	if req.AgentId == "" {
