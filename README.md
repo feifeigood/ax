@@ -283,16 +283,6 @@ gar trigger \
   --input "Hello, I heard that there is an agent that can help with processing this text!"
 ```
 
-## Future Enhancements
-
-- [ ] Replace Content with Interactions Content
-- [ ] Rehydrate dangling agent invocations by appending agent events to the event log
-- [ ] Observability and trajectory collection
-- [ ] TLS support for remote agents
-- [ ] Fork session when resuming from a checkpoint that isn't the latest
-- [ ] Create a package of local agents (listing files, reading files, grep'ing the directory)
-- [ ] Web UI
-
 ## License
 
 Apache 2.0
