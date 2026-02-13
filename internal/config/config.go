@@ -120,7 +120,7 @@ func (c *Config) setDefaults() {
 
 	// Controller defaults
 	if c.MaxSteps == 0 {
-		c.MaxSteps = 100
+		c.MaxSteps = 5
 	}
 	// HealthCheck defaults
 	if c.HealthCheck.Enabled && c.HealthCheck.Interval == 0 {

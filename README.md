@@ -188,7 +188,7 @@ eventlog:
   dir: "eventlog"
 
 # Maximum steps per trigger
-max_steps: 50
+max_steps: 5
 
 health_check:
   # Health check interval for agents

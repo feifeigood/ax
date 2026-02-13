@@ -52,7 +52,7 @@ type Config struct {
 // New creates a new controller instance.
 func New(ctx context.Context, config Config) (*Controller, error) {
 	if config.MaxSteps == 0 {
-		config.MaxSteps = 100
+		config.MaxSteps = 5
 	}
 
 	if config.EventLogBuilder == nil {
