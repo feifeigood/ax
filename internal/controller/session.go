@@ -41,14 +41,14 @@ type Session struct {
 type SessionManager struct {
 	mu              sync.RWMutex
 	sessions        map[string]*Session
-	eventLogFactory eventlog.EventLogFactory
+	eventLogBuilder eventlog.EventLogBuilder
 }
 
-// NewSessionManager creates a new session manager with a custom EventLog factory.
-func NewSessionManager(factory eventlog.EventLogFactory) *SessionManager {
+// NewSessionManager creates a new session manager with a custom EventLog builder.
+func NewSessionManager(builder eventlog.EventLogBuilder) *SessionManager {
 	return &SessionManager{
 		sessions:        make(map[string]*Session),
-		eventLogFactory: factory,
+		eventLogBuilder: builder,
 	}
 }
 
@@ -65,8 +65,8 @@ func (sm *SessionManager) NewSession(sessionID string) (*Session, error) {
 		return nil, fmt.Errorf("session %s already exists", sessionID)
 	}
 
-	// Create event log for this session using the factory
-	el, err := sm.eventLogFactory(sessionID)
+	// Create event log for this session using the builder.
+	el, err := sm.eventLogBuilder(sessionID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create event log: %w", err)
 	}
@@ -102,8 +102,8 @@ func (sm *SessionManager) LoadSessionFromCheckpoint(ctx context.Context, session
 	// Check if already loaded - remove it to reload fresh from checkpoint
 	delete(sm.sessions, sessionID)
 
-	// Open event log for replay using the factory
-	el, err := sm.eventLogFactory(sessionID)
+	// Open event log for replay using the builder.
+	el, err := sm.eventLogBuilder(sessionID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open event log for replay: %w", err)
 	}

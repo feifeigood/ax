@@ -37,14 +37,14 @@ type Controller struct {
 	loopExecutor       *LoopExecutor
 }
 
-// PlannerFactory is a function that creates a PlanFunc given a Registry.
-type PlannerFactory func(ctx context.Context, r *Registry) (agent.Agent, error)
+// PlannerBuilder is a function that creates a PlanFunc given a Registry.
+type PlannerBuilder func(ctx context.Context, r *Registry) (agent.Agent, error)
 
 // Config configures the controller.
 type Config struct {
-	EventLogFactory eventlog.EventLogFactory
-	PlannerFactory  PlannerFactory
-	// TODO(jbd): Add CompacterFactory.
+	EventLogBuilder eventlog.EventLogBuilder
+	PlannerBuilder  PlannerBuilder
+	// TODO(jbd): Add CompacterBuilder.
 	HealthCheck config.HealthCheckConfig
 	MaxSteps    int
 }
@@ -55,8 +55,8 @@ func New(ctx context.Context, config Config) (*Controller, error) {
 		config.MaxSteps = 100
 	}
 
-	if config.EventLogFactory == nil {
-		config.EventLogFactory = func(sessionID string) (eventlog.EventLog, error) {
+	if config.EventLogBuilder == nil {
+		config.EventLogBuilder = func(sessionID string) (eventlog.EventLog, error) {
 			return eventlog.NewFileEventLog(eventlog.FileConfig{
 				SessionID: sessionID,
 				Dir:       "eventlog",
@@ -65,7 +65,7 @@ func New(ctx context.Context, config Config) (*Controller, error) {
 	}
 
 	// Initialize session manager with file-based event logs
-	sessionManager := NewSessionManager(config.EventLogFactory)
+	sessionManager := NewSessionManager(config.EventLogBuilder)
 
 	// Initialize agent registry
 	registry, err := NewRegistry(config.HealthCheck)
@@ -74,16 +74,16 @@ func New(ctx context.Context, config Config) (*Controller, error) {
 	}
 
 	// Determine plan function
-	// If no planner factory is provided, use the default Gemini planner.
-	if config.PlannerFactory == nil {
-		config.PlannerFactory = func(ctx context.Context, r *Registry) (agent.Agent, error) {
+	// If no planner builder is provided, use the default Gemini planner.
+	if config.PlannerBuilder == nil {
+		config.PlannerBuilder = func(ctx context.Context, r *Registry) (agent.Agent, error) {
 			return NewGeminiPlanner(ctx, r, GeminiPlannerConfig{})
 		}
 	}
 
-	planner, err := config.PlannerFactory(ctx, registry)
+	planner, err := config.PlannerBuilder(ctx, registry)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create planner from factory: %w", err)
+		return nil, fmt.Errorf("failed to create planner from builder: %w", err)
 	}
 
 	// Initialize loop executor

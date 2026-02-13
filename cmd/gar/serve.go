@@ -88,17 +88,17 @@ func runServe(cmd *cobra.Command, args []string) error {
 }
 
 func newControllerFromConfig(ctx context.Context, cfg *config.Config) (*controller.Controller, error) {
-	// Create event log factory
-	eventLogFactory := func(sessionID string) (eventlog.EventLog, error) {
+	// Create event log builder
+	eventLogBuilder := func(sessionID string) (eventlog.EventLog, error) {
 		return eventlog.NewFileEventLog(eventlog.FileConfig{
 			SessionID: sessionID,
 			Dir:       cfg.EventLog.Dir,
 		})
 	}
 
-	// Create planner factory
-	plannerFactory := func(ctx context.Context, r *controller.Registry) (agent.Agent, error) {
-		// The factory defines which planner to use.
+	// Create planner builder
+	plannerBuilder := func(ctx context.Context, r *controller.Registry) (agent.Agent, error) {
+		// The builder defines which planner to use.
 		// Currently, it uses the Gemini planner.
 		// Gemini config can be customized via environment variables (GEMINI_API_KEY, GAR_GEMINI_MODEL)
 		// TODO(lhuan): allow other planners based on cfg.PlannerType
@@ -112,8 +112,8 @@ func newControllerFromConfig(ctx context.Context, cfg *config.Config) (*controll
 
 	// Build controller config
 	controllerConfig := controller.Config{
-		EventLogFactory: eventLogFactory,
-		PlannerFactory:  plannerFactory,
+		EventLogBuilder: eventLogBuilder,
+		PlannerBuilder:  plannerBuilder,
 		MaxSteps:        cfg.MaxSteps,
 		HealthCheck:     cfg.HealthCheck,
 	}
