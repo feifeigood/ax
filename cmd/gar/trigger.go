@@ -30,29 +30,24 @@ import (
 )
 
 var (
-	triggerSessionID     string
-	triggerInput         string
-	triggerCheckpoint    string
-	triggerDestSessionID string
-	triggerServerAddr    string
-	triggerHeadless      bool
-	triggerConfigFile    string
+	triggerSessionID  string
+	triggerInput      string
+	triggerServerAddr string
+	triggerHeadless   bool
+	triggerConfigFile string
 )
 
 var triggerCmd = &cobra.Command{
 	Use:   "trigger",
 	Short: "Trigger a new session or resume an existing one",
 	Long: `Trigger a new agentic session or resume an existing one.
-If no session ID is provided, a new UUID will be generated.
-Use --checkpoint to resume from a specific checkpoint.`,
+If no session ID is provided, a new UUID will be generated.`,
 	RunE: runTrigger,
 }
 
 func init() {
 	triggerCmd.Flags().StringVar(&triggerSessionID, "session", "", "Session ID (optional, generates UUID if not provided)")
 	triggerCmd.Flags().StringVar(&triggerInput, "input", "", "Input message to send (required)")
-	triggerCmd.Flags().StringVar(&triggerCheckpoint, "checkpoint", "", "Resume from specific checkpoint UUID (empty for latest)")
-	triggerCmd.Flags().StringVar(&triggerDestSessionID, "destination_session", "", "Destination Session ID when forking from checkpoint (optional)")
 	triggerCmd.Flags().StringVar(&triggerServerAddr, "server", "localhost:8494", "gRPC controller server address (default: localhost:8494)")
 	triggerCmd.Flags().BoolVar(&triggerHeadless, "headless", false, "Run in headless mode with a built-in Controller")
 	triggerCmd.Flags().StringVar(&triggerConfigFile, "config", "gar.yaml", "Path to YAML configuration file (only used in headless mode)")
@@ -107,20 +102,6 @@ func runTrigger(cmd *cobra.Command, args []string) error {
 
 	client := proto.NewGARServiceClient(conn)
 
-	// If checkpoint is provided, we fork the session first
-	if triggerCheckpoint != "" {
-		if triggerDestSessionID == "" {
-			triggerDestSessionID = uuid.New().String()
-			fmt.Printf("Generated new session ID: %s\n", triggerDestSessionID)
-		}
-		
-		forkedID, err := ForkSession(ctx, client, triggerSessionID, triggerCheckpoint, triggerDestSessionID)
-		if err != nil {
-			return err
-		}
-		triggerSessionID = forkedID
-	}
-
 	stream, err := client.TriggerSession(ctx, &proto.TriggerSessionRequest{
 		SessionId:    triggerSessionID,
 		Inputs:       inputs,
@@ -167,7 +148,6 @@ func runHeadless(ctx context.Context, sessionID string, inputs []*proto.Content)
 		return fmt.Errorf("error creating controller: %w", err)
 	}
 	defer c.Close()
-
 	// TODO(lhuan): Allow a default local agent to be registered in headless mode.
 
 	// Create output handler to print streaming results to stdout
@@ -177,8 +157,7 @@ func runHeadless(ctx context.Context, sessionID string, inputs []*proto.Content)
 	})
 
 	req := &proto.ProcessRequest{
-		CheckpointId: triggerCheckpoint,
-		Contents:     inputs,
+		Contents: inputs,
 	}
 
 	if err := c.TriggerSession(ctx, sessionID, req, outputHandler); err != nil {

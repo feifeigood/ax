@@ -153,8 +153,7 @@ enum State {
 // TriggerSessionRequest for triggering a new session
 message TriggerSessionRequest {
   string session_id = 1;               // Unique session identifier
-  string checkpoint_id = 2;            // Optional: Resume from specific checkpoint UUID (empty for latest)
-  repeated Content inputs = 3;         // Input content to process
+  repeated Content inputs = 2;         // Input content to process
 }
 
 // TriggerSessionResponse contains the result of triggering a session

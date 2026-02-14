@@ -48,7 +48,6 @@ func New(c *controller.Controller) *Server {
 func (s *Server) TriggerSession(req *proto.TriggerSessionRequest, stream grpc.ServerStreamingServer[proto.TriggerSessionResponse]) error {
 	sessionID := req.SessionId
 	inputs := req.Inputs
-	checkpointID := req.CheckpointId
 
 	// TODO(jbd): This state update should be sent directly from the controller.
 	if err := stream.Send(&proto.TriggerSessionResponse{
@@ -59,44 +58,19 @@ func (s *Server) TriggerSession(req *proto.TriggerSessionRequest, stream grpc.Se
 	}
 
 	incoming := &proto.ProcessRequest{
-		CheckpointId: req.CheckpointId,
-		Contents:     inputs,
+		Contents: inputs,
 	}
-	if checkpointID == "" {
-		// Create output handler to stream outputs back to client
-		outputHandler := agent.OutputHandler(func(outgoing *proto.ProcessResponse) error {
-			return stream.Send(&proto.TriggerSessionResponse{
-				SessionId:    sessionID,
-				CheckpointId: outgoing.CheckpointId,
-				Outputs:      outgoing.Contents,
-				State:        proto.State_STATE_RUNNING,
-			})
-		})
-		return s.controller.TriggerSession(
-			stream.Context(), sessionID, incoming, outputHandler)
-	}
-
-	return s.TriggerFromCheckpoint(stream.Context(), sessionID, checkpointID, sessionID, incoming, stream)
-}
-
-func (s *Server) TriggerFromCheckpoint(ctx context.Context, sourceSessionID, checkpointID, newSessionID string, incoming *proto.ProcessRequest, stream grpc.ServerStreamingServer[proto.TriggerSessionResponse]) error {
-	// Create output handler
+	// Create output handler to stream outputs back to client
 	outputHandler := agent.OutputHandler(func(outgoing *proto.ProcessResponse) error {
 		return stream.Send(&proto.TriggerSessionResponse{
-			SessionId:    newSessionID,
+			SessionId:    sessionID,
 			CheckpointId: outgoing.CheckpointId,
 			Outputs:      outgoing.Contents,
 			State:        proto.State_STATE_RUNNING,
 		})
 	})
-
-	// Fork session
-	if err := s.controller.ForkSession(ctx, sourceSessionID, checkpointID, newSessionID); err != nil {
-		return fmt.Errorf("failed to prepare session from checkpoint: %w", err)
-	}
-
-	// Trigger new session
-	return s.controller.TriggerSession(ctx, newSessionID, incoming, outputHandler)
+	return s.controller.TriggerSession(
+		stream.Context(), sessionID, incoming, outputHandler)
 }
 
 func (s *Server) ForkSession(ctx context.Context, req *proto.ForkSessionRequest) (*proto.ForkSessionResponse, error) {

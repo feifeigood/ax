@@ -118,18 +118,14 @@ The `gar` command provides several subcommands:
 gar trigger \
     --input <text> \
     [--session <id>] \
-    [--checkpoint <uuid>] \
-    [--destination_session <id>] \
     [--server <address>]
 ```
 
-Triggers a new agentic loop session or automatically resumes an existing one. If the session ID already exists, the session will be resumed from its last checkpoint (or a specific checkpoint if provided) with the new input.
+Triggers a new agentic loop session or automatically resumes an existing one. If the session ID already exists, the session will be resumed from its last state with the new input.
 
 Options:
 - `--input`: Input message to send to agents (required)
 - `--session`: Unique session identifier (optional, generates UUID if not provided, or resumes if exists)
-- `--checkpoint`: Resume from specific checkpoint (empty for latest)
-- `--destination_session`: New Session ID when resuming from a checkpoint (optional, auto-generated if empty).
 - `--server`: gRPC controller server address (default: "localhost:8494")
 - `--headless`: Run in headless mode with a built-in GAR server
 - `--config`: Path to YAML configuration file (only used in headless mode, default: "gar.yaml")
@@ -143,20 +139,9 @@ gar trigger --input "Hello agent"
 # Resume an existing session with new input
 gar trigger --session abc123 --input "Continue processing"
 
-# Resume from a specific checkpoint (useful for undoing mistakes or exploring alternatives)
-gar trigger --session abc123 \
-    --checkpoint "550e8400-e29b-41d4-a716-446655440000" \
-    --input "Try a different approach"
-
 # Trigger using headless mode (local controller)
 gar trigger --headless --input "Quick test to upper case"
 
-# Trigger a session from a specific checkpoint - gar will auto fork the session to a new session id and resume from the checkpoint. User can provide desitination_session to specify the new session id, otherwise it will auto generate one. 
-gar trigger \
-    --session session123 \
-    --checkpoint "550e8400-e29b-41d4-a716-446655440000" \
-    --destination_session session123-fork \
-    --input "Continue processing"
 ```
 
 #### Fork a Session
