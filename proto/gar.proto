@@ -165,8 +165,8 @@ message TriggerSessionResponse {
 }
 
 message ForkSessionRequest {
-  string source_session_id = 1;
-  string source_checkpoint_id = 2; // Checkpoint ID within the source session to fork from.
+  string src_session_id = 1;
+  string src_checkpoint_id = 2; // Checkpoint ID within the source session to fork from.
   string dest_session_id = 3; // New session ID. If provided, must not exist.
 }
 

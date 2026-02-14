@@ -27,7 +27,6 @@ var (
 	forkSourceSessionID string
 	forkCheckpointID    string
 	forkDestSessionID   string
-	forkInput           string
 	forkServerAddr      string
 )
 
@@ -35,17 +34,17 @@ var forkCmd = &cobra.Command{
 	Use:   "fork",
 	Short: "Fork a session from a specific checkpoint",
 	Long: `Fork an existing agentic session from a specific checkpoint.
-If --destination_session is not provided, a new UUID will be generated.`,
+If --dest_session is not provided, a new UUID will be generated.`,
 	RunE: runFork,
 }
 
 func init() {
-	forkCmd.Flags().StringVar(&forkSourceSessionID, "source_session", "", "Source Session ID to fork from (required)")
-	forkCmd.Flags().StringVar(&forkCheckpointID, "checkpoint", "", "Checkpoint ID to fork from (optional, defaults to latest)")
-	forkCmd.Flags().StringVar(&forkDestSessionID, "destination_session", "", "Destination Session ID (optional, generates UUID if not provided)")
+	forkCmd.Flags().StringVar(&forkSourceSessionID, "src_session", "", "Source Session ID to fork from (required)")
+	forkCmd.Flags().StringVar(&forkCheckpointID, "src_checkpoint", "", "Checkpoint ID to fork from (optional, defaults to latest)")
+	forkCmd.Flags().StringVar(&forkDestSessionID, "dest_session", "", "Destination Session ID (optional, generates UUID if not provided)")
 	forkCmd.Flags().StringVar(&forkServerAddr, "server", "localhost:8494", "gRPC controller server address (default: localhost:8494)")
 
-	forkCmd.MarkFlagRequired("source_session")
+	forkCmd.MarkFlagRequired("src_session")
 }
 
 func runFork(cmd *cobra.Command, args []string) error {
@@ -74,9 +73,9 @@ func ForkSession(ctx context.Context, client proto.GARServiceClient, sourceSessi
 	fmt.Printf("Forking from source session %s at checkpoint %s to destination session %s\n", sourceSessionID, checkpointID, destSessionID)
 
 	resp, err := client.ForkSession(ctx, &proto.ForkSessionRequest{
-		SourceSessionId:    sourceSessionID,
-		SourceCheckpointId: checkpointID,
-		DestSessionId:      destSessionID,
+		SrcSessionId:    sourceSessionID,
+		SrcCheckpointId: checkpointID,
+		DestSessionId:   destSessionID,
 	})
 	if err != nil {
 		return "", fmt.Errorf("error forking session: %w", err)

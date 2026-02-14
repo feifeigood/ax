@@ -153,8 +153,11 @@ func (sm *SessionManager) loadEvents(ctx context.Context, sessionID, checkpointI
 
 // ForkSession creates a new session by forking from a source session's checkpoint.
 func (sm *SessionManager) ForkSession(ctx context.Context, sourceSessionID, sourceCheckpointID, newSessionID string) (*Session, error) {
+	if err := validateID(sourceSessionID); err != nil {
+		return nil, fmt.Errorf("invalid source session ID: %w", err)
+	}
 	if err := validateID(newSessionID); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("invalid new session ID: %w", err)
 	}
 
 	// 1. Check if session already exists in backend storage

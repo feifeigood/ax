@@ -74,7 +74,7 @@ func (s *Server) TriggerSession(req *proto.TriggerSessionRequest, stream grpc.Se
 }
 
 func (s *Server) ForkSession(ctx context.Context, req *proto.ForkSessionRequest) (*proto.ForkSessionResponse, error) {
-	if err := s.controller.ForkSession(ctx, req.SourceSessionId, req.SourceCheckpointId, req.DestSessionId); err != nil {
+	if err := s.controller.ForkSession(ctx, req.SrcSessionId, req.SrcCheckpointId, req.DestSessionId); err != nil {
 		return nil, err
 	}
 

@@ -155,10 +155,10 @@ func (d *Controller) TriggerSession(ctx context.Context, sessionID string, incom
 // If checkpointId is provided, fork til the checkpoint. Otherwise, fork the whole session.
 func (d *Controller) ForkSession(ctx context.Context, sourceSessionID, sourceCheckpoint, destSessionID string) error {
 	if sourceSessionID == "" {
-		return fmt.Errorf("source_session_id is required")
+		return fmt.Errorf("source session ID is required")
 	}
 	if destSessionID == "" {
-		return fmt.Errorf("new_session_id is required")
+		return fmt.Errorf("destination session ID is required")
 	}
 
 	d.inFlightSessionsMu.Lock()
