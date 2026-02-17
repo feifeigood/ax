@@ -256,7 +256,7 @@ func (s *Session) reconstructState(events []*proto.Event) error {
 		case *proto.Event_SessionStateEvent:
 			s.state = x.SessionStateEvent.State
 		case *proto.Event_HandoffEvent:
-			return fmt.Errorf("HandoffEvent is not yet supported")
+			// TODO: Visit this section when resuming the waiting agents.
 		case *proto.Event_ContentEvent:
 			s.messageHistory = append(s.messageHistory, x.ContentEvent.Contents...)
 		default:
