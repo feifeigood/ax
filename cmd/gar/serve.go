@@ -82,7 +82,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 	go func() {
 		<-sigChan
 		log.Println("\nReceived interrupt, shutting down...")
-		os.Exit(0)
+		srv.GracefulStop()
 	}()
 
 	log.Printf("Starting GAR server at %s...\n", cfg.Server.Address)

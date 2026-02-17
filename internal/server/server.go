@@ -35,6 +35,7 @@ type Server struct {
 	proto.UnimplementedGARServiceServer
 
 	controller *controller.Controller
+	grpcServer *grpc.Server
 }
 
 // New creates a new controller server.
@@ -143,12 +144,20 @@ func (s *Server) Serve(address string, opts ...grpc.ServerOption) error {
 		return fmt.Errorf("failed to listen: %w", err)
 	}
 
-	grpcServer := grpc.NewServer(opts...)
-	proto.RegisterGARServiceServer(grpcServer, s)
+	s.grpcServer = grpc.NewServer(opts...)
+	proto.RegisterGARServiceServer(s.grpcServer, s)
 
-	if err := grpcServer.Serve(lis); err != nil {
+	if err := s.grpcServer.Serve(lis); err != nil {
 		return fmt.Errorf("failed to serve: %w", err)
 	}
 
 	return nil
 }
+
+// GracefulStop stops the gRPC server gracefully.
+func (s *Server) GracefulStop() {
+	if s.grpcServer != nil {
+		s.grpcServer.GracefulStop()
+	}
+}
+
