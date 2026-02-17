@@ -145,10 +145,11 @@ func runTriggerHeadless(ctx context.Context, d *internal.Display, sessionID stri
 
 	var checkpoint string
 	outputHandler := agent.OutputHandler(func(resp *proto.ProcessResponse) error {
-		displayContents(d, resp.Contents)
 		if resp.CheckpointId != "" {
 			checkpoint = resp.CheckpointId
 		}
+
+		displayContents(d, resp.Contents)
 		return nil
 	})
 	if err := triggerController.TriggerSession(ctx, sessionID, &proto.ProcessRequest{

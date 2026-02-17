@@ -19,7 +19,6 @@ import (
 	"sync/atomic"
 
 	"github.com/charmbracelet/huh"
-	"github.com/charmbracelet/huh/spinner"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -56,27 +55,6 @@ func NewDisplay(sessionID string) *Display {
 	}
 }
 
-func (d *Display) hideLoading() {
-	if d.loadingVisible.Load() {
-		d.loadingStopCh <- true
-		d.loadingVisible.Store(false)
-	}
-}
-
-func (d *Display) showLoading() {
-	d.loadingVisible.Store(true)
-
-	done := func() {
-		<-d.loadingStopCh
-	}
-	go func() {
-		spinner.New().
-			Title("Loading...").
-			Action(done).
-			Run()
-	}()
-}
-
 // DisplayInput displays the user input.
 func (d *Display) DisplayInput(text string) {
 	fmt.Printf("%s %s\n",
@@ -84,14 +62,10 @@ func (d *Display) DisplayInput(text string) {
 		text,
 	)
 	fmt.Println()
-
-	d.showLoading()
 }
 
 // DisplayOutput displays an output fragment.
 func (d *Display) DisplayOutput(text string) {
-	d.hideLoading()
-
 	fmt.Print(text)
 }
 
@@ -114,8 +88,6 @@ func (d *Display) DisplayHeader() {
 // PromptForApproval shows an accept/reject dialog
 // Returns true if accepted, false if rejected, and an error if cancelled (Ctrl+C)
 func (d *Display) PromptForApproval(question string) (bool, error) {
-	d.hideLoading()
-
 	var accepted bool
 	form := huh.NewForm(
 		huh.NewGroup(
@@ -136,8 +108,6 @@ func (d *Display) PromptForApproval(question string) (bool, error) {
 // PromptForInput shows the input box and returns the user input
 // Returns the input string and an error if the user cancelled (Ctrl+C)
 func (d *Display) PromptForInput() (string, error) {
-	d.hideLoading()
-
 	var userInput string
 	form := huh.NewForm(
 		huh.NewGroup(

@@ -166,7 +166,6 @@ func (p *geminiPlannerAgent) Process(ctx context.Context, sessionID string, inco
 		}
 
 		if part.Text != "" {
-			// Text response
 			if err := handler(&proto.ProcessResponse{
 				Contents: []*proto.Content{{
 					Content: &proto.Content_Text{
