@@ -58,11 +58,10 @@ agents and built-in tools already linked into the GAR binary.
 
 ```bash
 # Using default gar.yaml
-gar gar trigger --headless --input "Can you list me this directory?"
+gar trigger --headless --input "Can you list me this directory?"
 
 # Using a custom configuration
-gar gar trigger --headless --input "Can you list me this directory?" --config my-config.yaml
-
+gar trigger --headless --input "Can you list me this directory?" --config my-config.yaml
 ```
 
 You can continue a session any time:
