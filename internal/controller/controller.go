@@ -137,24 +137,14 @@ func (d *Controller) TriggerSession(ctx context.Context, sessionID string, incom
 		return fmt.Errorf("session_id is required")
 	}
 
-	d.inFlightSessionsMu.Lock()
-	_, ok := d.inFlightSessions[sessionID]
-	if !ok {
-		d.inFlightSessions[sessionID] = struct{}{}
-	}
-	d.inFlightSessionsMu.Unlock()
+	inFlight, cleanup := d.markInFlight(sessionID)
+	defer cleanup()
 
-	if ok {
+	if inFlight {
 		return fmt.Errorf("session is already in flight")
 	}
 
-	defer func() {
-		d.inFlightSessionsMu.Lock()
-		delete(d.inFlightSessions, sessionID)
-		d.inFlightSessionsMu.Unlock()
-	}()
-
-	// Always load session from storage to ensure latest state
+	// Check if session already exists
 	sess, err := d.sessionManager.LoadSession(ctx, sessionID)
 	if err != nil {
 		return fmt.Errorf("failed to load session from storage: %w", err)
@@ -179,6 +169,23 @@ func (d *Controller) TriggerSession(ctx context.Context, sessionID string, incom
 	return nil
 }
 
+func (d *Controller) markInFlight(sessionID string) (exists bool, cleanup func()) {
+	d.inFlightSessionsMu.Lock()
+	defer d.inFlightSessionsMu.Unlock()
+
+	_, ok := d.inFlightSessions[sessionID]
+	if ok {
+		return true, func() {}
+	}
+	d.inFlightSessions[sessionID] = struct{}{}
+
+	return false, func() {
+		d.inFlightSessionsMu.Lock()
+		delete(d.inFlightSessions, sessionID)
+		d.inFlightSessionsMu.Unlock()
+	}
+}
+
 // ForkSession forks a session from a source session.
 // If checkpointId is provided, fork til the checkpoint. Otherwise, fork the whole session.
 func (d *Controller) ForkSession(ctx context.Context, sourceSessionID, sourceCheckpoint, destSessionID string) error {
@@ -189,22 +196,19 @@ func (d *Controller) ForkSession(ctx context.Context, sourceSessionID, sourceChe
 		return fmt.Errorf("destination session ID is required")
 	}
 
-	d.inFlightSessionsMu.Lock()
-	_, ok := d.inFlightSessions[destSessionID]
-	if !ok {
-		d.inFlightSessions[destSessionID] = struct{}{}
-	}
-	d.inFlightSessionsMu.Unlock()
+	srInFlight, srcCleanup := d.markInFlight(sourceSessionID)
+	defer srcCleanup()
 
-	if ok {
-		return fmt.Errorf("newly generated session ID collision")
+	if srInFlight {
+		return fmt.Errorf("source session is already in flight")
 	}
 
-	defer func() {
-		d.inFlightSessionsMu.Lock()
-		delete(d.inFlightSessions, destSessionID)
-		d.inFlightSessionsMu.Unlock()
-	}()
+	destFlight, destCleanup := d.markInFlight(destSessionID)
+	defer destCleanup()
+
+	if destFlight {
+		return fmt.Errorf("destination session is already in flight")
+	}
 
 	// Fork the session
 	_, err := d.sessionManager.ForkSession(ctx, sourceSessionID, sourceCheckpoint, destSessionID)
