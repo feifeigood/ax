@@ -39,12 +39,12 @@ If --dest_session is not provided, a new UUID will be generated.`,
 }
 
 func init() {
-	forkCmd.Flags().StringVar(&forkSourceSessionID, "src_session", "", "Source Session ID to fork from (required)")
-	forkCmd.Flags().StringVar(&forkCheckpointID, "src_checkpoint", "", "Checkpoint ID to fork from (optional, defaults to latest)")
-	forkCmd.Flags().StringVar(&forkDestSessionID, "dest_session", "", "Destination Session ID (optional, generates UUID if not provided)")
+	forkCmd.Flags().StringVar(&forkSourceSessionID, "src-session", "", "Source Session ID to fork from (required)")
+	forkCmd.Flags().StringVar(&forkCheckpointID, "src-checkpoint", "", "Checkpoint ID to fork from (optional, defaults to latest)")
+	forkCmd.Flags().StringVar(&forkDestSessionID, "dest-session", "", "Destination Session ID (optional, generates UUID if not provided)")
 	forkCmd.Flags().StringVar(&forkServerAddr, "server", "localhost:8494", "gRPC controller server address (default: localhost:8494)")
 
-	forkCmd.MarkFlagRequired("src_session")
+	forkCmd.MarkFlagRequired("src-session")
 }
 
 func runFork(cmd *cobra.Command, args []string) error {

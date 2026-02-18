@@ -246,9 +246,13 @@ Checkpoints provide a mechanism to save and resume session state at specific poi
 **Usage Examples:**
 
 ```bash
-# Resume from a specific checkpoint
-gar trigger --session session123 \
-  --checkpoint "550e8400-e29b-41d4-a716-446655440000" \
+# Fork from a checkpoint to a new session
+gar fork --src_session session123 \
+  --src_checkpoint "550e8400-e29b-41d4-a716-446655440000" \
+  --dest_session session456
+
+# Resume from the forked session
+gar trigger --session session456 \
   --input "Try different approach"
 ```
 
