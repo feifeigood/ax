@@ -124,7 +124,7 @@ func registerDefaultLocalAgents(r *Registry) error {
 	return r.RegisterLocal(config.LocalAgentConfig{
 		ID:          "browser",
 		Name:        "Browser Agent",
-		Description: "An agent that can browse the a given URL. The agent returns the content of the page as markdown.",
+		Description: "An agent that can fetch a URL. The agent returns the content of the page as markdown. Only use this agent if user specifically provides a URL to fetch.",
 		Agent:       browser.NewAgent(),
 	})
 }
