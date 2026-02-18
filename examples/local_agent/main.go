@@ -75,7 +75,6 @@ func main() {
 
 	inputs := []*proto.Content{
 		{
-			Role: "user",
 			Content: &proto.Content_Text{
 				Text: &proto.TextContent{
 					Text: input,
@@ -98,6 +97,7 @@ func main() {
 		return nil
 	})
 	if err := c.TriggerSession(ctx, sessionID, &proto.ProcessRequest{
+		Role:     "user",
 		Contents: inputs,
 	}, handler); err != nil {
 		log.Fatalf("Error triggering session: %v\n", err)
@@ -109,9 +109,9 @@ func createEchoAgent() (*agent.LocalAgent, error) {
 		// Process each input and call handler with response
 		for _, content := range incoming.Contents {
 			if err := handler(&proto.ProcessResponse{
+				Role: "assistant",
 				Contents: []*proto.Content{
 					{
-						Role: "assistant",
 						Content: &proto.Content_Text{
 							Text: &proto.TextContent{
 								Text: strings.ToUpper(content.GetText().Text),

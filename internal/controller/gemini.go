@@ -132,7 +132,7 @@ func (p *geminiPlannerAgent) Process(ctx context.Context, sessionID string, inco
 	}
 
 	// Convert session to conversation history
-	contents := protoToContents(incoming.Contents)
+	contents := protoToContents(incoming.Role, incoming.Contents)
 	resp, err := p.client.Models.GenerateContent(ctx, p.config.Model, contents, &genai.GenerateContentConfig{
 		Tools: tools,
 		ToolConfig: &genai.ToolConfig{
@@ -214,12 +214,11 @@ func (p *geminiPlannerAgent) Close() error {
 }
 
 // protoToContents converts session message history to Gemini conversation format.
-func protoToContents(inputs []*proto.Content) []*genai.Content {
+func protoToContents(role string, inputs []*proto.Content) []*genai.Content {
 	var contents []*genai.Content
 
 	// Convert each message to Gemini format
 	for _, msg := range inputs {
-		role := msg.Role
 		if role != "user" {
 			role = "model"
 		}

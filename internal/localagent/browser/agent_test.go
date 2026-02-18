@@ -48,10 +48,10 @@ func TestBrowserAgentProcess(t *testing.T) {
 
 	var chunks []string
 	err := a.Process(context.Background(), "s1", &proto.ProcessRequest{
+		Role:         "user",
 		CheckpointId: "cp1",
 		Contents: []*proto.Content{
 			{
-				Role:    "user",
 				Content: &proto.Content_Text{Text: &proto.TextContent{Text: "Check out this URL: example.test/page"}},
 			},
 		},

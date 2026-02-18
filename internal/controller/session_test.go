@@ -45,7 +45,7 @@ func (m *MockEventLog) AppendEvent(ctx context.Context, e *proto.Event) error {
 func (m *MockEventLog) LoadEvents(ctx context.Context, checkpointID string) ([]*proto.Event, proto.State, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	var events []*proto.Event
 	var state proto.State
 	for _, e := range m.events {
@@ -74,7 +74,7 @@ func (m *MockEventLog) SessionID() string {
 
 func TestSessionManager_ForkSession_Success(t *testing.T) {
 	ctx := context.Background()
-	
+
 	// Create a storage for mocks to simulate persistence
 	storage := make(map[string]*MockEventLog)
 	factory := func(sessionID string) (eventlog.EventLog, error) {
@@ -98,7 +98,7 @@ func TestSessionManager_ForkSession_Success(t *testing.T) {
 	// Setup source session with events
 	sourceEL, _ := factory(sourceID)
 	sourceEvents := []*proto.Event{
-		{SessionId: sourceID, CheckpointId: checkpointID, Kind: &proto.Event_ContentEvent{ContentEvent: &proto.ContentEvent{Contents: []*proto.Content{{Role: "user"}}}}},
+		{SessionId: sourceID, CheckpointId: checkpointID, Kind: &proto.Event_ContentEvent{ContentEvent: &proto.ContentEvent{Role: "user", Contents: []*proto.Content{{}}}}},
 		{SessionId: sourceID, Kind: &proto.Event_SessionStateEvent{SessionStateEvent: &proto.SessionStateEvent{State: proto.State_STATE_COMPLETED}}},
 	}
 	for _, e := range sourceEvents {
@@ -124,7 +124,6 @@ func TestSessionManager_ForkSession_Success(t *testing.T) {
 		t.Errorf("expected replayed event to have session ID %s, got %s", newID, forkEL.events[0].SessionId)
 	}
 }
-
 
 func TestSessionManager_ForkSession_Concurrent(t *testing.T) {
 	// Test if multiple concurrent forks to the same ID handle memory lock correctly

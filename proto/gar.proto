@@ -26,8 +26,11 @@ message ProcessRequest {
   // the contents.
   string checkpoint_id = 1;
 
+  // The role associated with the contents if any.
+  string role = 2;
+
   // Contents as input.
-  repeated Content contents = 2;
+  repeated Content contents = 3;
 }
 
 // ProcessResponse is an output from an agent.
@@ -37,12 +40,15 @@ message ProcessResponse {
   // the contents.
   string checkpoint_id = 1;
 
+  // The role associated with the contents if any.
+  string role = 2;
+
   // Contents as output.
-  repeated Content contents = 2;
+  repeated Content contents = 3;
 
   // Optional agent handoff. If set controller, hands off the
   // execution to the provided agent.
-  string agent_handoff = 3;
+  string agent_handoff = 4;
 }
 
 // TextContent represents a text content.
@@ -59,8 +65,6 @@ message Content {
   oneof content {
     TextContent text = 10;
   }
-
-  string role = 1000; // The role of the content (e.g., "user", "assistant", "system")
 
   // TODO: Bring other types to the oneof to be
   // fully compatible with the Interactions Content message.
@@ -97,7 +101,8 @@ message HandoffEvent {
 // Content changes such as user inputs are recorded
 // as content events.
 message ContentEvent {
-  repeated Content contents = 1;
+  string role = 1;
+  repeated Content contents = 2;
 }
 
 // Event is the entry in the event log. Events are used
@@ -153,15 +158,17 @@ enum State {
 // TriggerSessionRequest for triggering a new session
 message TriggerSessionRequest {
   string session_id = 1;               // Unique session identifier
-  repeated Content inputs = 2;         // Input content to process
+  string role = 2;                    // The role associated with the inputs
+  repeated Content inputs = 3;         // Input content to process
 }
 
 // TriggerSessionResponse contains the result of triggering a session
 message TriggerSessionResponse {
   string session_id = 1;          // Session ID (in case it was generated or modified by server)
   string checkpoint_id = 2;       // Current checkpoint ID
-  repeated Content outputs = 3;   // Output content
-  State state = 4;                // Session state
+  string role = 3;                // The role associated with the outputs
+  repeated Content outputs = 4;   // Output content
+  State state = 5;                // Session state
 }
 
 message ForkSessionRequest {

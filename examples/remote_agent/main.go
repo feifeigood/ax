@@ -51,7 +51,6 @@ func (s *server) Process(stream proto.AgentService_ProcessServer) error {
 		var contents []*proto.Content
 		for _, input := range incoming.Contents {
 			contents = append(contents, &proto.Content{
-				Role: "assistant",
 				Content: &proto.Content_Text{
 					Text: &proto.TextContent{
 						Text: strings.ToUpper(input.GetText().Text),
@@ -60,6 +59,7 @@ func (s *server) Process(stream proto.AgentService_ProcessServer) error {
 			})
 		}
 		if err := stream.Send(&proto.ProcessResponse{
+			Role:         "assistant",
 			Contents:     contents,
 			CheckpointId: uuid.New().String(),
 		}); err != nil {

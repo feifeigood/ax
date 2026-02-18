@@ -95,7 +95,6 @@ func triggerLoop(ctx context.Context, sessionID string, input string) error {
 
 		inputs := []*proto.Content{
 			{
-				Role: "user",
 				Content: &proto.Content_Text{
 					Text: &proto.TextContent{
 						Text: input,
@@ -172,6 +171,7 @@ func runTriggerServer(ctx context.Context, d *internal.Display, sessionID string
 	client := proto.NewGARServiceClient(conn)
 	stream, err := client.TriggerSession(ctx, &proto.TriggerSessionRequest{
 		SessionId: sessionID,
+		Role:      "user",
 		Inputs:    inputs,
 	})
 	if err != nil {

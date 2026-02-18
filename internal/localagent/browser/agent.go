@@ -83,10 +83,10 @@ func (a *BrowserAgent) Close() error {
 // It generates a new UUID for each response checkpoint.
 func (a *BrowserAgent) emit(handler agent.OutputHandler, text string) error {
 	return handler(&proto.ProcessResponse{
+		Role:         "assistant",
 		CheckpointId: uuid.New().String(),
 		Contents: []*proto.Content{
 			{
-				Role:    "assistant",
 				Content: &proto.Content_Text{Text: &proto.TextContent{Text: text}},
 			},
 		},
