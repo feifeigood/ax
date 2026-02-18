@@ -35,7 +35,6 @@ var (
 	triggerSessionID  string
 	triggerInput      string
 	triggerServerAddr string
-	triggerHeadless   bool
 	triggerConfigFile string
 )
 
@@ -50,9 +49,8 @@ If no session ID is provided, a new UUID will be generated.`,
 func init() {
 	triggerCmd.Flags().StringVar(&triggerSessionID, "session", "", "Session ID (optional, generates UUID if not provided)")
 	triggerCmd.Flags().StringVar(&triggerInput, "input", "", "Input message to send (required)")
-	triggerCmd.Flags().StringVar(&triggerServerAddr, "server", "localhost:8494", "gRPC controller server address (default: localhost:8494)")
-	triggerCmd.Flags().BoolVar(&triggerHeadless, "headless", false, "Run in headless mode with a built-in Controller")
-	triggerCmd.Flags().StringVar(&triggerConfigFile, "config", "gar.yaml", "Path to YAML configuration file (only used in headless mode)")
+	triggerCmd.Flags().StringVar(&triggerServerAddr, "server", "", "gRPC controller server address (if specified, connects to remote server; otherwise runs with a local built-in GAR server)")
+	triggerCmd.Flags().StringVar(&triggerConfigFile, "config", "gar.yaml", "Path to YAML configuration file (only used with a local built-in GAR server)")
 	triggerCmd.MarkFlagRequired("input")
 }
 
@@ -102,7 +100,7 @@ func triggerLoop(ctx context.Context, sessionID string, input string) error {
 				},
 			},
 		}
-		if triggerHeadless {
+		if triggerServerAddr == "" {
 			if err := runTriggerHeadless(ctx, d, triggerSessionID, inputs); err != nil {
 				return err
 			}
@@ -154,7 +152,7 @@ func runTriggerHeadless(ctx context.Context, d *internal.Display, sessionID stri
 	if err := triggerController.TriggerSession(ctx, sessionID, &proto.ProcessRequest{
 		Contents: inputs,
 	}, outputHandler); err != nil {
-		return fmt.Errorf("error triggering session in headless mode: %w", err)
+		return fmt.Errorf("error triggering session with local server: %w", err)
 	}
 
 	d.FinishOutput(checkpoint)

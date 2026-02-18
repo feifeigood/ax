@@ -51,23 +51,23 @@ You should see the gar CLI usage information.
 
 ## Quick Start
 
-### 1. Run headless
+### 1. Run trigger
 
 The CLI provides an easy way to trigger a session by using the
 agents and built-in tools already linked into the GAR binary.
 
 ```bash
 # Using default gar.yaml
-gar trigger --headless --input "Can you list me this directory?"
+gar trigger --input "Can you list me this directory?"
 
 # Using a custom configuration
-gar trigger --headless --input "Can you list me this directory?" --config my-config.yaml
+gar trigger --input "Can you list me this directory?" --config my-config.yaml
 ```
 
 You can continue a session any time:
 
 ```bash
-gar trigger --headless --session session123 --input "Show me the contents of README.md"
+gar trigger --session session123 --input "Show me the contents of README.md"
 ```
 
 ### 2. Run Remote Agent with GAR Server
@@ -99,8 +99,9 @@ gar register \
     --agent-description "Echoes input in uppercase" \
     --agent-addr localhost:50051
 
-# Trigger a session - gar will coordinate the remote agent via Process RPC
+# Trigger a session - once server address is specified, gar will coordinate the remote agent via Process RPC accordingly
 gar trigger \
+    --server localhost:8494 \
     --session session123 \
     --input "Hello, can you uppercase what I just said?"
 ```
@@ -118,7 +119,6 @@ gar trigger \
     --input <text> \
     [--session <id>] \
     [--server <address>] \
-    [--headless] \
     [--config <file>]
 ```
 
@@ -127,9 +127,8 @@ Triggers a new agentic loop session or automatically resumes an existing one. If
 Options:
 - `--input`: Input message to send to agents (required)
 - `--session`: Unique session identifier (optional, generates UUID if not provided, or resumes if exists)
-- `--server`: gRPC controller server address (default: "localhost:8494")
-- `--headless`: Run in headless mode with a built-in GAR server
-- `--config`: Path to YAML configuration file (only used in headless mode, default: "gar.yaml")
+- `--server`: gRPC controller server address (optional. If not provided, runs with a built-in GAR server)
+- `--config`: Path to YAML configuration file (only used with a built-in GAR server, default: "gar.yaml")
 
 **Examples:**
 
@@ -140,8 +139,8 @@ gar trigger --input "Hello agent"
 # Resume an existing session with new input
 gar trigger --session abc123 --input "Continue processing"
 
-# Trigger using headless mode (local controller)
-gar trigger --headless --input "Quick test to upper case"
+# Trigger using server mode (connect to gar serve)
+gar trigger --server localhost:8494 --input "Use remote agent"
 
 ```
 
@@ -309,6 +308,7 @@ gar register \
 
 # Trigger a session
 gar trigger \
+  --server localhost:8494 \
   --session session123 \
   --input "Hello, I heard that there is an agent that can help with processing this text!"
 ```
