@@ -94,6 +94,7 @@ The GAR server exposes the `GARService` on port `:8494`.
 ```bash
 # Register the remote agent with gar
 gar register \
+    --server localhost:8494 \
     --agent-id remote-echo-agent \
     --agent-name "Echo Agent" \
     --agent-description "Echoes input in uppercase" \
@@ -301,6 +302,7 @@ python agent.py
 
 # Register with gar (in another terminal)
 gar register \
+  --server localhost:8494 \
   --agent-id "text-processing-agent" \
   --agent-name "Text Processing Agent" \
   --agent-description "An agent that processes text" \
