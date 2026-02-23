@@ -89,23 +89,35 @@ func (s *Server) RegisterAgent(ctx context.Context, req *proto.RegisterAgentRequ
 	if req.AgentId == "" {
 		return nil, fmt.Errorf("agent_id is required")
 	}
-
-	if req.Address == "" {
-		return nil, fmt.Errorf("address is required for remote agents")
+	if req.Name == "" {
+		return nil, fmt.Errorf("name is required")
+	}
+	if req.Description == "" {
+		return nil, fmt.Errorf("description is required")
+	}
+	if req.Config == nil {
+		return nil, fmt.Errorf("config is required")
 	}
 
 	registry := s.controller.Registry()
 
-	// All registered agents are remote
-	err := registry.RegisterRemote(config.RemoteAgentConfig{
-		ID:          req.AgentId,
-		Name:        req.Name,
-		Description: req.Description,
-		Address:     req.Address,
-		Metadata:    req.Metadata,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to register agent: %w", err)
+	switch cfg := req.Config.(type) {
+	case *proto.RegisterAgentRequest_Remote:
+		if cfg.Remote.Address == "" {
+			return nil, fmt.Errorf("address is required for remote agents")
+		}
+		// All registered agents are remote
+		if err := registry.RegisterRemote(config.RemoteAgentConfig{
+			ID:          req.AgentId,
+			Name:        req.Name,
+			Description: req.Description,
+			Address:     cfg.Remote.Address,
+			Metadata:    req.Metadata,
+		}); err != nil {
+			return nil, fmt.Errorf("failed to register agent: %w", err)
+		}
+	default:
+		return nil, fmt.Errorf("unknown agent type")
 	}
 
 	return &proto.RegisterAgentResponse{}, nil
@@ -160,4 +172,3 @@ func (s *Server) GracefulStop() {
 		s.grpcServer.GracefulStop()
 	}
 }
-

@@ -174,13 +174,19 @@ message ForkSessionResponse {
   string new_session_id = 1; // New session ID (in case it was generated or modified by server)
 }
 
+message RemoteAgentConfig {
+  string address = 1;     // gRPC address for remote agents
+}
+
 // RegisterAgentRequest for registering an agent
 message RegisterAgentRequest {
   string agent_id = 1;
   string name = 2;        // Human-readable name for the agent
   string description = 3; // Description of agent capabilities
-  string address = 4;     // gRPC address for remote agents
-  map<string, string> metadata = 5;
+  map<string, string> metadata = 4;
+  oneof config {
+    RemoteAgentConfig remote = 5;
+  }
 }
 
 // RegisterAgentResponse contains registration result

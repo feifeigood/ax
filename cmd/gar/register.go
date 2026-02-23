@@ -64,7 +64,11 @@ func runRegister(cmd *cobra.Command, args []string) error {
 		AgentId:     registerAgentID,
 		Name:        registerAgentName,
 		Description: registerAgentDesc,
-		Address:     registerAgentAddr,
+		Config: &proto.RegisterAgentRequest_Remote{
+			Remote: &proto.RemoteAgentConfig{
+				Address: registerAgentAddr,
+			},
+		},
 	})
 	if err != nil {
 		return fmt.Errorf("error registering agent: %w", err)
