@@ -168,6 +168,9 @@ func (s *Server) Serve(address string, opts ...grpc.ServerOption) error {
 
 // GracefulStop stops the gRPC server gracefully.
 func (s *Server) GracefulStop() {
+	if s.controller != nil {
+		s.controller.Close()
+	}
 	if s.grpcServer != nil {
 		s.grpcServer.GracefulStop()
 	}
