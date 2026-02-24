@@ -16,6 +16,7 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -25,6 +26,7 @@ import (
 
 	"github.com/google/gar/agent"
 	"github.com/google/gar/proto"
+	"github.com/google/uuid"
 	"google.golang.org/genai"
 )
 
@@ -39,9 +41,9 @@ type GeminiPlannerConfig struct {
 	SystemPrompt string        // Custom system prompt (optional)
 }
 
-func NewGeminiPlanner(ctx context.Context, registry *Registry, h ApprovalHandler, config GeminiPlannerConfig) (agent.Agent, error) {
+func NewGeminiPlanner(ctx context.Context, registry *Registry, config GeminiPlannerConfig) (agent.Agent, error) {
 	if config.Timeout == 0 {
-		config.Timeout = 60 * time.Second
+		config.Timeout = 30 * time.Second
 	}
 	if config.Model == "" {
 		config.Model = os.Getenv("GAR_GEMINI_MODEL")
@@ -70,10 +72,12 @@ Your job is to:
 3. If enough work is done, stop to indicate completion
 
 Guidelines:
-- Choose tools based on their capabilities and the user's needs
+- Choose tools based on their capabilities and the user's needs.
+- Keep responses concise, don't chat too much about what you can do.
 - If no suitable tool exists, stop.
-- Keep the conversation context in mind when selecting tools
-- It's valid not to choose a tool`
+- Keep the conversation context in mind when selecting tools.
+- It's valid not to choose a tool.
+- Once something is approved, try executing it.`
 	}
 
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
@@ -85,7 +89,7 @@ Guidelines:
 
 	return &geminiPlannerAgent{
 		client:   client,
-		fsTool:   newFilesystemTool(h),
+		fsTool:   newFilesystemTool(),
 		registry: registry,
 		config:   config,
 	}, nil
@@ -133,6 +137,9 @@ func (p *geminiPlannerAgent) Process(ctx context.Context, sessionID string, inco
 
 	// Convert session to conversation history
 	contents := protoToContents(incoming.Contents)
+	ctx, cancel := context.WithTimeout(ctx, p.config.Timeout)
+	defer cancel()
+
 	resp, err := p.client.Models.GenerateContent(ctx, p.config.Model, contents, &genai.GenerateContentConfig{
 		Tools: tools,
 		ToolConfig: &genai.ToolConfig{
@@ -181,10 +188,25 @@ func (p *geminiPlannerAgent) Process(ctx context.Context, sessionID string, inco
 		if fc := part.FunctionCall; fc != nil {
 			switch fc.Name {
 			case fsToolName:
+				command, ok := fc.Args["command"].(string)
+				if !ok {
+					return fmt.Errorf("command parameter missing or invalid in function call")
+				}
+				question := fmt.Sprintf("Can I execute %q?", command)
+
+				continueProcessing, err := checkCommandApproval(incoming.Contents, question, handler)
+				if err != nil {
+					return err
+				}
+				if !continueProcessing {
+					return nil
+				}
+
 				output, err := p.fsTool.executeShellCommand(fc.Args)
 				if err != nil {
 					return err
 				}
+
 				return handler(&proto.ProcessResponse{
 					Contents: []*proto.Content{{
 						Role: "assistant",
@@ -236,22 +258,45 @@ func protoToContents(inputs []*proto.Content) []*genai.Content {
 					},
 				},
 			})
-			// TODO(jbd): Handle other content types (e.g., images, files)
+		case *proto.Content_Confirmation:
+			if m.Confirmation.Question != "" {
+				contents = append(contents, &genai.Content{
+					Role: "model",
+					Parts: []*genai.Part{
+						{
+							Text: m.Confirmation.Question,
+						},
+					},
+				})
+			}
+			switch d := m.Confirmation.Decision.(type) {
+			case *proto.ConfirmationContent_Decline:
+				// should never happen
+			case *proto.ConfirmationContent_Approval:
+				if d.Approval.Approved {
+					contents = append(contents, &genai.Content{
+						Role: "user",
+						Parts: []*genai.Part{
+							{
+								Text: "Approved.",
+							},
+						},
+					})
+				}
+			}
 		}
+		// TODO(jbd): Handle other content types (e.g., images, files)
 	}
 	return contents
 }
 
-func newFilesystemTool(h ApprovalHandler) *filesystemTool {
-	return &filesystemTool{
-		approval: h,
-	}
+func newFilesystemTool() *filesystemTool {
+	return &filesystemTool{}
 }
 
 // filesystemTool is the built-in tool that allows
 // planner to operate file system operations.
 type filesystemTool struct {
-	approval ApprovalHandler
 }
 
 func (f *filesystemTool) funcDecl() *genai.Tool {
@@ -284,14 +329,6 @@ func (f *filesystemTool) executeShellCommand(args map[string]any) (string, error
 		return "", fmt.Errorf("command parameter missing or invalid")
 	}
 
-	// Request approval if callback is set
-	if f.approval != nil {
-		approved := f.approval(fmt.Sprintf("Can I execute %q?", command))
-		if !approved {
-			return fmt.Sprintf("Command execution of %q is rejected by user.", command), nil
-		}
-	}
-
 	// Execute the command.
 	var cmd *exec.Cmd
 	if runtime.GOOS == "windows" {
@@ -303,13 +340,59 @@ func (f *filesystemTool) executeShellCommand(args map[string]any) (string, error
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		// Return both the error and any output that was produced
-		return fmt.Sprintf("Error: %v\nOutput: %s", err, output), nil
+		return fmt.Sprintf("Error: %v\nOutput: %s\n\n", err, output), nil
 	}
 
-	result := strings.TrimSpace(string(output)) + "\n\n"
+	result := strings.TrimSpace(string(output))
 	if result == "" {
 		return "Command executed successfully (no output)", nil
 	}
+	result += "\n\n"
 
 	return result, nil
+}
+
+// checkCommandApproval checks if the user has approved or declined the command.
+// It searches backwards through the history for a confirmation request with the same question
+// and then looks for the user's response to that confirmation.
+// This isn't a true implementation based on id checking, but it's good enough for now.
+func checkCommandApproval(history []*proto.Content, question string, handler agent.OutputHandler) (cont bool, err error) {
+	// Find the most recent confirmation request testing this question
+	var expectedID string
+	for i := len(history) - 1; i >= 0; i-- {
+		c := history[i]
+		if conf := c.GetConfirmation(); conf != nil && c.Role == "assistant" && conf.Question == question {
+			expectedID = conf.Id
+			break
+		}
+	}
+
+	if expectedID != "" {
+		// Find the user's response to this confirmation ID
+		for i := len(history) - 1; i >= 0; i-- {
+			c := history[i]
+			if conf := c.GetConfirmation(); conf != nil && c.Role == "user" && conf.Id == expectedID {
+				if approval := conf.GetApproval(); approval != nil {
+					if approval.Approved {
+						return true, nil
+					}
+				}
+				return false, errors.New("commands must be already approved before geminiPlannerAgent.Process")
+			}
+		}
+	}
+
+	// Not decided yet, prompt the user for confirmation.
+	err = handler(&proto.ProcessResponse{
+		Contents: []*proto.Content{{
+			Role: "assistant",
+			Content: &proto.Content_Confirmation{
+				Confirmation: &proto.ConfirmationContent{
+					Id:       uuid.New().String(),
+					Question: question,
+				},
+			},
+		}},
+	})
+	return false, err
 }

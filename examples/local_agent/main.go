@@ -48,9 +48,6 @@ func main() {
 
 	c, err := controller.New(ctx, controller.Config{
 		MaxSteps: 10,
-		ApprovalHandler: func(prompt string) bool {
-			return true // nothing to approve
-		},
 		HealthCheck: config.HealthCheckConfig{
 			Enabled:  true,
 			Interval: 30 * time.Second,

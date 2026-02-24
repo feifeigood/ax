@@ -52,12 +52,35 @@ message TextContent {
   string text = 3;
 }
 
+message ApprovalDecision {
+  bool approved = 1;
+}
+
+message DeclineDecision {
+  reserved 2;
+  reserved "reason";
+  bool declined = 1;
+}
+
+message ConfirmationContent {
+  reserved 1, 2;
+  reserved "type";
+  string id = 3;
+  string question = 4;
+  oneof decision {
+    ApprovalDecision approval = 5;
+    DeclineDecision decline = 6;
+  }
+}
+
+
 // Content represents a message with role, type, mimetype, and data fields
 message Content {
   reserved 1 to 4, 6 to 9, 11 to 25;
 
   oneof content {
     TextContent text = 10;
+    ConfirmationContent confirmation = 26;
   }
 
   string role = 1000; // The role of the content (e.g., "user", "assistant", "system")

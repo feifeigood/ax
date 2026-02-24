@@ -78,8 +78,17 @@ func (e *LoopExecutor) runLoop(ctx context.Context, session *Session, incoming *
 	for _, agentID := range session.WaitingAgents() {
 		buffer := session.WaitingBuffer(agentID)
 		_ = buffer
-		// TODO(jbd): Run the agent with session history and buffer as input.
+
 		return fmt.Errorf("resuming waiting agents is not yet supported")
+	}
+
+	// Ensure the last confirmation question was answered.
+	exitLoop, err := e.handleConfirmation(ctx, session, incoming, handler)
+	if err != nil {
+		return err
+	}
+	if exitLoop {
+		return nil
 	}
 
 	// Write the new inputs to the event log.
@@ -174,4 +183,68 @@ func (e *LoopExecutor) runAgent(ctx context.Context, session *Session, agentID s
 		return "", err
 	}
 	return handoff, nil
+}
+
+// handleConfirmation checks if the session is waiting for a confirmation response,
+// and if so, verifies that the incoming request provides a matching response.
+// It returns a boolean indicating whether the loop should stop early, and an error.
+func (e *LoopExecutor) handleConfirmation(ctx context.Context, session *Session, incoming *proto.ProcessRequest, handler agent.OutputHandler) (exitLoop bool, err error) {
+	history := session.History()
+	if len(history) == 0 {
+		return false, nil
+	}
+	lastMsg := history[len(history)-1]
+	confReq := lastMsg.GetConfirmation()
+	if confReq == nil {
+		// not a confirmation question or answer
+		return false, nil
+	}
+
+	if lastMsg.Role != "assistant" || confReq.Id == "" || confReq.Question == "" {
+		// not a confirmation question
+		return false, nil
+	}
+
+	// Require the first incoming content to be the confirmation response
+	if len(incoming.Contents) == 0 {
+		return true, handler(&proto.ProcessResponse{
+			Contents: []*proto.Content{lastMsg},
+		})
+	}
+
+	confResp := incoming.Contents[0].GetConfirmation()
+	if confResp == nil || (confResp.GetApproval() == nil && confResp.GetDecline() == nil) {
+		return true, handler(&proto.ProcessResponse{
+			Contents: []*proto.Content{lastMsg},
+		})
+	}
+
+	if confResp.Id != confReq.Id {
+		return true, handler(&proto.ProcessResponse{
+			Contents: []*proto.Content{lastMsg},
+		})
+	}
+	if confResp.GetDecline() != nil {
+		out := []*proto.Content{{
+			Role: "assistant",
+			Content: &proto.Content_Text{
+				// Respond with "Ok" instead of the rejection decision
+				// to ensure the loop isn't stuck on that rejection decision.
+				// Models keep rejecting the confirmation in the lifetime
+				// of a session otherwise. Given we are explicitly asking
+				// for confirmation, this is safe.
+				Text: &proto.TextContent{Text: "Ok."},
+			},
+		}}
+
+		if err := session.WriteContent(ctx, plannerAgentID, "", out); err != nil {
+			return true, fmt.Errorf("failed to write content: %w", err)
+		}
+		return true, handler(&proto.ProcessResponse{Contents: out})
+	}
+	// TODO(jbd): We can consider directly supporting
+	// handing off to the agent that asked the question.
+	// Planner should be able to handoff to the correct agent
+	// if it's good enough.
+	return false, nil
 }

@@ -78,6 +78,9 @@ func runTrigger(cmd *cobra.Command, args []string) error {
 	go func() {
 		<-sigChan
 		fmt.Println("\nReceived interrupt, shutting down...")
+		if triggerController != nil {
+			triggerController.Close()
+		}
 		cancel()
 	}()
 
@@ -88,10 +91,10 @@ func triggerLoop(ctx context.Context, sessionID string, input string) error {
 	d := internal.NewDisplay(sessionID)
 	d.DisplayHeader()
 
-	for {
+	var inputs []*proto.Content
+	if input != "" {
 		d.DisplayInput(input)
-
-		inputs := []*proto.Content{
+		inputs = []*proto.Content{
 			{
 				Role: "user",
 				Content: &proto.Content_Text{
@@ -101,50 +104,96 @@ func triggerLoop(ctx context.Context, sessionID string, input string) error {
 				},
 			},
 		}
+	}
+
+	for {
+		var conf *proto.ConfirmationContent
+		var err error
 		if triggerServerAddr == "" {
-			if err := runTriggerHeadless(ctx, d, triggerSessionID, inputs); err != nil {
-				return err
-			}
+			conf, err = runTriggerHeadless(ctx, d, triggerSessionID, inputs)
 		} else {
-			if err := runTriggerServer(ctx, d, triggerSessionID, inputs); err != nil {
-				return err
-			}
+			conf, err = runTriggerServer(ctx, d, triggerSessionID, inputs)
+		}
+		if err != nil {
+			return err
 		}
 
-		var err error
+		if conf != nil {
+			approved, err := d.PromptForApproval(conf.Question)
+			if err != nil {
+				return err
+			}
+			if approved {
+				inputs = []*proto.Content{{
+					Role: "user",
+					Content: &proto.Content_Confirmation{
+						Confirmation: &proto.ConfirmationContent{
+							Id: conf.Id,
+							Decision: &proto.ConfirmationContent_Approval{
+								Approval: &proto.ApprovalDecision{Approved: true},
+							},
+						},
+					},
+				}}
+			} else {
+				inputs = []*proto.Content{{
+					Role: "user",
+					Content: &proto.Content_Confirmation{
+						Confirmation: &proto.ConfirmationContent{
+							Id: conf.Id,
+							Decision: &proto.ConfirmationContent_Decline{
+								Decline: &proto.DeclineDecision{Declined: true},
+							},
+						},
+					},
+				}}
+			}
+			continue
+		}
+
 		input, err = d.PromptForInput()
 		if err != nil {
 			return err
 		}
+		d.DisplayInput(input)
+		inputs = []*proto.Content{
+			{
+				Role: "user",
+				Content: &proto.Content_Text{
+					Text: &proto.TextContent{
+						Text: input,
+					},
+				},
+			},
+		}
 	}
 }
 
-func runTriggerHeadless(ctx context.Context, d *internal.Display, sessionID string, inputs []*proto.Content) error {
+func runTriggerHeadless(ctx context.Context, d *internal.Display, sessionID string, inputs []*proto.Content) (*proto.ConfirmationContent, error) {
 	if triggerController == nil {
 		cfg, err := config.LoadFromFile(triggerConfigFile)
 		if err != nil {
-			return fmt.Errorf("error loading config file '%s': %w", triggerConfigFile, err)
+			return nil, fmt.Errorf("error loading config file '%s': %w", triggerConfigFile, err)
 		}
 
-		approval := func(question string) bool {
-			ok, err := d.PromptForApproval(question)
-			if err != nil {
-				return false
-			}
-			return ok
-		}
-
-		c, err := newControllerFromConfig(ctx, approval, cfg)
+		c, err := newControllerFromConfig(ctx, cfg)
 		if err != nil {
-			return fmt.Errorf("error creating controller: %w", err)
+			return nil, fmt.Errorf("error creating controller: %w", err)
 		}
 		triggerController = c
 	}
 
 	var checkpoint string
+	var confirmation *proto.ConfirmationContent
 	outputHandler := agent.OutputHandler(func(resp *proto.ProcessResponse) error {
 		if resp.CheckpointId != "" {
 			checkpoint = resp.CheckpointId
+		}
+
+		for _, c := range resp.Contents {
+			if conf := c.GetConfirmation(); conf != nil {
+				confirmation = conf
+			}
 		}
 
 		displayContents(d, resp.Contents)
@@ -153,17 +202,19 @@ func runTriggerHeadless(ctx context.Context, d *internal.Display, sessionID stri
 	if err := triggerController.TriggerSession(ctx, sessionID, &proto.ProcessRequest{
 		Contents: inputs,
 	}, outputHandler); err != nil {
-		return fmt.Errorf("error triggering session with local server: %w", err)
+		return nil, fmt.Errorf("error triggering session with local server: %w", err)
 	}
 
-	d.FinishOutput(checkpoint)
-	return nil
+	if confirmation == nil {
+		d.FinishOutput(checkpoint)
+	}
+	return confirmation, nil
 }
 
-func runTriggerServer(ctx context.Context, d *internal.Display, sessionID string, inputs []*proto.Content) error {
+func runTriggerServer(ctx context.Context, d *internal.Display, sessionID string, inputs []*proto.Content) (*proto.ConfirmationContent, error) {
 	conn, err := connect(triggerServerAddr)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer conn.Close()
 
@@ -173,27 +224,35 @@ func runTriggerServer(ctx context.Context, d *internal.Display, sessionID string
 		Inputs:    inputs,
 	})
 	if err != nil {
-		return fmt.Errorf("error triggering session: %w", err)
+		return nil, fmt.Errorf("error triggering session: %w", err)
 	}
 
 	var checkpoint string
+	var confirmation *proto.ConfirmationContent
 	for {
 		resp, err := stream.Recv()
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
-			return fmt.Errorf("error receiving response: %w", err)
+			return nil, fmt.Errorf("error receiving response: %w", err)
 		}
 		if resp.Outputs != nil {
+			for _, c := range resp.Outputs {
+				if conf := c.GetConfirmation(); conf != nil {
+					confirmation = conf
+				}
+			}
 			displayContents(d, resp.Outputs)
 		}
 		if resp.CheckpointId != "" {
 			checkpoint = resp.CheckpointId
 		}
 	}
-	d.FinishOutput(checkpoint)
-	return nil
+	if confirmation == nil {
+		d.FinishOutput(checkpoint)
+	}
+	return confirmation, nil
 }
 
 func displayContents(d *internal.Display, contents []*proto.Content) {
@@ -201,6 +260,8 @@ func displayContents(d *internal.Display, contents []*proto.Content) {
 		switch o := output.Content.(type) {
 		case *proto.Content_Text:
 			d.DisplayOutput(o.Text.Text)
+		case *proto.Content_Confirmation:
+			// Let the confirmation prompt handle displaying the question.
 		default:
 			d.DisplayOutput(fmt.Sprintf("unknown output type: %v", o))
 		}
