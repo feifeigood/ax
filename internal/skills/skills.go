@@ -48,14 +48,30 @@ type ScriptResult struct {
 	ExitCode int
 }
 
+// DefaultDir returns the default system-wide directory for discovering skills.
+// It resolves to ~/.agents/skills on all platforms.
+func DefaultDir() string {
+    homeDir, err := os.UserHomeDir()
+    if err != nil {
+        // Fallback to Unix HOME if UserHomeDir fails (though rare).
+        homeDir = os.Getenv("HOME")
+    }
+    return filepath.Join(homeDir, ".agents", "skills")
+}
+
 // Discover scans dir for agentskills.io-compatible skill directories and
 // returns their parsed metadata. Invisible entries (names starting with ".")
 // and entries that are not directories (including broken symlinks) are skipped.
 // Directories that lack a valid SKILL.md are silently skipped.
 func Discover(dir string) ([]Skill, error) {
-	entries, err := os.ReadDir(dir)
+	absDir, err := filepath.Abs(dir)
 	if err != nil {
-		return nil, fmt.Errorf("read skills dir %s: %w", dir, err)
+		return nil, fmt.Errorf("resolve skills dir path %s: %w", dir, err)
+	}
+
+	entries, err := os.ReadDir(absDir)
+	if err != nil {
+		return nil, fmt.Errorf("read skills dir %s: %w", absDir, err)
 	}
 
 	var out []Skill
@@ -63,7 +79,7 @@ func Discover(dir string) ([]Skill, error) {
 		if strings.HasPrefix(e.Name(), ".") {
 			continue
 		}
-		skillDir := filepath.Join(dir, e.Name())
+		skillDir := filepath.Join(absDir, e.Name())
 		// os.Stat follows symlinks, so symlinked skill directories are supported.
 		info, err := os.Stat(skillDir)
 		if err != nil || !info.IsDir() {
@@ -111,14 +127,15 @@ func (s Skill) RunScript(ctx context.Context, script string, args []string) (*Sc
 		return nil, fmt.Errorf("invalid script name: %q", script)
 	}
 	scriptPath := filepath.Join(s.Dir, "scripts", script)
+
 	if _, err := os.Stat(scriptPath); err != nil {
 		return nil, fmt.Errorf("script %q not found or inaccessible: %w", script, err)
 	}
 
 	cmd := exec.CommandContext(ctx, scriptPath, args...)
 	cmd.Dir = s.Dir
-
-	var stdout, stderr bytes.Buffer
+	
+	var stdout, stderr bytes.Buffer	
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
@@ -137,9 +154,9 @@ func (s Skill) RunScript(ctx context.Context, script string, args []string) (*Sc
 	}, nil
 }
 
-// systemPrompt returns the <available_skills> XML block for injection into a
+// SystemPrompt returns the <available_skills> XML block for injection into a
 // model system prompt, following the agentskills.io integration guide.
-func systemPrompt(skills []Skill) string {
+func SystemPrompt(skills []Skill) string {
 	var b strings.Builder
 	b.WriteString("<available_skills>\n")
 	for _, s := range skills {

@@ -107,6 +107,7 @@ func newControllerFromConfig(ctx context.Context, cfg *config.Config) (*controll
 			MaxTokens:    cfg.Planner.Gemini.MaxTokens,
 			Timeout:      cfg.Planner.Gemini.Timeout,
 			SystemPrompt: cfg.Planner.Gemini.SystemPrompt,
+			SkillsDir:    cfg.Planner.Gemini.SkillsDir,
 		})
 	}
 

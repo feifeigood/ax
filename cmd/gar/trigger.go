@@ -262,6 +262,14 @@ func displayContents(d *internal.Display, contents []*proto.Content) {
 			d.DisplayOutput(o.Text.Text)
 		case *proto.Content_Confirmation:
 			// Let the confirmation prompt handle displaying the question.
+		case *proto.Content_FunctionCall:
+			// No-op for cleaner CLI logs
+		case *proto.Content_FunctionResponse:
+			// Only print if the tool returned an error, otherwise skip
+			respMap := o.FunctionResponse.Response.AsMap()
+			if errStr, ok := respMap["error"]; ok {
+				d.DisplayOutput(fmt.Sprintf("\n[TOOL ERROR for %s]\n%v\n", o.FunctionResponse.Name, errStr))
+			}
 		default:
 			d.DisplayOutput(fmt.Sprintf("unknown output type: %v", o))
 		}

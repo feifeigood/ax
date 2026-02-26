@@ -18,6 +18,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"log"
 	"os"
 	"os/exec"
 	"runtime"
@@ -25,9 +27,11 @@ import (
 	"time"
 
 	"github.com/google/gar/agent"
+	"github.com/google/gar/internal/skills"
 	"github.com/google/gar/proto"
 	"github.com/google/uuid"
 	"google.golang.org/genai"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 const fsToolName = "filesystem"
@@ -39,6 +43,7 @@ type GeminiPlannerConfig struct {
 	MaxTokens    int32         // Max output tokens (default: 8192)
 	Timeout      time.Duration // Request timeout (default: 60s)
 	SystemPrompt string        // Custom system prompt (optional)
+	SkillsDir    string        // Directory for discovering skills (optional)
 }
 
 func NewGeminiPlanner(ctx context.Context, registry *Registry, config GeminiPlannerConfig) (agent.Agent, error) {
@@ -87,19 +92,42 @@ Guidelines:
 		return nil, fmt.Errorf("failed to create Gemini client: %w", err)
 	}
 
+	skillsDir := config.SkillsDir
+	if skillsDir == "" {
+		skillsDir = os.Getenv("SKILLS_DIR")
+	}
+	if skillsDir == "" {
+		skillsDir = skills.DefaultDir()
+	}
+
+	skillExec, err := skills.NewExecutor(client, config.Model, skillsDir)
+	if err != nil && err != io.EOF {
+		log.Printf("Warning: failed to initialize skill executor for %q: %v\n", skillsDir, err)
+	}
+
+	if skillExec != nil && skillExec.HasSkills() {
+		config.SystemPrompt += "\n\n" + skillExec.SystemPrompt()
+
+		skillExec.OnUpdate(func(ev skills.UpdateEvent) {
+			// No-op for cleaner CLI logs
+		})
+	}
+
 	return &geminiPlannerAgent{
-		client:   client,
-		fsTool:   newFilesystemTool(),
-		registry: registry,
-		config:   config,
+		client:    client,
+		fsTool:    newFilesystemTool(),
+		registry:  registry,
+		config:    config,
+		skillExec: skillExec,
 	}, nil
 }
 
 type geminiPlannerAgent struct {
-	client   *genai.Client
-	fsTool   *filesystemTool
-	registry *Registry
-	config   GeminiPlannerConfig
+	client    *genai.Client
+	fsTool    *filesystemTool
+	registry  *Registry
+	config    GeminiPlannerConfig
+	skillExec *skills.Executor
 }
 
 // agentsToTools converts registry agents to Gemini function declarations.
@@ -133,6 +161,9 @@ func (p *geminiPlannerAgent) Process(ctx context.Context, sessionID string, inco
 	tools, err := agentsToTools(p.fsTool, p.registry)
 	if err != nil {
 		return fmt.Errorf("failed to convert agents to tools: %w", err)
+	}
+	if p.skillExec != nil && p.skillExec.HasSkills() {
+		tools = append(tools, skills.BuildTool(p.skillExec.SkillNames()))
 	}
 
 	// Convert session to conversation history
@@ -186,7 +217,94 @@ func (p *geminiPlannerAgent) Process(ctx context.Context, sessionID string, inco
 		}
 
 		if fc := part.FunctionCall; fc != nil {
+			argsStruct, err := structpb.NewStruct(fc.Args)
+			if err != nil {
+				return fmt.Errorf("failed to convert function call args to structpb: %w", err)
+			}
+			if err := handler(&proto.ProcessResponse{
+				Contents: []*proto.Content{{
+					Role: "assistant",
+					Content: &proto.Content_FunctionCall{
+						FunctionCall: &proto.FunctionCallContent{
+							Name:             fc.Name,
+							Args:             argsStruct,
+							Id:               fc.ID,
+							ThoughtSignature: part.ThoughtSignature,
+						},
+					},
+				}},
+			}); err != nil {
+				return err
+			}
+
 			switch fc.Name {
+			case "activate_skill", "run_skill_script":
+				if p.skillExec == nil {
+					return fmt.Errorf("skill executor not initialized")
+				}
+
+				if fc.Name == "run_skill_script" {
+					skill, _ := fc.Args["skill"].(string)
+					script, _ := fc.Args["script"].(string)
+					question := fmt.Sprintf("Can I run script %q from skill %q?", script, skill)
+
+					continueProcessing, err := checkCommandApproval(incoming.Contents, question, handler)
+					if err != nil {
+						return err
+					}
+					if !continueProcessing {
+						return nil
+					}
+				}
+
+				resultPart := p.skillExec.HandleCall(ctx, fc)
+
+				// Format the output for GAR's text-based history log
+				var output string
+				if resultPart != nil && resultPart.FunctionResponse != nil {
+					resultMap := resultPart.FunctionResponse.Response
+					if body, ok := resultMap["instructions"]; ok {
+						output = body.(string)
+					} else if errStr, ok := resultMap["error"]; ok {
+						output = "Error: " + errStr.(string)
+					} else {
+						if so, ok := resultMap["stdout"].(string); ok && so != "" {
+							output += so
+						}
+						if se, ok := resultMap["stderr"].(string); ok && se != "" {
+							if output != "" {
+								output += "\n"
+							}
+							output += "Stderr: " + se
+						}
+						if output == "" {
+							output = "Command executed successfully (no output)"
+						}
+					}
+				} else {
+					output = "Error: nil response from executor"
+				}
+
+				// Explicitly format as a tool result so the reconstructed history doesn't confuse the model
+				respStruct, err := structpb.NewStruct(map[string]interface{}{"result": output})
+				if err != nil {
+					return fmt.Errorf("failed to convert function response to structpb: %w", err)
+				}
+
+				return handler(&proto.ProcessResponse{
+					Contents: []*proto.Content{{
+						Role: "assistant",
+						Content: &proto.Content_FunctionResponse{
+							FunctionResponse: &proto.FunctionResponseContent{
+								Name:     fc.Name,
+								Response: respStruct,
+								Id:       fc.ID,
+							},
+						},
+					}},
+					AgentHandoff: plannerAgentID,
+				})
+
 			case fsToolName:
 				command, ok := fc.Args["command"].(string)
 				if !ok {
@@ -207,11 +325,20 @@ func (p *geminiPlannerAgent) Process(ctx context.Context, sessionID string, inco
 					return err
 				}
 
+				respStruct, err := structpb.NewStruct(map[string]interface{}{"result": output})
+				if err != nil {
+					return fmt.Errorf("failed to convert function response to structpb: %w", err)
+				}
+				
 				return handler(&proto.ProcessResponse{
 					Contents: []*proto.Content{{
-						Role: "assistant",
-						Content: &proto.Content_Text{
-							Text: &proto.TextContent{Text: output},
+						Role: "assistant", // Note: The history uses assistant for now
+						Content: &proto.Content_FunctionResponse{
+							FunctionResponse: &proto.FunctionResponseContent{
+								Name:     fc.Name,
+								Response: respStruct,
+								Id:       fc.ID,
+							},
 						},
 					}},
 					AgentHandoff: plannerAgentID, // Explicitly return to planner in same response
@@ -263,9 +390,7 @@ func protoToContents(inputs []*proto.Content) []*genai.Content {
 				contents = append(contents, &genai.Content{
 					Role: "model",
 					Parts: []*genai.Part{
-						{
-							Text: m.Confirmation.Question,
-						},
+						{Text: m.Confirmation.Question},
 					},
 				})
 			}
@@ -277,13 +402,38 @@ func protoToContents(inputs []*proto.Content) []*genai.Content {
 					contents = append(contents, &genai.Content{
 						Role: "user",
 						Parts: []*genai.Part{
-							{
-								Text: "Approved.",
-							},
+							{Text: "Approved."},
 						},
 					})
 				}
 			}
+		case *proto.Content_FunctionCall:
+			contents = append(contents, &genai.Content{
+				Role: "model",
+				Parts: []*genai.Part{
+					{
+						ThoughtSignature: m.FunctionCall.ThoughtSignature,
+						FunctionCall: &genai.FunctionCall{
+							ID:   m.FunctionCall.Id,
+							Name: m.FunctionCall.Name,
+							Args: m.FunctionCall.Args.AsMap(),
+						},
+					},
+				},
+			})
+		case *proto.Content_FunctionResponse:
+			contents = append(contents, &genai.Content{
+				Role: "user",
+				Parts: []*genai.Part{
+					{
+						FunctionResponse: &genai.FunctionResponse{
+							ID:       m.FunctionResponse.Id,
+							Name:     m.FunctionResponse.Name,
+							Response: m.FunctionResponse.Response.AsMap(),
+						},
+					},
+				},
+			})
 		}
 		// TODO(jbd): Handle other content types (e.g., images, files)
 	}

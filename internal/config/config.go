@@ -74,6 +74,7 @@ type GeminiPlannerConfig struct {
 	Timeout       time.Duration `yaml:"timeout,omitempty"`
 	ContextWindow int           `yaml:"context_window,omitempty"`
 	SystemPrompt  string        `yaml:"system_prompt,omitempty"`
+	SkillsDir     string        `yaml:"skills_dir,omitempty"` // Directory to discover skills from
 }
 
 // RemoteAgentConfig configures a remote agent to register on startup.
@@ -86,10 +87,10 @@ type RemoteAgentConfig struct {
 }
 
 type LocalAgentConfig struct {
-	ID          string            // Unique agent identifier
-	Name        string            // Human-readable name
-	Description string            // Description of agent capabilities
-	Metadata    map[string]string // Optional metadata
+	ID          string            `yaml:"id"`                 // Unique agent identifier
+	Name        string            `yaml:"name"`               // Human-readable name
+	Description string            `yaml:"description"`        // Description of agent capabilities
+	Metadata    map[string]string `yaml:"metadata,omitempty"` // Optional metadata
 	Agent       agent.Agent       // In-process agent instance (not in YAML)
 }
 

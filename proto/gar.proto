@@ -17,6 +17,7 @@ syntax = "proto3";
 package proto;
 
 import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
 
 option go_package = "github.com/google/gar/proto";
 
@@ -73,6 +74,19 @@ message ConfirmationContent {
   }
 }
 
+message FunctionCallContent {
+  string name = 1;
+  google.protobuf.Struct args = 2;
+  string id = 3;
+  bytes thought_signature = 4;
+}
+
+message FunctionResponseContent {
+  string name = 1;
+  google.protobuf.Struct response = 2;
+  string id = 3;
+}
+
 
 // Content represents a message with role, type, mimetype, and data fields
 message Content {
@@ -81,6 +95,8 @@ message Content {
   oneof content {
     TextContent text = 10;
     ConfirmationContent confirmation = 26;
+    FunctionCallContent function_call = 27;
+    FunctionResponseContent function_response = 28;
   }
 
   string role = 1000; // The role of the content (e.g., "user", "assistant", "system")

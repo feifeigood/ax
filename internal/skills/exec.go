@@ -18,7 +18,6 @@ import (
 	"context"
 	"io"
 	"os"
-	"path/filepath"
 
 	"google.golang.org/genai"
 )
@@ -47,6 +46,7 @@ type Executor struct {
 	cfg    *genai.GenerateContentConfig
 
 	byName   map[string]Skill
+	names    []string
 	onUpdate func(UpdateEvent)
 }
 
@@ -69,7 +69,7 @@ func NewExecutor(client *genai.Client, model, dir string) (*Executor, error) {
 		dir = os.Getenv("SKILLS_DIR")
 	}
 	if dir == "" {
-		dir = filepath.Join(os.Getenv("HOME"), ".agents", "skills")
+		dir = DefaultDir()
 	}
 
 	found, err := Discover(dir)
@@ -90,16 +90,17 @@ func NewExecutor(client *genai.Client, model, dir string) (*Executor, error) {
 	si := "You are a helpful AI assistant with access to a set of skills.\n" +
 		"When a user task matches one or more skills, call activate_skill to load\n" +
 		"its full instructions before answering.\n\n" +
-		systemPrompt(found)
+		SystemPrompt(found)
 
 	cfg := &genai.GenerateContentConfig{
 		SystemInstruction: genai.NewContentFromText(si, genai.RoleUser),
-		Tools:             []*genai.Tool{buildTool(names)},
+		Tools:             []*genai.Tool{BuildTool(names)},
 	}
 
 	return &Executor{
 		client: client,
 		byName: byName,
+		names:  names,
 		cfg:    cfg,
 		model:  model,
 	}, nil
@@ -128,13 +129,15 @@ func (e *Executor) Run(ctx context.Context, prompt string) (string, error) {
 
 		var results []*genai.Part
 		for _, call := range calls {
-			results = append(results, e.handleCall(ctx, call))
+			results = append(results, e.HandleCall(ctx, call))
 		}
 		history = append(history, genai.NewContentFromParts(results, genai.RoleUser))
 	}
 }
 
-func (e *Executor) handleCall(ctx context.Context, call *genai.FunctionCall) *genai.Part {
+// HandleCall processes an 'activate_skill' or 'run_skill_script' call.
+// It returns a genai.Part containing the function response.
+func (e *Executor) HandleCall(ctx context.Context, call *genai.FunctionCall) *genai.Part {
 	respond := func(v map[string]any) *genai.Part {
 		return genai.NewPartFromFunctionResponse(call.Name, v)
 	}
@@ -177,6 +180,7 @@ func (e *Executor) handleCall(ctx context.Context, call *genai.FunctionCall) *ge
 		if !ok {
 			return respond(map[string]any{"error": "unknown skill: " + skillName})
 		}
+
 		e.update(UpdateEvent{Kind: UpdateScriptRunning, Skill: skillName, Script: script})
 		result, err := s.RunScript(ctx, script, args)
 		if err != nil {
@@ -194,7 +198,8 @@ func (e *Executor) handleCall(ctx context.Context, call *genai.FunctionCall) *ge
 	}
 }
 
-func buildTool(names []string) *genai.Tool {
+// BuildTool creates the Gemini Tool definition for skill invocation.
+func BuildTool(names []string) *genai.Tool {
 	return &genai.Tool{
 		FunctionDeclarations: []*genai.FunctionDeclaration{
 			{
@@ -238,4 +243,29 @@ func buildTool(names []string) *genai.Tool {
 			},
 		},
 	}
+}
+
+// HasSkills returns true if the executor has any skills.
+func (e *Executor) HasSkills() bool {
+	return len(e.names) > 0
+}
+
+// SystemPrompt returns the agentskills.io instructional block for all skills.
+func (e *Executor) SystemPrompt() string {
+	if !e.HasSkills() {
+		return ""
+	}
+	var b []Skill
+	for _, name := range e.names {
+		b = append(b, e.byName[name])
+	}
+	return SystemPrompt(b)
+}
+
+// SkillNames returns the names of all discovered skills.
+func (e *Executor) SkillNames() []string {
+	if !e.HasSkills() {
+		return nil
+	}
+	return append([]string(nil), e.names...)
 }
