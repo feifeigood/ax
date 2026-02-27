@@ -30,12 +30,17 @@ import (
 type Session struct {
 	id string
 
-	mu             sync.RWMutex
-	eventLog       eventlog.EventLog
-	state          proto.State
-	messageHistory []*proto.Content
-	waitingAgents  map[string][]*proto.Content // by agent ID
-	checkpointIDs  map[string]struct{}         // checkpoint UUIDs
+	mu            sync.RWMutex
+	eventLog      eventlog.EventLog
+	state         proto.State
+	steps         []*Step
+	waitingAgents map[string][]*proto.Content // by agent ID
+	checkpointIDs map[string]struct{}         // checkpoint UUIDs
+}
+
+type Step struct {
+	AgentID  string
+	Contents []*proto.Content
 }
 
 // SessionManager manages multiple sessions.
@@ -73,12 +78,12 @@ func (sm *SessionManager) NewSession(sessionID string) (*Session, error) {
 	}
 
 	session := &Session{
-		id:             sessionID,
-		state:          proto.State_STATE_UNSPECIFIED,
-		messageHistory: []*proto.Content{},
-		waitingAgents:  make(map[string][]*proto.Content),
-		checkpointIDs:  make(map[string]struct{}),
-		eventLog:       el,
+		id:            sessionID,
+		state:         proto.State_STATE_UNSPECIFIED,
+		steps:         []*Step{},
+		waitingAgents: make(map[string][]*proto.Content),
+		checkpointIDs: make(map[string]struct{}),
+		eventLog:      el,
 	}
 
 	sm.sessions[sessionID] = session
@@ -107,12 +112,12 @@ func (sm *SessionManager) LoadSessionFromCheckpoint(ctx context.Context, session
 
 	// 2. Construct session state in memory - No Lock
 	session := &Session{
-		id:             sessionID,
-		state:          state,
-		eventLog:       el,
-		waitingAgents:  make(map[string][]*proto.Content),
-		messageHistory: []*proto.Content{},
-		checkpointIDs:  make(map[string]struct{}),
+		id:            sessionID,
+		state:         state,
+		eventLog:      el,
+		waitingAgents: make(map[string][]*proto.Content),
+		steps:         []*Step{},
+		checkpointIDs: make(map[string]struct{}),
 	}
 
 	err = session.reconstructState(events)
@@ -199,12 +204,12 @@ func (sm *SessionManager) ForkSession(ctx context.Context, sourceSessionID, sour
 
 	// 4. Construct base session
 	session := &Session{
-		id:             newSessionID,
-		state:          proto.State_STATE_UNSPECIFIED,
-		messageHistory: []*proto.Content{},
-		waitingAgents:  make(map[string][]*proto.Content),
-		checkpointIDs:  make(map[string]struct{}),
-		eventLog:       newEL,
+		id:            newSessionID,
+		state:         proto.State_STATE_UNSPECIFIED,
+		steps:         []*Step{},
+		waitingAgents: make(map[string][]*proto.Content),
+		checkpointIDs: make(map[string]struct{}),
+		eventLog:      newEL,
 	}
 
 	// Reconstruct session from new events
@@ -239,16 +244,14 @@ func (s *Session) reconstructState(events []*proto.Event) error {
 				s.waitingAgents[event.Sender] = append(
 					s.waitingAgents[event.Sender], event.Contents...)
 			} else {
-				// If buffer already exists, append it to the history first.
-				// Then merge the new contents to the message history.
-				// Once we don't wait for new contents from an agent,
-				// we don't care about the origin of the contents anymore.
-				if len(s.waitingAgents[event.Sender]) > 0 {
-					s.messageHistory = append(
-						s.messageHistory, s.waitingAgents[event.Sender]...)
+				// Merge buffered and new contents into a single step.
+				contents := append(s.waitingAgents[event.Sender], event.Contents...)
+				if len(contents) > 0 {
+					s.steps = append(s.steps, &Step{
+						AgentID:  event.Sender,
+						Contents: contents,
+					})
 				}
-				s.messageHistory = append(
-					s.messageHistory, event.Contents...)
 
 				// Cleanup the waiting buffer, it's now a part of the overall history.
 				delete(s.waitingAgents, event.Sender)
@@ -258,7 +261,12 @@ func (s *Session) reconstructState(events []*proto.Event) error {
 		case *proto.Event_HandoffEvent:
 			// TODO: Visit this section when resuming the waiting agents.
 		case *proto.Event_ContentEvent:
-			s.messageHistory = append(s.messageHistory, x.ContentEvent.Contents...)
+			if len(x.ContentEvent.Contents) > 0 {
+				s.steps = append(s.steps, &Step{
+					AgentID:  e.SenderId,
+					Contents: x.ContentEvent.Contents,
+				})
+			}
 		default:
 			return fmt.Errorf("unknown event kind: %v", e.Kind)
 		}
@@ -360,7 +368,12 @@ func (s *Session) WriteContent(ctx context.Context, sender string, checkpointID 
 		return err
 	}
 
-	s.messageHistory = append(s.messageHistory, contents...)
+	if len(contents) > 0 {
+		s.steps = append(s.steps, &Step{
+			AgentID:  sender,
+			Contents: contents,
+		})
+	}
 	if checkpointID != "" {
 		s.checkpointIDs[checkpointID] = struct{}{}
 	}
@@ -422,5 +435,25 @@ func (s *Session) History() []*proto.Content {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	return s.messageHistory
+	var history []*proto.Content
+	for _, step := range s.steps {
+		history = append(history, step.Contents...)
+	}
+	return history
+}
+
+func (s *Session) ConfirmationWaitingAgent(confirmationID string) string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	for i := len(s.steps) - 1; i >= 0; i-- {
+		step := s.steps[i]
+		for _, content := range step.Contents {
+			conf := content.GetConfirmation()
+			if conf != nil && conf.Id == confirmationID && conf.Question != "" {
+				return step.AgentID
+			}
+		}
+	}
+	return ""
 }
