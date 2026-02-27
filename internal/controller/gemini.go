@@ -34,7 +34,7 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-const fsToolName = "filesystem"
+const bashToolName = "bash"
 
 // GeminiPlannerConfig configures the Gemini-based planner.
 type GeminiPlannerConfig struct {
@@ -115,7 +115,7 @@ Guidelines:
 
 	return &geminiPlannerAgent{
 		client:    client,
-		fsTool:    newFilesystemTool(),
+		bashTool:  newBashTool(),
 		registry:  registry,
 		config:    config,
 		skillExec: skillExec,
@@ -124,14 +124,14 @@ Guidelines:
 
 type geminiPlannerAgent struct {
 	client    *genai.Client
-	fsTool    *filesystemTool
+	bashTool  *bashTool
 	registry  *Registry
 	config    GeminiPlannerConfig
 	skillExec *skills.Executor
 }
 
 // agentsToTools converts registry agents to Gemini function declarations.
-func agentsToTools(fsTool *filesystemTool, registry *Registry) ([]*genai.Tool, error) {
+func agentsToTools(bashTool *bashTool, registry *Registry) ([]*genai.Tool, error) {
 	healthyAgents := registry.ListHealthy()
 
 	var tools []*genai.Tool
@@ -152,13 +152,13 @@ func agentsToTools(fsTool *filesystemTool, registry *Registry) ([]*genai.Tool, e
 			FunctionDeclarations: []*genai.FunctionDeclaration{funcDecl},
 		})
 	}
-	tools = append(tools, fsTool.funcDecl())
+	tools = append(tools, bashTool.funcDecl())
 	return tools, nil
 }
 
 func (p *geminiPlannerAgent) Process(ctx context.Context, sessionID string, incoming *proto.ProcessRequest, handler agent.OutputHandler) error {
 	// Convert agents to Gemini function declarations
-	tools, err := agentsToTools(p.fsTool, p.registry)
+	tools, err := agentsToTools(p.bashTool, p.registry)
 	if err != nil {
 		return fmt.Errorf("failed to convert agents to tools: %w", err)
 	}
@@ -305,7 +305,7 @@ func (p *geminiPlannerAgent) Process(ctx context.Context, sessionID string, inco
 					AgentHandoff: plannerAgentID,
 				})
 
-			case fsToolName:
+			case bashToolName:
 				command, ok := fc.Args["command"].(string)
 				if !ok {
 					return fmt.Errorf("command parameter missing or invalid in function call")
@@ -320,7 +320,7 @@ func (p *geminiPlannerAgent) Process(ctx context.Context, sessionID string, inco
 					return nil
 				}
 
-				output, err := p.fsTool.executeShellCommand(fc.Args)
+				output, err := p.bashTool.executeShellCommand(fc.Args)
 				if err != nil {
 					return err
 				}
@@ -440,23 +440,23 @@ func protoToContents(inputs []*proto.Content) []*genai.Content {
 	return contents
 }
 
-func newFilesystemTool() *filesystemTool {
-	return &filesystemTool{}
+func newBashTool() *bashTool {
+	return &bashTool{}
 }
 
-// filesystemTool is the built-in tool that allows
-// planner to operate file system operations.
-type filesystemTool struct {
+// bashTool is the built-in tool that allows
+// planner to execute general purpose bash commands.
+type bashTool struct {
 }
 
-func (f *filesystemTool) funcDecl() *genai.Tool {
+func (f *bashTool) funcDecl() *genai.Tool {
 	osInfo := fmt.Sprintf("User's Operating System: %s (%s)", runtime.GOOS, runtime.GOARCH)
-	description := fmt.Sprintf("Execute a shell command for file system operations. %s. Generate commands appropriate for this OS. Supports listing directories, reading files, writing files, and other file operations. Returns the command output or error. Never produce code, only use existing command line programs available in the system.", osInfo)
+	description := fmt.Sprintf("OS specific bash execution tool. %s. Generate commands appropriate for this OS. Returns the command output or error. Never produce code, only use existing command line programs available in the system.", osInfo)
 
 	return &genai.Tool{
 		FunctionDeclarations: []*genai.FunctionDeclaration{
 			{
-				Name:        fsToolName,
+				Name:        bashToolName,
 				Description: description,
 				Parameters: &genai.Schema{
 					Type: genai.TypeObject,
@@ -473,7 +473,7 @@ func (f *filesystemTool) funcDecl() *genai.Tool {
 	}
 }
 
-func (f *filesystemTool) executeShellCommand(args map[string]any) (string, error) {
+func (f *bashTool) executeShellCommand(args map[string]any) (string, error) {
 	command, ok := args["command"].(string)
 	if !ok {
 		return "", fmt.Errorf("command parameter missing or invalid")
