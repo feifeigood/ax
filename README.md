@@ -4,10 +4,11 @@ GAR, a short for Google Agent Runtime, is a single-writer agent orchestrator sys
 
 ## Features
 
-- **Streaming**: gRPC bidirectional streaming for agent communication
+- **Session Management**: Builtin session management for starting, resuming, forking, and inspecting agentic loop sessions
 - **Local & Remote Agents**: Support for both in-process and remote agent deployment
-- **Session Management**: Start, pause, resume, and inspect agentic loop sessions
-- **Agent Registry**: Automatic health monitoring and agent discovery
+- **Streaming**: gRPC bidirectional streaming for agent communication
+- **Tools and Skills**: Built-in bash tool and agent skills support
+- **Registry**: Agent discovery and automatic health monitoring
 
 Built-in consistency and resumability features:
 - **Single-Writer Architecture**: Centralized controller ensures consistent state management
@@ -22,7 +23,8 @@ Built-in consistency and resumability features:
 │  - Event Log           │                 └──────────────┘
 │  - Loop Executor       │                 ┌──────────────┐
 │  - Agent Registry      │--(gRPC stream)--| remote agent |
-└────────────────────────┘                 └──────────────┘
+│  - Tools & Skills      │                 └──────────────┘
+└────────────────────────┘
 ```
 
 As agents move from simple interactions to "autonomous workers," most developers
@@ -95,9 +97,9 @@ The GAR server exposes the `GARService` on port `:8494`.
 # Register the remote agent with gar
 gar register \
     --server localhost:8494 \
-    --agent-id remote-echo-agent \
-    --agent-name "Echo Agent" \
-    --agent-description "Echoes input in uppercase" \
+    --agent-id uppercase-agent \
+    --agent-name "Uppercase Agent" \
+    --agent-description "Converts input text to uppercase." \
     --agent-addr localhost:50051
 
 # Trigger a session - once server address is specified, gar will coordinate the remote agent via Process RPC accordingly
@@ -135,13 +137,13 @@ Options:
 
 ```bash
 # Trigger a new session
-gar trigger --input "Hello agent"
+gar trigger --input "Hello agents!"
 
 # Resume an existing session with new input
-gar trigger --session abc123 --input "Continue processing"
+gar trigger --session abc123 --input "Ok, now let's do something else..."
 
 # Trigger using server mode (connect to gar serve)
-gar trigger --server localhost:8494 --input "Use remote agent"
+gar trigger --server localhost:8494 --input "Hello agents!"
 
 ```
 
@@ -261,6 +263,20 @@ gar trigger --session session456 \
 
 Event logs use the `Event` message available in the protobuf.
 
+## Built-in Capabilities
+
+### Skills
+
+GAR includes built-in support for the agentskills.io discovery and execution protocol.
+
+The planner automatically discovers skills from `~/.agents/skills` by default (or a custom directory specified in `gar.yaml`). These skills are provided to the planner as tools, allowing it to seamlessly read skill instructions and execute their scripts.
+
+### Bash Tool
+
+The built-in planner is equipped with a `bash` tool that enables it to execute general-purpose shell commands. The tool automatically adapts to the user's operating system.
+
+For safety and control, any execution initiated by the bash tool requires explicit user approval via a confirmation flow before running.
+
 ## Building Custom Agents
 
 ### Local Agent
@@ -306,14 +322,14 @@ gar register \
   --server localhost:8494 \
   --agent-id "text-processing-agent" \
   --agent-name "Text Processing Agent" \
-  --agent-description "An agent that processes text" \
+  --agent-description "An agent that processes text to lower or upper case the inputs." \
   --agent-addr localhost:50051
 
 # Trigger a session
 gar trigger \
   --server localhost:8494 \
   --session session123 \
-  --input "Hello, I heard that there is an agent that can help with processing this text!"
+  --input "Hello, can you uppercase what I just said?"
 ```
 
 ## License
