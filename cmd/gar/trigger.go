@@ -48,10 +48,9 @@ If no session ID is provided, a new UUID will be generated.`,
 
 func init() {
 	triggerCmd.Flags().StringVar(&triggerSessionID, "session", "", "Session ID (optional, generates UUID if not provided)")
-	triggerCmd.Flags().StringVar(&triggerInput, "input", "", "Input message to send (required)")
+	triggerCmd.Flags().StringVar(&triggerInput, "input", "", "Input message to send (optional)")
 	triggerCmd.Flags().StringVar(&triggerServerAddr, "server", "", "gRPC controller server address (if specified, connects to remote server; otherwise runs with a local built-in GAR server)")
 	triggerCmd.Flags().StringVar(&triggerConfigFile, "config", "gar.yaml", "Path to YAML configuration file (only used with a local built-in GAR server)")
-	triggerCmd.MarkFlagRequired("input")
 }
 
 // TODO(jbd): Add multimodal input flags, e.g. --input-image.
@@ -91,19 +90,24 @@ func triggerLoop(ctx context.Context, sessionID string, input string) error {
 	d := internal.NewDisplay(sessionID)
 	d.DisplayHeader()
 
-	var inputs []*proto.Content
-	if input != "" {
-		d.DisplayInput(input)
-		inputs = []*proto.Content{
-			{
-				Role: "user",
-				Content: &proto.Content_Text{
-					Text: &proto.TextContent{
-						Text: input,
-					},
+	if input == "" {
+		var err error
+		input, err = d.PromptForInput()
+		if err != nil {
+			return err
+		}
+	}
+
+	d.DisplayInput(input)
+	inputs := []*proto.Content{
+		{
+			Role: "user",
+			Content: &proto.Content_Text{
+				Text: &proto.TextContent{
+					Text: input,
 				},
 			},
-		}
+		},
 	}
 
 	for {
