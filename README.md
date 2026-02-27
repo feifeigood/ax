@@ -1,5 +1,7 @@
 # gar
 
+🚧 This project is in active development and may introduce breaking changes to capabilities and APIs until the 1.0 release. 🚧
+
 GAR, a short for Google Agent Runtime, is a single-writer agent orchestrator system built in Go. It provides a minimal runtime that coordinates agentic loops, manages sessions with event logging, and communicates with both local and remote agents via streaming protocols.
 
 ## Features
