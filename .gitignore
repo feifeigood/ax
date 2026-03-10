@@ -4,3 +4,7 @@ eventlog/*
 local_agent
 remote_agent
 *.log
+gar-bin
+google-cloud-cli-darwin-arm.tar.gz
+google-cloud-sdk/
+test-sandbox-config.yaml

@@ -28,6 +28,7 @@ type HealthMonitor struct {
 	ticker   *time.Ticker
 	stop     chan struct{}
 	wg       sync.WaitGroup
+	stopOnce sync.Once
 }
 
 // NewHealthMonitor creates a new health monitor.
@@ -50,7 +51,9 @@ func (hm *HealthMonitor) Start() {
 func (hm *HealthMonitor) Stop() {
 	if hm.ticker != nil {
 		hm.ticker.Stop()
-		close(hm.stop)
+		hm.stopOnce.Do(func() {
+			close(hm.stop)
+		})
 		hm.wg.Wait()
 	}
 }

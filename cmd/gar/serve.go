@@ -126,14 +126,16 @@ func newControllerFromConfig(ctx context.Context, cfg *config.Config) (*controll
 	}
 
 	for _, agentCfg := range cfg.Agents {
-		switch agentCfg.Type {
-		case "remote":
-			cfg := agentCfg.RemoteAgentConfig
-			if err := c.Registry().RegisterRemote(cfg); err != nil {
-				return nil, fmt.Errorf("failed to register remote agent %s: %w", cfg.ID, err)
+		if agentCfg.SandboxAgentConfig != nil {
+			if err := c.Registry().RegisterSandbox(ctx, *agentCfg.SandboxAgentConfig); err != nil {
+				return nil, fmt.Errorf("failed to register sandbox agent %s: %w", agentCfg.SandboxAgentConfig.ID, err)
 			}
-		default:
-			return nil, fmt.Errorf("unknown agent type: %s", agentCfg.Type)
+		} else if agentCfg.RemoteAgentConfig != nil {
+			if err := c.Registry().RegisterRemote(*agentCfg.RemoteAgentConfig); err != nil {
+				return nil, fmt.Errorf("failed to register remote agent %s: %w", agentCfg.RemoteAgentConfig.ID, err)
+			}
+		} else {
+			return nil, fmt.Errorf("invalid agent configuration: must specify 'sandbox' or 'remote'")
 		}
 	}
 

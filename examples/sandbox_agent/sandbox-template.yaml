@@ -1,0 +1,28 @@
+# This is the Kubernetes manifest defining the execution environment for the agent.
+# It is applied strictly to the GKE Agent Sandbox controllers to define the Sandbox.
+# For more details on GKE Agent Sandbox container requirements, see:
+# https://docs.cloud.google.com/kubernetes-engine/docs/how-to/agent-sandbox
+apiVersion: extensions.agents.x-k8s.io/v1alpha1
+kind: SandboxTemplate
+metadata:
+  name: uppercase-agent-template
+  namespace: default
+spec:
+  podTemplate:
+    spec:
+      runtimeClassName: gvisor
+      containers:
+      - name: agent
+        image: us-central1-docker.pkg.dev/a2a-ae-fishfood-eoeg5x/gar-repo/gar-uppercase:latest
+        imagePullPolicy: Always
+        env:
+        - name: PORT
+          value: "8494"
+        ports:
+        - containerPort: 8494
+          name: grpc
+        readinessProbe:
+          tcpSocket:
+            port: 8494
+          initialDelaySeconds: 1
+          periodSeconds: 2

@@ -68,3 +68,23 @@ planner:
 #     address: "localhost:50051"
 #     metadata:
 #      version: "1.0"
+
+agents:
+  - type: "remote"
+    remote:
+      id: "remote-text-processor"
+      name: "Remote Text Processor"
+      description: "Converts text to lowercase."
+      address: "localhost:50051"
+      metadata:
+       version: "1.0"
+  - type: "sandbox"
+    sandbox:
+      id: "uppercase"
+      name: "Upper Case Agent"
+      description: "Converts text to uppercase."
+      sandbox_template_ref: "uppercase-agent-template"
+      container_port: 8494
+      use_router: true
+      metadata:
+       version: "1.0"

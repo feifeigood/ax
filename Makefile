@@ -56,3 +56,8 @@ deps:
 	@go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 	@go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 	@echo "Dependencies installed!"
+
+# Build Sandbox Router Static Binary
+build-router:
+	@echo "Building sandbox-router Linux binary..."
+	@GOOS=linux CGO_ENABLED=0 GOARCH=amd64 go build -o sandbox-router ./cmd/sandbox-router

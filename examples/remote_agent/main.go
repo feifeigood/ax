@@ -20,7 +20,6 @@ import (
 	"io"
 	"log"
 	"net"
-	"strings"
 
 	"google.golang.org/grpc"
 
@@ -50,11 +49,15 @@ func (s *server) Process(stream proto.AgentService_ProcessServer) error {
 
 		var contents []*proto.Content
 		for _, input := range incoming.Contents {
+			textContent := input.GetText()
+			if textContent == nil {
+				continue
+			}
 			contents = append(contents, &proto.Content{
 				Role: "assistant",
 				Content: &proto.Content_Text{
 					Text: &proto.TextContent{
-						Text: strings.ToUpper(input.GetText().Text),
+						Text: "Remote Prefix: " + textContent.Text,
 					},
 				},
 			})
