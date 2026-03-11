@@ -131,9 +131,9 @@ func newControllerFromConfig(ctx context.Context, cfg *config.Config) (*controll
 		}
 	}
 
-	for _, agentCfg := range cfg.Registry.SandboxAgents {
-		if err := c.Registry().RegisterSandbox(ctx, agentCfg); err != nil {
-			return nil, fmt.Errorf("failed to register sandbox agent %s: %w", agentCfg.ID, err)
+	for _, agentCfg := range cfg.Registry.KubernetesSandboxAgents {
+		if err := c.Registry().RegisterKubernetesSandbox(ctx, agentCfg); err != nil {
+			return nil, fmt.Errorf("failed to register kubernetes sandbox agent %s: %w", agentCfg.ID, err)
 		}
 	}
 	return c, nil

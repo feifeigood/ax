@@ -28,9 +28,9 @@ import (
 type AgentType string
 
 const (
-	AgentTypeLocal   AgentType = "local"
-	AgentTypeRemote  AgentType = "remote"
-	AgentTypeSandbox AgentType = "sandbox"
+	AgentTypeLocal             AgentType = "local"
+	AgentTypeRemote            AgentType = "remote"
+	AgentTypeKubernetesSandbox AgentType = "k8s_sandbox"
 )
 
 // AgentInfo contains metadata about a registered agent.
@@ -136,8 +136,8 @@ func (r *Registry) RegisterRemote(cfg config.RemoteAgentConfig) error {
 	return nil
 }
 
-// RegisterSandbox registers a sandbox agent by dynamically provisioning a Sandbox on GKE.
-func (r *Registry) RegisterSandbox(ctx context.Context, cfg config.SandboxAgentConfig) error {
+// RegisterKubernetesSandbox registers a sandbox agent by dynamically provisioning a Sandbox on GKE.
+func (r *Registry) RegisterKubernetesSandbox(ctx context.Context, cfg config.SandboxAgentConfig) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -149,7 +149,7 @@ func (r *Registry) RegisterSandbox(ctx context.Context, cfg config.SandboxAgentC
 		return fmt.Errorf("agent %s already registered", cfg.ID)
 	}
 
-	sandboxAgent, err := agent.NewSandboxAgent(ctx, agent.SandboxAgentConfig{
+	sandboxAgent, err := agent.NewKubernetesSandboxAgent(ctx, agent.KubernetesSandboxAgentConfig{
 		ID:                 cfg.ID,
 		SandboxTemplateRef: cfg.SandboxTemplateRef,
 		ContainerPort:      cfg.ContainerPort,
@@ -164,7 +164,7 @@ func (r *Registry) RegisterSandbox(ctx context.Context, cfg config.SandboxAgentC
 		ID:              cfg.ID,
 		Name:            cfg.Name,
 		Description:     cfg.Description,
-		Type:            AgentTypeSandbox,
+		Type:            AgentTypeKubernetesSandbox,
 		Healthy:         true,
 		LastHealthCheck: time.Time{},
 		Metadata:        cfg.Metadata,

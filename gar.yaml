@@ -67,7 +67,7 @@ registry:
       address: "localhost:50051"
       metadata:
        version: "1.0"
-  sandbox_agents: # TODO: Rename to k8s_sandbox_agents
+  k8s_sandbox_agents: # TODO: Rename to k8s_sandbox_agents
     - id: "uppercase"
       name: "Upper Case Agent"
       description: "Converts text to uppercase."

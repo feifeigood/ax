@@ -233,7 +233,7 @@ registry:
       address: "localhost:50051"
       metadata:
        version: "1.0"
-  sandbox_agents:
+  k8s_sandbox_agents:
     - id: "uppercase"
       name: "Upper Case Agent"
       description: "Converts text to uppercase."
@@ -345,7 +345,7 @@ To use a Sandbox Agent, specify it in your `gar.yaml` configuration using the `s
 
 ```yaml
 registry:
-  sandbox_agents:
+  k8s_sandbox_agents:
     - id: "my-sandbox-agent"
       name: "Sandbox Worker"
       description: "An ephemeral sandbox processor"
@@ -379,7 +379,7 @@ kubectl apply -f examples/sandbox_agent/sandbox-template-and-pool.yaml
 Ensure your `gar.yaml` references this sandbox agent:
 ```yaml
 registry:
-  sandbox_agents:
+  k8s_sandbox_agents:
     - id: "uppercase-agent"
       sandbox_template_ref: "uppercase-agent-template"
       container_port: 8494

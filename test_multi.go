@@ -42,7 +42,7 @@ func main() {
 	c, err := controller.New(ctx, controller.Config{
 		MaxSteps: 15,
 		HealthCheck: config.HealthCheckConfig{
-			Enabled:  false, // disable to speed up
+			Enabled: false, // disable to speed up
 		},
 		PlannerBuilder: func(ctx context.Context, r *controller.Registry) (agent.Agent, error) {
 			return &mockPlanner{}, nil
@@ -74,7 +74,7 @@ func main() {
 	}
 
 	// 5. Register Sandbox Agent
-	if err := c.Registry().RegisterSandbox(ctx, config.SandboxAgentConfig{
+	if err := c.Registry().RegisterKubernetesSandbox(ctx, config.SandboxAgentConfig{
 		ID:                 "uppercase",
 		SandboxTemplateRef: "uppercase-agent-template",
 		ContainerPort:      8494,
@@ -104,7 +104,7 @@ func main() {
 		}
 		return nil
 	})
-	
+
 	req := &proto.ProcessRequest{
 		Contents: inputs,
 	}
@@ -152,10 +152,10 @@ func createLocalAgent() (*agent.LocalAgent, error) {
 
 type mockPlanner struct{}
 
-func (m *mockPlanner) ID() string   { return "__planner" }
-func (m *mockPlanner) Name() string { return "Mock Planner" }
+func (m *mockPlanner) ID() string                            { return "__planner" }
+func (m *mockPlanner) Name() string                          { return "Mock Planner" }
 func (m *mockPlanner) HealthCheck(ctx context.Context) error { return nil }
-func (m *mockPlanner) Close() error { return nil }
+func (m *mockPlanner) Close() error                          { return nil }
 func (m *mockPlanner) Process(ctx context.Context, sessionID string, incoming *proto.ProcessRequest, handler agent.OutputHandler) error {
 	var lastText string
 	for _, c := range incoming.Contents {
