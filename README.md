@@ -225,19 +225,23 @@ health_check:
   interval: 30s
 
 # Agents to register on startup
-agents:
-  - remote:
-      id: "text-processing-agent"
-      name: "Text Processing Agent"
-      description: "An agent for text processing"
+registry:
+  remote_agents:
+    - id: "remote-text-processor"
+      name: "Remote Text Processor"
+      description: "Converts text to lowercase."
       address: "localhost:50051"
       metadata:
-        version: "1.0"
-  - sandbox:
-      id: "uppercase-sandbox-agent"
-      name: "Sandbox Uppercase Agent"
-      description: "A secure, ephemeral cloud container for executing uppercase transformations"
+       version: "1.0"
+  sandbox_agents:
+    - id: "uppercase"
+      name: "Upper Case Agent"
+      description: "Converts text to uppercase."
       sandbox_template_ref: "uppercase-agent-template"
+      container_port: 8494
+      use_router: true
+      metadata:
+       version: "1.0"
 
 ```
 
@@ -340,9 +344,9 @@ kubectl expose deployment sandbox-router --port=8080 --target-port=8080
 To use a Sandbox Agent, specify it in your `gar.yaml` configuration using the `sandbox` type:
 
 ```yaml
-agents:
-  - sandbox:
-      id: "my-sandbox-agent"
+registry:
+  sandbox_agents:
+    - id: "my-sandbox-agent"
       name: "Sandbox Worker"
       description: "An ephemeral sandbox processor"
       sandbox_template_ref: "your-gke-sandbox-template-name"
@@ -374,9 +378,9 @@ kubectl apply -f examples/sandbox_agent/sandbox-template-and-pool.yaml
 **3. Configure gar.yaml**
 Ensure your `gar.yaml` references this sandbox agent:
 ```yaml
-agents:
-  - id: "uppercase-agent"
-    sandbox:
+registry:
+  sandbox_agents:
+    - id: "uppercase-agent"
       sandbox_template_ref: "uppercase-agent-template"
       container_port: 8494
 ```

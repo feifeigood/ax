@@ -31,12 +31,13 @@ type Config struct {
 	MaxSteps    int               `yaml:"max_steps"` // Maximum steps per trigger
 	HealthCheck HealthCheckConfig `yaml:"health_check"`
 	Planner     PlannerConfig     `yaml:"planner,omitempty"`
-	Agents      []Agent           `yaml:"agents,omitempty"` // List of local agents to register
+	Registry    RegistryConfig    `yaml:"registry,omitempty"`
 }
 
-type Agent struct {
-	RemoteAgentConfig  *RemoteAgentConfig  `yaml:"remote,omitempty"`
-	SandboxAgentConfig *SandboxAgentConfig `yaml:"sandbox,omitempty"`
+// RegistryConfig allows registring agents.
+type RegistryConfig struct {
+	RemoteAgents  []RemoteAgentConfig  `yaml:"remote_agents,omitempty"`
+	SandboxAgents []SandboxAgentConfig `yaml:"sandbox_agents,omitempty"`
 }
 
 // HealthCheckConfig defines the configuration for agent health checks.
