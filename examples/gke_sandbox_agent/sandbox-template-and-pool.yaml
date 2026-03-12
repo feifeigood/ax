@@ -33,7 +33,7 @@ spec:
       runtimeClassName: gvisor
       containers:
       - name: agent
-        image: us-central1-docker.pkg.dev/a2a-ae-fishfood-eoeg5x/gar-repo/gar-uppercase:latest
+        image: us-central1-docker.pkg.dev/a2a-ae-demo-eoeg5x/gar-repo/gar-uppercase:latest
         imagePullPolicy: Always
         env:
         - name: PORT

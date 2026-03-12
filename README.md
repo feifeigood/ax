@@ -393,7 +393,7 @@ gar serve --config gar.yaml
 **5. Trigger the Agent**
 In a separate terminal:
 ```bash
-gar trigger --prompt "use the uppercase-agent to convert 'hello world'"
+gar trigger --input "use the uppercase-agent to convert 'hello world'"
 ```
 
 The system will dynamically create a `SandboxClaim`, establish a connection via `kubectl port-forward`, execute the code securely, and return the result.
