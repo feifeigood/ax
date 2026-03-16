@@ -6,6 +6,7 @@ require (
 	github.com/charmbracelet/huh v0.8.0
 	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834
 	github.com/google/uuid v1.6.0
+	github.com/mattn/go-sqlite3 v1.14.37
 	github.com/spf13/cobra v1.10.2
 	golang.org/x/net v0.48.0
 	golang.org/x/sync v0.19.0

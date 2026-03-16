@@ -56,7 +56,7 @@ type ServerConfig struct {
 
 // EventLogConfig configures the event log storage.
 type EventLogConfig struct {
-	Dir string `yaml:"dir"` // Directory for event log files
+	SQLiteFilename string `yaml:"db_filename"` // SQLite file for event log storage
 }
 
 // PlannerConfig configures the planner.
@@ -132,8 +132,8 @@ func (c *Config) setDefaults() {
 	}
 
 	// EventLog defaults
-	if c.EventLog.Dir == "" {
-		c.EventLog.Dir = "eventlog"
+	if c.EventLog.SQLiteFilename == "" {
+		c.EventLog.SQLiteFilename = "eventlog/log.sqlite"
 	}
 
 	// HealthCheck defaults
@@ -147,8 +147,8 @@ func (c *Config) Validate() error {
 	if c.Server.Address == "" {
 		return fmt.Errorf("server.address is required")
 	}
-	if c.EventLog.Dir == "" {
-		return fmt.Errorf("eventlog.dir is required")
+	if c.EventLog.SQLiteFilename == "" {
+		return fmt.Errorf("eventlog.db_filename is required")
 	}
 	// Validate health check
 	if c.HealthCheck.Enabled {

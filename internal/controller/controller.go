@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path"
 	"sync"
 
 	"github.com/google/ax/agent"
@@ -38,7 +37,7 @@ type Controller struct {
 	inFlightExecutionsMu sync.Mutex
 	inFlightExecutions   map[string]struct{}
 	registry           *Registry
-	eventLogBuilder    task.EventLogBuilder
+	eventLog           task.EventLog
 	plannerBuilder     PlannerBuilder
 }
 
@@ -55,12 +54,6 @@ type Config struct {
 
 // New creates a new controller instance.
 func New(ctx context.Context, config Config) (*Controller, error) {
-	if config.EventLogBuilder == nil {
-		config.EventLogBuilder = func(taskID string) (task.EventLog, error) {
-			return task.OpenFileEventLog(path.Join(".", "tasklog", taskID+".jsonl"))
-		}
-	}
-
 	// Initialize agent registry
 	registry, err := NewRegistry(config.HealthCheck)
 	if err != nil {
@@ -75,10 +68,18 @@ func New(ctx context.Context, config Config) (*Controller, error) {
 		}
 	}
 
+	if config.EventLogBuilder == nil {
+		return nil, fmt.Errorf("event log builder is required")
+	}
+	eventLog, err := config.EventLogBuilder()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create event log: %w", err)
+	}
+
 	return &Controller{
 		inFlightExecutions: make(map[string]struct{}),
 		registry:         registry,
-		eventLogBuilder:  config.EventLogBuilder,
+		eventLog:         eventLog,
 		plannerBuilder:   config.PlannerBuilder,
 	}, nil
 }
@@ -130,7 +131,7 @@ func (d *Controller) Exec(ctx context.Context, id string, agentID string, incomi
 	if agentID == "" {
 		agentID = plannerAgentID
 	}
-	e := task.DefaultExecutor(d.eventLogBuilder, registry)
+	e := task.DefaultExecutor(d.eventLog, registry)
 	return e.Exec(ctx, &agent.Task{
 		ID:      id,
 		AgentID: agentID,
@@ -159,6 +160,9 @@ func (d *Controller) Registry() *Registry {
 
 // Close gracefully shuts down the controller.
 func (d *Controller) Close() error {
+	if err := d.eventLog.Close(); err != nil {
+		return fmt.Errorf("failed to close event log: %w", err)
+	}
 	if err := d.registry.Close(); err != nil {
 		return fmt.Errorf("failed to close registry: %w", err)
 	}

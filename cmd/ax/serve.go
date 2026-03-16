@@ -20,7 +20,6 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"path"
 	"syscall"
 
 	"github.com/google/ax/agent"
@@ -90,9 +89,8 @@ func runServe(cmd *cobra.Command, args []string) error {
 
 func newControllerFromConfig(ctx context.Context, cfg *config.Config) (*controller.Controller, error) {
 	// Create event log builder
-	eventLogBuilder := func(taskID string) (task.EventLog, error) {
-		path := path.Join(cfg.EventLog.Dir, taskID+".jsonl")
-		return task.OpenFileEventLog(path)
+	eventLogBuilder := func() (task.EventLog, error) {
+		return task.OpenSQLiteEventLog(cfg.EventLog.SQLiteFilename)
 	}
 
 	// Create planner builder

@@ -224,7 +224,7 @@ server:
   address: ":8494"
 
 eventlog:
-  dir: "eventlog"
+  db_filename: "eventlog/log.sqlite"
 
 health_check:
   enabled: true

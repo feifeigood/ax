@@ -43,12 +43,16 @@ func (m *MemoryEventLog) Append(_ context.Context, event *proto.ExecutionEvent) 
 	return nil
 }
 
-func (m *MemoryEventLog) Events(_ context.Context) ([]*proto.ExecutionEvent, error) {
+func (m *MemoryEventLog) Events(_ context.Context, taskID string) ([]*proto.ExecutionEvent, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	out := make([]*proto.ExecutionEvent, len(m.events))
-	copy(out, m.events)
+	out := make([]*proto.ExecutionEvent, 0)
+	for _, ev := range m.events {
+		if ev.TaskId == taskID {
+			out = append(out, ev)
+		}
+	}
 	return out, nil
 }
 
@@ -72,10 +76,8 @@ func (m *MemoryEventLog) Close() error {
 }
 
 // memoryBuilder returns a new EventLogBuilder that creates a fresh MemoryEventLog per task.
-func memoryBuilder() EventLogBuilder {
-	return func(taskID string) (EventLog, error) {
-		return &MemoryEventLog{}, nil
-	}
+func memoryEventLog() EventLog {
+	return &MemoryEventLog{}
 }
 
 func Example() {
@@ -101,7 +103,7 @@ func Example() {
 		}),
 	}
 
-	tm := DefaultExecutor(memoryBuilder(), registry)
+	tm := DefaultExecutor(memoryEventLog(), registry)
 	if err := tm.Exec(ctx, &agent.Task{
 		ID:      "test",
 		AgentID: "planner",
@@ -139,7 +141,7 @@ func TestTaskManager(t *testing.T) {
 		}),
 	}
 
-	tm := DefaultExecutor(memoryBuilder(), registry)
+	tm := DefaultExecutor(memoryEventLog(), registry)
 	if err := tm.Exec(ctx, &agent.Task{
 		ID:      "root-task",
 		AgentID: "root",
@@ -210,7 +212,7 @@ func TestFanout(t *testing.T) {
 		}),
 	}
 
-	tm := DefaultExecutor(memoryBuilder(), registry)
+	tm := DefaultExecutor(memoryEventLog(), registry)
 	if err := tm.Exec(ctx, &agent.Task{
 		ID:      "root-task",
 		AgentID: "root",
@@ -228,18 +230,7 @@ func TestConfirmation(t *testing.T) {
 	ctx := context.Background()
 
 	var runCount int
-	logs := map[string]*MemoryEventLog{}
-	var logsMu sync.Mutex
-	builder := func(taskID string) (EventLog, error) {
-		logsMu.Lock()
-		defer logsMu.Unlock()
-		if l, ok := logs[taskID]; ok {
-			return l, nil
-		}
-		l := &MemoryEventLog{}
-		logs[taskID] = l
-		return l, nil
-	}
+	eventLog := memoryEventLog()
 
 	confID := "test-conf-id"
 	var childDone atomic.Bool
@@ -283,7 +274,7 @@ func TestConfirmation(t *testing.T) {
 		}),
 	}
 
-	tm := DefaultExecutor(builder, registry)
+	tm := DefaultExecutor(eventLog, registry)
 
 	// First run: child returns a confirmation request.
 	if err := tm.Exec(ctx, &agent.Task{
@@ -321,11 +312,7 @@ func TestConfirmation(t *testing.T) {
 
 func TestResume(t *testing.T) {
 	ctx := context.Background()
-	dir := t.TempDir()
-
-	builder := func(taskID string) (EventLog, error) {
-		return OpenFileEventLog(dir + "/test-resume-" + taskID + ".jsonl")
-	}
+	eventLog := memoryEventLog()
 
 	registry := map[string]agent.Agent{
 		"root": AgentFunc(func(inputs []*proto.Content, tm agent.TaskExecutor, o agent.OutputHandler) {
@@ -352,7 +339,7 @@ func TestResume(t *testing.T) {
 		}),
 	}
 
-	tm := DefaultExecutor(builder, registry)
+	tm := DefaultExecutor(eventLog, registry)
 	if err := tm.Exec(ctx, &agent.Task{
 		ID:      "root-task",
 		AgentID: "root",

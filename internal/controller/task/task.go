@@ -23,11 +23,11 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-type EventLogBuilder func(taskID string) (EventLog, error)
+type EventLogBuilder func() (EventLog, error)
 
 type taskExecutor struct {
 	id        string
-	elBuilder EventLogBuilder
+	eventLog  EventLog
 	registry  map[string]agent.Agent
 }
 
@@ -38,27 +38,22 @@ func newTaskID(parent, child string) string {
 	return parent + "-" + child
 }
 
-func DefaultExecutor(b EventLogBuilder, registry map[string]agent.Agent) agent.TaskExecutor {
+func DefaultExecutor(eventLog EventLog, registry map[string]agent.Agent) agent.TaskExecutor {
 	return &taskExecutor{
 		id:        "",
-		elBuilder: b,
+		eventLog:  eventLog,
 		registry:  registry,
 	}
 }
 
 func (tm *taskExecutor) Exec(ctx context.Context, t *agent.Task, o agent.OutputHandler) error {
 	t.ID = newTaskID(tm.id, t.ID)
-	el, err := tm.elBuilder(t.ID)
-	if err != nil {
-		return err
-	}
-
 	a, ok := tm.registry[t.AgentID]
 	if !ok {
 		return errors.New("no agent found")
 	}
 
-	allInputs, state, err := history(ctx, el, t.ID)
+	allInputs, state, err := history(ctx, tm.eventLog, t.ID)
 	if err != nil {
 		return err
 	}
@@ -72,7 +67,7 @@ func (tm *taskExecutor) Exec(ctx context.Context, t *agent.Task, o agent.OutputH
 		}
 		return nil
 	}
-	return tm.exec(ctx, t, el, a, allInputs, o)
+	return tm.exec(ctx, t, tm.eventLog, a, allInputs, o)
 }
 
 func (tm *taskExecutor) exec(
@@ -84,10 +79,9 @@ func (tm *taskExecutor) exec(
 	o agent.OutputHandler) error {
 	child := &taskExecutor{
 		id:        t.ID,
-		elBuilder: tm.elBuilder,
+		eventLog:  tm.eventLog,
 		registry:  tm.registry,
 	}
-	defer el.Close()
 
 	var allOutputs []*proto.Content
 	outputBuffer := func(outgoing *proto.ProcessResponse) error {
@@ -134,7 +128,7 @@ func (tm *taskExecutor) exec(
 }
 
 func history(ctx context.Context, el EventLog, taskID string) ([]*proto.Content, proto.State, error) {
-	events, err := el.Events(ctx)
+	events, err := el.Events(ctx, taskID)
 	if err != nil {
 		return nil, proto.State_STATE_UNSPECIFIED, err
 	}

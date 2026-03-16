@@ -19,8 +19,8 @@ server:
 
 # Event log configuration
 eventlog:
-  # Directory where event logs are stored
-  dir: "eventlog"
+  # SQLite file for event log storage
+  db_filename: "eventlog/log.sqlite"
 
 health_check:
   # Whether to enable active health checking
