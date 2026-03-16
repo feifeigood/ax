@@ -110,7 +110,7 @@ func main() {
 
 	for i := 0; i < 4; i++ {
 		log.Printf("\n--- Executing step %d ---\n", i+1)
-		if err := c.Exec(ctx, execID, "", req, handler); err != nil {
+		if err := c.Exec(ctx, execID, "", nil, req, handler); err != nil {
 			log.Fatalf("Error executing step %d: %v\n", i+1, err)
 		}
 		// Subsequent execs just ask the planner to continue processing the existing history

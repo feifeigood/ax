@@ -27,6 +27,7 @@ import (
 	"github.com/google/ax/internal/controller/task"
 	"github.com/google/ax/internal/testagent"
 	"github.com/google/ax/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 const plannerAgentID = "__planner"
@@ -36,9 +37,9 @@ const plannerAgentID = "__planner"
 type Controller struct {
 	inFlightExecutionsMu sync.Mutex
 	inFlightExecutions   map[string]struct{}
-	registry           *Registry
-	eventLog           task.EventLog
-	plannerBuilder     PlannerBuilder
+	registry             *Registry
+	eventLog             task.EventLog
+	plannerBuilder       PlannerBuilder
 }
 
 // PlannerBuilder is a function that creates a PlanFunc given a Registry.
@@ -78,16 +79,16 @@ func New(ctx context.Context, config Config) (*Controller, error) {
 
 	return &Controller{
 		inFlightExecutions: make(map[string]struct{}),
-		registry:         registry,
-		eventLog:         eventLog,
-		plannerBuilder:   config.PlannerBuilder,
+		registry:           registry,
+		eventLog:           eventLog,
+		plannerBuilder:     config.PlannerBuilder,
 	}, nil
 }
 
 // Exec executes a new agentic loop execution or resumes an existing one.
 // If id is empty, a UUID will be generated.
 // If the execution already exists, it will be resumed with optional new inputs.
-func (d *Controller) Exec(ctx context.Context, id string, agentID string, incoming *proto.ProcessRequest, handler agent.OutputHandler) error {
+func (d *Controller) Exec(ctx context.Context, id string, agentID string, agentConfig *anypb.Any, incoming *proto.ProcessRequest, handler agent.OutputHandler) error {
 	if id == "" {
 		return fmt.Errorf("id is required")
 	}
@@ -136,6 +137,7 @@ func (d *Controller) Exec(ctx context.Context, id string, agentID string, incomi
 		ID:      id,
 		AgentID: agentID,
 		Inputs:  incoming.Contents,
+		Config:  agentConfig,
 	}, o)
 }
 

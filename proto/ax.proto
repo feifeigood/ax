@@ -18,6 +18,7 @@ package proto;
 
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/struct.proto";
+import "google/protobuf/any.proto";
 
 option go_package = "github.com/google/ax/proto";
 
@@ -134,9 +135,10 @@ enum State {
 
 // ExecRequest for executing.
 message ExecRequest {
-  string id = 1;               // Unique execution identifier
-  string agent_id = 2;         // Agent ID, if empty planner is used.
-  repeated Content inputs = 3; // Input content to process
+  string id = 1;                         // Unique execution identifier
+  string agent_id = 2;                   // Agent ID, if empty planner is used
+  google.protobuf.Any agent_config = 3;  // Agent configuration if any
+  repeated Content inputs = 4;           // Input content to process
 }
 
 // ExecResponse contains the result of an execution.

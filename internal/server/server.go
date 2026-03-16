@@ -57,7 +57,7 @@ func (s *Server) Exec(req *proto.ExecRequest, stream grpc.ServerStreamingServer[
 		})
 	})
 	return s.controller.Exec(
-		stream.Context(), req.Id, req.AgentId, incoming, outputHandler)
+		stream.Context(), req.Id, req.AgentId, req.AgentConfig, incoming, outputHandler)
 }
 
 func (s *Server) Fork(ctx context.Context, req *proto.ForkRequest) (*proto.ForkResponse, error) {

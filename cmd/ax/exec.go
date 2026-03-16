@@ -32,7 +32,7 @@ import (
 )
 
 var (
-	execID  string
+	execID         string
 	execAgentID    string
 	execInput      string
 	execServerAddr string
@@ -232,7 +232,7 @@ func runExecHeadless(ctx context.Context, d *internal.Display, id string, agentI
 		displayContents(d, resp.Contents)
 		return nil
 	})
-	if err := execController.Exec(ctx, id, agentID, &proto.ProcessRequest{
+	if err := execController.Exec(ctx, id, agentID, nil, &proto.ProcessRequest{
 		Contents: inputs,
 	}, outputHandler); err != nil {
 		return nil, nil, fmt.Errorf("error executing with local server: %w", err)
@@ -255,7 +255,7 @@ func runExecServer(ctx context.Context, d *internal.Display, id string, agentID 
 	stream, err := client.Exec(ctx, &proto.ExecRequest{
 		Id:      id,
 		AgentId: agentID,
-		Inputs:    inputs,
+		Inputs:  inputs,
 	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("error executing: %w", err)
