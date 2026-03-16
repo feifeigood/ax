@@ -41,7 +41,7 @@ type EventLog interface {
 }
 
 // FileEventLog is a durable EventLog that writes one JSON object per line to
-// a file. Each session should use its own file. The file is created if it does
+// a file. Each execution should use its own file. The file is created if it does
 // not exist and is opened for appending, so existing events survive restarts.
 //
 // The format is newline-delimited JSON (NDJSON): every Append call writes one
@@ -54,7 +54,7 @@ type FileEventLog struct {
 }
 
 // OpenFileEventLog opens (or creates) the log file at path.
-// Call Close when the session is done to release the file handle.
+// Call Close when the execution is done to release the file handle.
 func OpenFileEventLog(path string) (*FileEventLog, error) {
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0o644)
 	if err != nil {

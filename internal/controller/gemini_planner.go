@@ -491,7 +491,7 @@ func agentsToTools(bashTool *bashTool, registry *Registry) ([]*genai.Tool, error
 	return tools, nil
 }
 
-// protoToContents converts session message history to Gemini conversation format.
+// protoToContents converts history to Gemini conversation format.
 func protoToContents(inputs []*proto.Content) []*genai.Content {
 	var contents []*genai.Content
 

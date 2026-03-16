@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // Package controller implements the single-writer orchestrator that coordinates
-// agentic loops, manages sessions, and communicates with local and remote agents.
+// agentic loops, manages executions, and communicates with local and remote agents.
 package controller
 
 import (
@@ -35,8 +35,8 @@ const plannerAgentID = "__planner"
 // Controller is the main controller that coordinates all components.
 // It acts as a single-writer system for managing agentic loops.
 type Controller struct {
-	inFlightSessionsMu sync.Mutex
-	inFlightSessions   map[string]struct{}
+	inFlightExecutionsMu sync.Mutex
+	inFlightExecutions   map[string]struct{}
 	registry           *Registry
 	eventLogBuilder    task.EventLogBuilder
 	plannerBuilder     PlannerBuilder
@@ -76,26 +76,26 @@ func New(ctx context.Context, config Config) (*Controller, error) {
 	}
 
 	return &Controller{
-		inFlightSessions: make(map[string]struct{}),
+		inFlightExecutions: make(map[string]struct{}),
 		registry:         registry,
 		eventLogBuilder:  config.EventLogBuilder,
 		plannerBuilder:   config.PlannerBuilder,
 	}, nil
 }
 
-// Exec executes a new agentic loop session or resumes an existing one.
-// If sessionID is empty, a UUID will be generated.
-// If the session already exists, it will be resumed with optional new inputs.
-func (d *Controller) Exec(ctx context.Context, sessionID string, agentID string, incoming *proto.ProcessRequest, handler agent.OutputHandler) error {
-	if sessionID == "" {
-		return fmt.Errorf("session_id is required")
+// Exec executes a new agentic loop execution or resumes an existing one.
+// If id is empty, a UUID will be generated.
+// If the execution already exists, it will be resumed with optional new inputs.
+func (d *Controller) Exec(ctx context.Context, id string, agentID string, incoming *proto.ProcessRequest, handler agent.OutputHandler) error {
+	if id == "" {
+		return fmt.Errorf("id is required")
 	}
 
-	inFlight, cleanup := d.markInFlight(sessionID)
+	inFlight, cleanup := d.markInFlight(id)
 	defer cleanup()
 
 	if inFlight {
-		return fmt.Errorf("task %q is already in flight", sessionID)
+		return fmt.Errorf("task %q is already in flight", id)
 	}
 
 	planner, err := d.plannerBuilder(ctx, d.registry)
@@ -132,20 +132,20 @@ func (d *Controller) Exec(ctx context.Context, sessionID string, agentID string,
 	}
 	e := task.DefaultExecutor(d.eventLogBuilder, registry)
 	return e.Exec(ctx, &agent.Task{
-		ID:      sessionID,
+		ID:      id,
 		AgentID: agentID,
 		Inputs:  incoming.Contents,
 	}, o)
 }
 
-// ForkSession forks a session from a source session.
-// If checkpointId is provided, fork til the checkpoint. Otherwise, fork the whole session.
-func (d *Controller) ForkSession(ctx context.Context, sourceSessionID, sourceCheckpoint, destSessionID string) error {
-	if sourceSessionID == "" {
-		return fmt.Errorf("source session ID is required")
+// Fork forks an execution from a source execution.
+// If checkpointId is provided, fork til the checkpoint. Otherwise, fork the whole execution.
+func (d *Controller) Fork(ctx context.Context, sourceID, sourceCheckpoint, destID string) error {
+	if sourceID == "" {
+		return fmt.Errorf("source ID is required")
 	}
-	if destSessionID == "" {
-		return fmt.Errorf("destination session ID is required")
+	if destID == "" {
+		return fmt.Errorf("destination ID is required")
 	}
 	panic("not yet implemented")
 
@@ -165,19 +165,19 @@ func (d *Controller) Close() error {
 	return nil
 }
 
-func (d *Controller) markInFlight(sessionID string) (exists bool, cleanup func()) {
-	d.inFlightSessionsMu.Lock()
-	defer d.inFlightSessionsMu.Unlock()
+func (d *Controller) markInFlight(id string) (exists bool, cleanup func()) {
+	d.inFlightExecutionsMu.Lock()
+	defer d.inFlightExecutionsMu.Unlock()
 
-	_, ok := d.inFlightSessions[sessionID]
+	_, ok := d.inFlightExecutions[id]
 	if ok {
 		return true, func() {}
 	}
-	d.inFlightSessions[sessionID] = struct{}{}
+	d.inFlightExecutions[id] = struct{}{}
 
 	return false, func() {
-		d.inFlightSessionsMu.Lock()
-		delete(d.inFlightSessions, sessionID)
-		d.inFlightSessionsMu.Unlock()
+		d.inFlightExecutionsMu.Lock()
+		delete(d.inFlightExecutions, id)
+		d.inFlightExecutionsMu.Unlock()
 	}
 }

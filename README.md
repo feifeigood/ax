@@ -2,11 +2,11 @@
 
 🚧 This project is in active development and may introduce breaking changes to capabilities and APIs until the 1.0 release. 🚧
 
-GAR, a short for Google Agent Runtime, is a single-writer agent orchestrator system built in Go. It provides a minimal runtime that coordinates agentic loops, manages sessions with event logging, and communicates with both local and remote agents via streaming protocols.
+GAR, a short for Google Agent Runtime, is a single-writer agent orchestrator system built in Go. It provides a minimal runtime that coordinates agentic loops, manages executions with event logging, and communicates with both local and remote agents via streaming protocols.
 
 ## Features
 
-- **Session Management**: Builtin session management for starting, resuming, forking, and inspecting agentic loop sessions
+- **Session Management**: Builtin event log management for starting, resuming, forking, and inspecting agentic loop executions
 - **Local & Remote Agents**: Support for both in-process and remote agent deployment
 - **Streaming**: gRPC bidirectional streaming for agent communication
 - **Tools and Skills**: Built-in bash tool and agent skills support
@@ -14,7 +14,7 @@ GAR, a short for Google Agent Runtime, is a single-writer agent orchestrator sys
 
 Built-in consistency and resumability features:
 - **Single-Writer Architecture**: Centralized controller ensures consistent state management
-- **Event Log**: Durable session state with automatic recovery
+- **Event Log**: Durable execution state with automatic recovery
 
 ## Overview
 
@@ -57,7 +57,7 @@ You should see the gar CLI usage information.
 
 ### 1. Run exec
 
-The CLI provides an easy way to execute a session by using the
+The CLI provides an easy way to execute by using the
 agents and built-in tools already linked into the GAR binary.
 
 ```bash
@@ -68,10 +68,10 @@ gar exec --input "Can you list me this directory?"
 gar exec --input "Can you list me this directory?" --config my-config.yaml
 ```
 
-You can continue a session any time:
+You can continue an execution any time:
 
 ```bash
-gar exec --session session123 --input "Show me the contents of README.md"
+gar exec --id exec123 --input "Show me the contents of README.md"
 ```
 
 Instead of running the default planner agent, you can run any registered agent:
@@ -100,7 +100,7 @@ gar serve
 ```
 The GAR server exposes the `GARService` on port `:8494`.
 
-**Terminal 3** - Register the remote agent and execute a session:
+**Terminal 3** - Register the remote agent and execute:
 ```bash
 # Register the remote agent with gar
 gar register \
@@ -110,10 +110,10 @@ gar register \
     --agent-description "Converts input text to uppercase." \
     --agent-addr localhost:50051
 
-# Execute a session - once server address is specified, gar will coordinate the remote agent via Process RPC accordingly
+# Execute - once server address is specified, gar will coordinate the remote agent via Process RPC accordingly
 gar exec \
     --server localhost:8494 \
-    --session session123 \
+    --id task123 \
     --input "Hello, can you uppercase what I just said?"
 ```
 
@@ -123,34 +123,34 @@ gar exec \
 
 The `gar` command provides several subcommands:
 
-#### Execute a Session
+#### Execute
 
 ```bash
 gar exec \
     --input <text> \
-    [--session <id>] \
+    [--id <id>] \
     [--agent <id>] \
     [--server <address>] \
     [--config <file>]
 ```
 
-Executes a new agentic loop session or automatically resumes an existing one. If the session ID already exists, the session will be resumed from its last state with the new input.
+Executes a new agentic execution or automatically resumes an existing one. If the ID already exists, the execution will be resumed from its last state with the new input.
 
 Options:
 - `--input`: Input message to send to agents (required)
-- `--session`: Unique session identifier (optional, generates UUID if not provided, or resumes if exists)
-- `--agent`: Agent ID to use for the session (optional, defaults to planner)
+- `--id`: Unique identifier (optional, generates UUID if not provided, or resumes if exists)
+- `--agent`: Agent ID to use (optional, defaults to planner)
 - `--server`: gRPC controller server address (optional. If not provided, runs with a built-in GAR server)
 - `--config`: Path to YAML configuration file (only used with a built-in GAR server, default: "gar.yaml")
 
 **Examples:**
 
 ```bash
-# Execute a new session
+# Execute a new execution
 gar exec --input "Hello agents!"
 
-# Resume an existing session with new input
-gar exec --session abc123 --input "Ok, now let's do something else..."
+# Resume an existing execution with new input
+gar exec --id abc123 --input "Ok, now let's do something else..."
 
 # Execute using server mode (connect to gar serve)
 gar exec --server localhost:8494 --input "Hello agents!"
@@ -158,35 +158,35 @@ gar exec --server localhost:8494 --input "Hello agents!"
 gar exec --agent coding --input "Hello coding agent, write me a cool Go program!"
 ```
 
-#### Fork a Session
+#### Fork an Event Log
 
-Fork an existing session from a specific checkpoint (or the latest state) into a new session.
+Fork an existing agentic event log from a specific checkpoint (or the latest state) into a new event log.
 
 ```bash
 gar fork \
-    --src-session <id> \
+    --src-id <id> \
     [--src-checkpoint <id>] \
-    [--dest-session <id>] \
+    [--dest-id <id>] \
     [--server <address>]
 ```
 
 Options:
-- `--src-session`: Source Session ID to fork from (required)
+- `--src-id`: Source ID to fork from (required)
 - `--src-checkpoint`: Checkpoint ID to fork from (optional, defaults to latest)
-- `--dest-session`: Destination Session ID (optional, generates UUID if not provided)
+- `--dest-id`: Destination ID (optional, generates UUID if not provided)
 - `--server`: gRPC controller server address (default: "localhost:8494")
 
 **Example:**
 
 ```bash
 # Fork from the latest state
-gar fork --src-session abc123
+gar fork --src-id abc123
 
 # Fork from a specific checkpoint
-gar fork --src-session abc123 --src-checkpoint "550e..."
+gar fork --src-id abc123 --src-checkpoint "550e..."
 
-# Fork from a specific checkpoint to a new session with a specific new session id
-gar fork --src-session abc123 --src-checkpoint "550e..." --dest-session new-session-id 
+# Fork from a specific checkpoint to a new event log with a specific new ID
+gar fork --src-id abc123 --src-checkpoint "550e..." --dest-id new-id 
 ```
 
 #### Register a Remote Agent
@@ -271,18 +271,18 @@ gar serve --config my-config.yaml
 
 ### Checkpoints
 
-Checkpoints provide a mechanism to save and resume session state at specific points. Every content event can create a checkpoint with a unique UUID.
+Checkpoints provide a mechanism to save and resume state at specific points. Every content event can create a checkpoint with a unique UUID.
 
 **Usage Examples:**
 
 ```bash
-# Fork from a checkpoint to a new session
-gar fork --src-session session123 \
+# Fork from a checkpoint to a new event log
+gar fork --src-id task123 \
   --src-checkpoint "550e8400-e29b-41d4-a716-446655440000" \
-  --dest-session session456
+  --dest-id task456
 
-# Resume from the forked session
-gar exec --session session456 \
+# Resume from the forked event log
+gar exec --id task456 \
   --input "Try different approach"
 ```
 
@@ -324,7 +324,7 @@ See `examples/remote_agent/main.go` for a complete implementation.
 1. Remote agent starts as gRPC server on a port (e.g., :50051)
 2. Start gar controller: `gar serve`
 3. Register with gar: `gar register --agent-id my-agent --agent-name "My Agent" --agent-description "Agent description" --agent-addr localhost:50051`
-4. When gar executes a session, it calls the agent's `Process` RPC
+4. When gar executes an execution, it calls the agent's `Process` RPC
 5. GAR streams input content → Agent processes → Agent streams output back
 
 See `examples/remote_agent/main.go` for a complete implementation.
@@ -422,7 +422,7 @@ The system will dynamically create a `SandboxClaim`, establish a connection via 
 
 #### Viewing Sandbox Logs
 If you want to monitor the internal agent output or see if your gVisor sandbox received the physical gRPC requests:
-1. List the active sandbox Pods (named after your session IDs):
+1. List the active sandbox Pods:
    ```bash
    kubectl get pods -n default
    ```
@@ -459,15 +459,12 @@ gar register \
   --agent-description "An agent that processes text to lower or upper case the inputs." \
   --agent-addr localhost:50051
 
-# Execute a session
 gar exec \
   --server localhost:8494 \
-  --session session123 \
+  --id task123 \
   --input "Hello, can you uppercase what I just said?"
 ```
 
 ## License
 
 Apache 2.0
-
-

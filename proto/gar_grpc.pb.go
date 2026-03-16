@@ -177,7 +177,7 @@ var AgentService_ServiceDesc = grpc.ServiceDesc{
 
 const (
 	GARService_Exec_FullMethodName            = "/proto.GARService/Exec"
-	GARService_ForkSession_FullMethodName     = "/proto.GARService/ForkSession"
+	GARService_Fork_FullMethodName            = "/proto.GARService/Fork"
 	GARService_RegisterAgent_FullMethodName   = "/proto.GARService/RegisterAgent"
 	GARService_UnregisterAgent_FullMethodName = "/proto.GARService/UnregisterAgent"
 )
@@ -188,11 +188,11 @@ const (
 //
 // GARService defines the gRPC service for GAR operations
 type GARServiceClient interface {
-	// Exec executes a new agentic loop session or resumes an existing one with streaming responses
-	// If the session_id already exists, it will be resumed from the last checkpoint
+	// Exec executes an agentic task or resumes an existing one with streaming responses
+	// If the execution id already exists, it will be resumed from the last checkpoint.
 	Exec(ctx context.Context, in *ExecRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResponse], error)
-	// ForkSession forks a session from a specific checkpoint.
-	ForkSession(ctx context.Context, in *ForkSessionRequest, opts ...grpc.CallOption) (*ForkSessionResponse, error)
+	// Fork forks an event log from a specific checkpoint.
+	Fork(ctx context.Context, in *ForkRequest, opts ...grpc.CallOption) (*ForkResponse, error)
 	// RegisterAgent registers a new agent with the controller
 	RegisterAgent(ctx context.Context, in *RegisterAgentRequest, opts ...grpc.CallOption) (*RegisterAgentResponse, error)
 	// UnregisterAgent removes an agent from the controller
@@ -226,10 +226,10 @@ func (c *gARServiceClient) Exec(ctx context.Context, in *ExecRequest, opts ...gr
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type GARService_ExecClient = grpc.ServerStreamingClient[ExecResponse]
 
-func (c *gARServiceClient) ForkSession(ctx context.Context, in *ForkSessionRequest, opts ...grpc.CallOption) (*ForkSessionResponse, error) {
+func (c *gARServiceClient) Fork(ctx context.Context, in *ForkRequest, opts ...grpc.CallOption) (*ForkResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ForkSessionResponse)
-	err := c.cc.Invoke(ctx, GARService_ForkSession_FullMethodName, in, out, cOpts...)
+	out := new(ForkResponse)
+	err := c.cc.Invoke(ctx, GARService_Fork_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -262,11 +262,11 @@ func (c *gARServiceClient) UnregisterAgent(ctx context.Context, in *UnregisterAg
 //
 // GARService defines the gRPC service for GAR operations
 type GARServiceServer interface {
-	// Exec executes a new agentic loop session or resumes an existing one with streaming responses
-	// If the session_id already exists, it will be resumed from the last checkpoint
+	// Exec executes an agentic task or resumes an existing one with streaming responses
+	// If the execution id already exists, it will be resumed from the last checkpoint.
 	Exec(*ExecRequest, grpc.ServerStreamingServer[ExecResponse]) error
-	// ForkSession forks a session from a specific checkpoint.
-	ForkSession(context.Context, *ForkSessionRequest) (*ForkSessionResponse, error)
+	// Fork forks an event log from a specific checkpoint.
+	Fork(context.Context, *ForkRequest) (*ForkResponse, error)
 	// RegisterAgent registers a new agent with the controller
 	RegisterAgent(context.Context, *RegisterAgentRequest) (*RegisterAgentResponse, error)
 	// UnregisterAgent removes an agent from the controller
@@ -284,8 +284,8 @@ type UnimplementedGARServiceServer struct{}
 func (UnimplementedGARServiceServer) Exec(*ExecRequest, grpc.ServerStreamingServer[ExecResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method Exec not implemented")
 }
-func (UnimplementedGARServiceServer) ForkSession(context.Context, *ForkSessionRequest) (*ForkSessionResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ForkSession not implemented")
+func (UnimplementedGARServiceServer) Fork(context.Context, *ForkRequest) (*ForkResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Fork not implemented")
 }
 func (UnimplementedGARServiceServer) RegisterAgent(context.Context, *RegisterAgentRequest) (*RegisterAgentResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RegisterAgent not implemented")
@@ -325,20 +325,20 @@ func _GARService_Exec_Handler(srv interface{}, stream grpc.ServerStream) error {
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type GARService_ExecServer = grpc.ServerStreamingServer[ExecResponse]
 
-func _GARService_ForkSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ForkSessionRequest)
+func _GARService_Fork_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ForkRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(GARServiceServer).ForkSession(ctx, in)
+		return srv.(GARServiceServer).Fork(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: GARService_ForkSession_FullMethodName,
+		FullMethod: GARService_Fork_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GARServiceServer).ForkSession(ctx, req.(*ForkSessionRequest))
+		return srv.(GARServiceServer).Fork(ctx, req.(*ForkRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -387,8 +387,8 @@ var GARService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*GARServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "ForkSession",
-			Handler:    _GARService_ForkSession_Handler,
+			MethodName: "Fork",
+			Handler:    _GARService_Fork_Handler,
 		},
 		{
 			MethodName: "RegisterAgent",

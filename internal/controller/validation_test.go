@@ -18,54 +18,54 @@ import (
 	"testing"
 )
 
-func TestValidateSessionID(t *testing.T) {
+func TestValidateID(t *testing.T) {
 	tests := []struct {
-		name      string
-		sessionID string
-		wantErr   bool
+		name    string
+		id      string
+		wantErr bool
 	}{
 		{
-			name:      "valid lowercase",
-			sessionID: "session123",
+			name:    "valid lowercase",
+			id:      "task123",
 			wantErr:   false,
 		},
 		{
-			name:      "valid mixed",
-			sessionID: "Session-ID_123",
+			name:    "valid mixed",
+			id:      "Task-ID_123",
 			wantErr:   false,
 		},
 		{
-			name:      "valid simple",
-			sessionID: "Session-ID",
+			name:    "valid simple",
+			id:      "Task-ID",
 			wantErr:   false,
 		},
 		{
-			name:      "valid underscore",
-			sessionID: "session_id",
+			name:    "valid underscore",
+			id:      "task_id",
 			wantErr:   false,
 		},
 		{
-			name:      "invalid space",
-			sessionID: "session id",
-			wantErr:   true,
+			name:    "invalid space",
+			id:      "task id",
+			wantErr: true,
 		},
 		{
-			name:      "invalid char",
-			sessionID: "session!",
-			wantErr:   true,
+			name:    "invalid char",
+			id:      "task!",
+			wantErr: true,
 		},
 		{
-			name:      "empty",
-			sessionID: "",
-			wantErr:   true,
+			name:    "empty",
+			id:      "",
+			wantErr: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateID(tt.sessionID)
+			err := validateID(tt.id)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("validateID(%q) error = %v, wantErr %v", tt.sessionID, err, tt.wantErr)
+				t.Errorf("validateID(%q) error = %v, wantErr %v", tt.id, err, tt.wantErr)
 			}
 		})
 	}

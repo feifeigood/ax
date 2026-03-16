@@ -24,36 +24,36 @@ import (
 )
 
 var (
-	forkSourceSessionID string
-	forkCheckpointID    string
-	forkDestSessionID   string
-	forkServerAddr      string
+	forkSourceID string
+	forkCheckpointID string
+	forkDestID string
+	forkServerAddr string
 )
 
 var forkCmd = &cobra.Command{
 	Use:   "fork",
-	Short: "Fork a session from a specific checkpoint",
-	Long: `Fork an existing agentic session from a specific checkpoint.
-If --dest-session is not provided, a new UUID will be generated.`,
+	Short: "Fork an event log from a specific checkpoint",
+	Long: `Fork an existing agentic event log from a specific checkpoint.
+If --dest-id is not provided, a new UUID will be generated.`,
 	RunE: runFork,
 }
 
 func init() {
-	forkCmd.Flags().StringVar(&forkSourceSessionID, "src-session", "", "Source Session ID to fork from (required)")
+	forkCmd.Flags().StringVar(&forkSourceID, "src-id", "", "Source ID to fork from (required)")
 	forkCmd.Flags().StringVar(&forkCheckpointID, "src-checkpoint", "", "Checkpoint ID to fork from (optional, defaults to latest)")
-	forkCmd.Flags().StringVar(&forkDestSessionID, "dest-session", "", "Destination Session ID (optional, generates UUID if not provided)")
+	forkCmd.Flags().StringVar(&forkDestID, "dest-id", "", "Destination ID (optional, generates UUID if not provided)")
 	forkCmd.Flags().StringVar(&forkServerAddr, "server", "localhost:8494", "gRPC controller server address (default: localhost:8494)")
 
-	forkCmd.MarkFlagRequired("src-session")
+	forkCmd.MarkFlagRequired("src-id")
 }
 
 func runFork(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 
-	// Generate UUID if no destination session ID provided
-	if forkDestSessionID == "" {
-		forkDestSessionID = uuid.New().String()
-		fmt.Printf("Generated destination session ID: %s\n", forkDestSessionID)
+	// Generate UUID if no destination ID provided
+	if forkDestID == "" {
+		forkDestID = uuid.New().String()
+		fmt.Printf("Generated destination ID: %s\n", forkDestID)
 	}
 
 	conn, err := connect(forkServerAddr)
@@ -64,23 +64,19 @@ func runFork(cmd *cobra.Command, args []string) error {
 
 	client := proto.NewGARServiceClient(conn)
 
-	_, err = ForkSession(ctx, client, forkSourceSessionID, forkCheckpointID, forkDestSessionID)
+	_, err = Fork(ctx, client, forkSourceID, forkCheckpointID, forkDestID)
 	return err
 }
 
-// ForkSession forks a session from a checkpoint and returns the new session ID.
-func ForkSession(ctx context.Context, client proto.GARServiceClient, sourceSessionID, checkpointID, destSessionID string) (string, error) {
-	fmt.Printf("Forking from source session %s at checkpoint %s to destination session %s\n", sourceSessionID, checkpointID, destSessionID)
-
-	resp, err := client.ForkSession(ctx, &proto.ForkSessionRequest{
-		SrcSessionId:    sourceSessionID,
+// Fork forks a execution from a checkpoint and returns the new execution ID.
+func Fork(ctx context.Context, client proto.GARServiceClient, sourceID, checkpointID, destID string) (string, error) {
+	resp, err := client.Fork(ctx, &proto.ForkRequest{
+		SrcId:           sourceID,
 		SrcCheckpointId: checkpointID,
-		DestSessionId:   destSessionID,
+		DestId:          destID,
 	})
 	if err != nil {
-		return "", fmt.Errorf("error forking session: %w", err)
+		return "", fmt.Errorf("error forking: %w", err)
 	}
-
-	fmt.Printf("Forked session ID: %s\n", resp.NewSessionId)
-	return resp.NewSessionId, nil
+	return resp.NewId, nil
 }
