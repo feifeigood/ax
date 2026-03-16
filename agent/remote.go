@@ -95,8 +95,7 @@ func (a *RemoteAgent) connect() error {
 
 // Process handles processing of input content with the remote agent.
 func (a *RemoteAgent) Process(ctx context.Context, t *Task, e TaskExecutor, o OutputHandler) error {
-	// Add session_id to gRPC metadata without overwriting existing metadata hooks (e.g. sandbox routers)
-	ctx = metadata.AppendToOutgoingContext(ctx, "session-id", t.ID)
+	ctx = metadata.AppendToOutgoingContext(ctx, "execution-id", t.ID)
 
 	stream, err := a.client.Process(ctx)
 	if err != nil {

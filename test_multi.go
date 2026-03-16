@@ -30,7 +30,7 @@ import (
 func main() {
 	ctx := context.Background()
 	input := "Send the word 'oRanGe' to the local-echo-agent. Take its exact output and send it to the remote-text-processor. Take its exact output and send it to the uppercase agent. Return the final output."
-	sessionID := uuid.New().String()
+	execID := uuid.New().String()
 
 	// 1. Create a local agent
 	echoAgent, err := createLocalAgent()
@@ -93,7 +93,7 @@ func main() {
 		},
 	}
 
-	log.Printf("Session ID: %s\n", sessionID)
+	log.Printf("ID: %s\n", execID)
 
 	handler := agent.OutputHandler(func(outgoing *proto.ProcessResponse) error {
 		for _, c := range outgoing.Contents {
@@ -110,8 +110,8 @@ func main() {
 
 	for i := 0; i < 4; i++ {
 		log.Printf("\n--- Executing step %d ---\n", i+1)
-		if err := c.Exec(ctx, sessionID, "", req, handler); err != nil {
-			log.Fatalf("Error executing session step %d: %v\n", i+1, err)
+		if err := c.Exec(ctx, execID, "", req, handler); err != nil {
+			log.Fatalf("Error executing step %d: %v\n", i+1, err)
 		}
 		// Subsequent execs just ask the planner to continue processing the existing history
 		req = &proto.ProcessRequest{}

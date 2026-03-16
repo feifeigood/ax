@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // Package server implements the gRPC server for GARService,
-// exposing session management and agent registration APIs.
+// exposing execution management and agent registration APIs.
 
 package server
 
@@ -45,32 +45,28 @@ func New(c *controller.Controller) *Server {
 	}
 }
 
-// Exec executes a new agentic loop session with streaming responses.
+// Exec executes a new agentic task with streaming responses.
 func (s *Server) Exec(req *proto.ExecRequest, stream grpc.ServerStreamingServer[proto.ExecResponse]) error {
-	sessionID := req.SessionId
-	inputs := req.Inputs
-
 	incoming := &proto.ProcessRequest{
-		Contents: inputs,
+		Contents: req.Inputs,
 	}
 	// Create output handler to stream outputs back to client
 	outputHandler := agent.OutputHandler(func(outgoing *proto.ProcessResponse) error {
 		return stream.Send(&proto.ExecResponse{
-			SessionId: sessionID,
-			Outputs:   outgoing.Contents,
+			Outputs: outgoing.Contents,
 		})
 	})
 	return s.controller.Exec(
-		stream.Context(), sessionID, req.AgentId, incoming, outputHandler)
+		stream.Context(), req.Id, req.AgentId, incoming, outputHandler)
 }
 
-func (s *Server) ForkSession(ctx context.Context, req *proto.ForkSessionRequest) (*proto.ForkSessionResponse, error) {
-	if err := s.controller.ForkSession(ctx, req.SrcSessionId, req.SrcCheckpointId, req.DestSessionId); err != nil {
+func (s *Server) Fork(ctx context.Context, req *proto.ForkRequest) (*proto.ForkResponse, error) {
+	if err := s.controller.Fork(ctx, req.SrcId, req.SrcCheckpointId, req.DestId); err != nil {
 		return nil, err
 	}
 
-	return &proto.ForkSessionResponse{
-		NewSessionId: req.DestSessionId,
+	return &proto.ForkResponse{
+		NewId: req.DestId,
 	}, nil
 }
 

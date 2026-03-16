@@ -33,7 +33,7 @@ var (
 var registerCmd = &cobra.Command{
 	Use:   "register",
 	Short: "Register a remote agent",
-	Long:  `Register a remote agent with the controller so it can be used in sessions.`,
+	Long:  `Register a remote agent with the controller so it can be used in executions.`,
 	RunE:  runRegister,
 }
 

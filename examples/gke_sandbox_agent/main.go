@@ -52,7 +52,7 @@ func (s *server) Process(stream grpc.BidiStreamingServer[proto.ProcessRequest, p
 		var outputs []*proto.Content
 		
 		if len(req.Contents) > 0 {
-			// Find the most recent message from the "user" in the session history
+			// Find the most recent message from the "user" in the history
 			var targetText string
 			for i := len(req.Contents) - 1; i >= 0; i-- {
 				if text := req.Contents[i].GetText(); text != nil && req.Contents[i].Role == "user" {

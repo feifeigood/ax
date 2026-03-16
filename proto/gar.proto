@@ -124,7 +124,7 @@ service AgentService {
   rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
 }
 
-// State represents the state of a session
+// State represents the state of an execution
 enum State {
   STATE_UNSPECIFIED = 0;  // Unspecified state
   STATE_PENDING = 1;
@@ -134,26 +134,25 @@ enum State {
 
 // ExecRequest for executing.
 message ExecRequest {
-  string session_id = 1;               // Unique session identifier
-  string agent_id = 2;                 // Agent ID, if empty planner is used.
-  repeated Content inputs = 3;         // Input content to process
+  string id = 1;               // Unique execution identifier
+  string agent_id = 2;         // Agent ID, if empty planner is used.
+  repeated Content inputs = 3; // Input content to process
 }
 
 // ExecResponse contains the result of an execution.
 message ExecResponse {
-  string session_id = 1;          // Session ID
-  repeated Content outputs = 2;   // Output content
-  State state = 3;                // Session state
+  repeated Content outputs = 1; // Output content
+  State state = 2;              // Execution state
 }
 
-message ForkSessionRequest {
-  string src_session_id = 1;
-  string src_checkpoint_id = 2; // Checkpoint ID within the source session to fork from.
-  string dest_session_id = 3; // New session ID. If provided, must not exist.
+message ForkRequest {
+  string src_id = 1;
+  string src_checkpoint_id = 2; // Checkpoint ID within the source execution to fork from.
+  string dest_id = 3; // New ID. If provided, must not exist.
 }
 
-message ForkSessionResponse {
-  string new_session_id = 1; // New session ID (in case it was generated or modified by server)
+message ForkResponse {
+  string new_id = 1; // New task ID (in case it was generated or modified by server)
 }
 
 message RemoteAgentConfig {
@@ -186,12 +185,12 @@ message UnregisterAgentResponse {
 
 // GARService defines the gRPC service for GAR operations
 service GARService {
-  // Exec executes a new agentic loop session or resumes an existing one with streaming responses
-  // If the session_id already exists, it will be resumed from the last checkpoint
+  // Exec executes an agentic task or resumes an existing one with streaming responses
+  // If the execution id already exists, it will be resumed from the last checkpoint.
   rpc Exec(ExecRequest) returns (stream ExecResponse);
 
-  // ForkSession forks a session from a specific checkpoint.
-  rpc ForkSession(ForkSessionRequest) returns (ForkSessionResponse);
+  // Fork forks an event log from a specific checkpoint.
+  rpc Fork(ForkRequest) returns (ForkResponse);
 
   // RegisterAgent registers a new agent with the controller
   rpc RegisterAgent(RegisterAgentRequest) returns (RegisterAgentResponse);

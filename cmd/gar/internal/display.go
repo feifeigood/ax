@@ -32,24 +32,24 @@ var (
 )
 
 type Display struct {
-	sessionID string
+	id string
 
 	userStyle       lipgloss.Style
 	checkpointStyle lipgloss.Style
-	sessionStyle    lipgloss.Style
+	idStyle    lipgloss.Style
 
 	loadingVisible atomic.Bool
 	loadingStopCh  chan bool
 }
 
-func NewDisplay(sessionID string) *Display {
+func NewDisplay(id string) *Display {
 	return &Display{
-		sessionID: sessionID,
+		id: id,
 		userStyle: lipgloss.NewStyle().
 			Foreground(purple),
 		checkpointStyle: lipgloss.NewStyle().
 			Foreground(comment),
-		sessionStyle: lipgloss.NewStyle().
+		idStyle: lipgloss.NewStyle().
 			Foreground(comment),
 		loadingStopCh: make(chan bool),
 	}
@@ -81,7 +81,7 @@ func (d *Display) FinishOutput(checkpointID string) {
 }
 
 func (d *Display) DisplayHeader() {
-	fmt.Println(d.sessionStyle.Render("Session: " + d.sessionID))
+	fmt.Println(d.idStyle.Render("ID: " + d.id))
 	fmt.Println()
 }
 

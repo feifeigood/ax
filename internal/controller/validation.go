@@ -22,7 +22,7 @@ import (
 
 var validIDRegex = regexp.MustCompile(`^[A-Za-z0-9\-_]+$`)
 
-// validateID checks if a session ID or agent ID contains allowed characters.
+// validateID checks if an ID contains allowed characters.
 func validateID(id string) error {
 	if id == "" {
 		return errors.New("empty ID")

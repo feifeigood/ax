@@ -23,14 +23,14 @@ from gar import Agent
 import proto.gar_pb2 as pb2
 
 
-def process(session_id, inputs):
+def process(execution_id, inputs):
     """Process incoming content list and yield responses"""
     for content in inputs:
         yield pb2.Content(
             role="assistant",
             type="text",
             mimetype="text/plain",
-            data=f"Python processed (session {session_id}): {content.data.upper()}"
+            data=f"Python processed (execution {execution_id}): {content.data.upper()}"
         )
 
 

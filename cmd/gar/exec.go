@@ -32,7 +32,7 @@ import (
 )
 
 var (
-	execSessionID  string
+	execID  string
 	execAgentID    string
 	execInput      string
 	execServerAddr string
@@ -41,14 +41,14 @@ var (
 
 var execCmd = &cobra.Command{
 	Use:   "exec",
-	Short: "Execute a new session or resume an existing one",
-	Long: `Execute a new agentic session or resume an existing one.
-If no session ID is provided, a new UUID will be generated.`,
+	Short: "Execute a task or resume an existing one",
+	Long: `Execute a new agentic task or resume an existing one.
+If no ID is provided, a new UUID will be generated.`,
 	RunE: runExec,
 }
 
 func init() {
-	execCmd.Flags().StringVar(&execSessionID, "session", "", "Session ID (optional, generates UUID if not provided)")
+	execCmd.Flags().StringVar(&execID, "id", "", "ID (optional, generates UUID if not provided)")
 	execCmd.Flags().StringVar(&execAgentID, "agent", "", "Agent ID (optional, planner is used if not specified)")
 	execCmd.Flags().StringVar(&execInput, "input", "", "Input message to send (optional)")
 	execCmd.Flags().StringVar(&execServerAddr, "server", "", "gRPC controller server address (if specified, connects to remote server; otherwise runs with a local built-in GAR server)")
@@ -64,9 +64,9 @@ var (
 func runExec(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 
-	// Generate UUID if no session ID provided
-	if execSessionID == "" {
-		execSessionID = uuid.New().String()
+	// Generate UUID if no ID provided
+	if execID == "" {
+		execID = uuid.New().String()
 	}
 
 	// Setup signal handling for graceful shutdown
@@ -85,11 +85,11 @@ func runExec(cmd *cobra.Command, args []string) error {
 		cancel()
 	}()
 
-	return execLoop(ctx, execSessionID, execAgentID, execInput)
+	return execLoop(ctx, execID, execAgentID, execInput)
 }
 
-func execLoop(ctx context.Context, sessionID string, agentID string, input string) error {
-	d := internal.NewDisplay(sessionID)
+func execLoop(ctx context.Context, id string, agentID string, input string) error {
+	d := internal.NewDisplay(id)
 	d.DisplayHeader()
 
 	if input == "" {
@@ -113,7 +113,7 @@ func execLoop(ctx context.Context, sessionID string, agentID string, input strin
 	}
 
 	for {
-		conf, outputs, err := runAutoExec(ctx, d, sessionID, agentID, history)
+		conf, outputs, err := runAutoExec(ctx, d, id, agentID, history)
 		if err != nil {
 			return err
 		}
@@ -154,7 +154,7 @@ func execLoop(ctx context.Context, sessionID string, agentID string, input strin
 				// The task is still pending, we need to only send the answer.
 				// not the full history. Because we executor will put the full
 				// history together.
-				conf, outputs, err = runAutoExec(ctx, d, sessionID, agentID, decision)
+				conf, outputs, err = runAutoExec(ctx, d, id, agentID, decision)
 				if err != nil {
 					return err
 				}
@@ -168,8 +168,8 @@ func execLoop(ctx context.Context, sessionID string, agentID string, input strin
 
 		// Once we finished a task, we should start another one
 		// to continue the conversation with history.
-		sessionID = uuid.NewString()
-		d := internal.NewDisplay(sessionID)
+		id = uuid.NewString()
+		d := internal.NewDisplay(id)
 		d.DisplayHeader()
 
 		// Remove all the function calls, confirmations,
@@ -193,15 +193,15 @@ func execLoop(ctx context.Context, sessionID string, agentID string, input strin
 	}
 }
 
-func runAutoExec(ctx context.Context, d *internal.Display, sessionID string, agentID string, inputs []*proto.Content) (*proto.ConfirmationContent, []*proto.Content, error) {
+func runAutoExec(ctx context.Context, d *internal.Display, id string, agentID string, inputs []*proto.Content) (*proto.ConfirmationContent, []*proto.Content, error) {
 	fn := runExecHeadless
 	if execServerAddr != "" {
 		fn = runExecServer
 	}
-	return fn(ctx, d, sessionID, agentID, inputs)
+	return fn(ctx, d, id, agentID, inputs)
 }
 
-func runExecHeadless(ctx context.Context, d *internal.Display, sessionID string, agentID string, inputs []*proto.Content) (*proto.ConfirmationContent, []*proto.Content, error) {
+func runExecHeadless(ctx context.Context, d *internal.Display, id string, agentID string, inputs []*proto.Content) (*proto.ConfirmationContent, []*proto.Content, error) {
 	if execController == nil {
 		cfg, err := config.LoadFromFile(execConfigFile)
 		if err != nil {
@@ -232,7 +232,7 @@ func runExecHeadless(ctx context.Context, d *internal.Display, sessionID string,
 		displayContents(d, resp.Contents)
 		return nil
 	})
-	if err := execController.Exec(ctx, sessionID, agentID, &proto.ProcessRequest{
+	if err := execController.Exec(ctx, id, agentID, &proto.ProcessRequest{
 		Contents: inputs,
 	}, outputHandler); err != nil {
 		return nil, nil, fmt.Errorf("error executing with local server: %w", err)
@@ -244,7 +244,7 @@ func runExecHeadless(ctx context.Context, d *internal.Display, sessionID string,
 	return confirmation, outputs, nil
 }
 
-func runExecServer(ctx context.Context, d *internal.Display, sessionID string, agentID string, inputs []*proto.Content) (*proto.ConfirmationContent, []*proto.Content, error) {
+func runExecServer(ctx context.Context, d *internal.Display, id string, agentID string, inputs []*proto.Content) (*proto.ConfirmationContent, []*proto.Content, error) {
 	conn, err := connect(execServerAddr)
 	if err != nil {
 		return nil, nil, err
@@ -253,8 +253,8 @@ func runExecServer(ctx context.Context, d *internal.Display, sessionID string, a
 
 	client := proto.NewGARServiceClient(conn)
 	stream, err := client.Exec(ctx, &proto.ExecRequest{
-		SessionId: sessionID,
-		AgentId:   agentID,
+		Id:      id,
+		AgentId: agentID,
 		Inputs:    inputs,
 	})
 	if err != nil {
