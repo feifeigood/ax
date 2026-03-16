@@ -1,4 +1,4 @@
-module github.com/google/gar
+module github.com/google/ax
 
 go 1.25.0
 

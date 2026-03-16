@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package config provides configuration structures for GAR server.
+// Package config provides configuration structures for AX server.
 package config
 
 import (
@@ -20,11 +20,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/google/gar/agent"
+	"github.com/google/ax/agent"
 	"gopkg.in/yaml.v3"
 )
 
-// Config represents the main configuration for GAR server.
+// Config represents the main configuration for AX server.
 type Config struct {
 	Server      ServerConfig      `yaml:"server"`
 	EventLog    EventLogConfig    `yaml:"eventlog"`

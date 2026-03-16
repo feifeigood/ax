@@ -23,11 +23,11 @@ import (
 	"path"
 	"sync"
 
-	"github.com/google/gar/agent"
-	"github.com/google/gar/internal/config"
-	"github.com/google/gar/internal/controller/task"
-	"github.com/google/gar/internal/testagent"
-	"github.com/google/gar/proto"
+	"github.com/google/ax/agent"
+	"github.com/google/ax/internal/config"
+	"github.com/google/ax/internal/controller/task"
+	"github.com/google/ax/internal/testagent"
+	"github.com/google/ax/proto"
 )
 
 const plannerAgentID = "__planner"
@@ -118,7 +118,7 @@ func (d *Controller) Exec(ctx context.Context, id string, agentID string, incomi
 
 	// For testing only! Remove this once the project is stable.
 	// TODO(jbd): Remove this before the release.
-	if os.Getenv("GAR_TEST_AGENTS") == "1" {
+	if os.Getenv("AX_TEST_AGENTS") == "1" {
 		for id, agent := range testagent.Agents() {
 			registry[id] = agent
 		}

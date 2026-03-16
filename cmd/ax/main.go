@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Gar is a server for managing agent orchestrator tasks.
+// AX is a server for managing agent orchestrator tasks.
 // It provides commands to execute tasks, resume from checkpoints,
 // register agents, and run the controller server.
 package main
@@ -34,9 +34,9 @@ func main() {
 }
 
 var rootCmd = &cobra.Command{
-	Use:   "gar",
-	Short: "GAR - Google Agent Runtime",
-	Long: `Gar is a server for managing agent orchestrator tasks.
+	Use:   "ax",
+	Short: "AX - Agent eXecutor",
+	Long: `ax provides a server and CLI tools for managing agent orchestrator tasks.
 It provides commands to execute tasks, resume from checkpoints,
 register agents, and run the controller server.`,
 }

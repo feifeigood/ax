@@ -20,10 +20,10 @@ import (
 	"log"
 	"strings"
 
-	"github.com/google/gar/agent"
-	"github.com/google/gar/internal/config"
-	"github.com/google/gar/internal/controller"
-	"github.com/google/gar/proto"
+	"github.com/google/ax/agent"
+	"github.com/google/ax/internal/config"
+	"github.com/google/ax/internal/controller"
+	"github.com/google/ax/proto"
 	"github.com/google/uuid"
 )
 

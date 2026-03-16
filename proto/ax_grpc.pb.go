@@ -16,7 +16,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             v5.28.2
-// source: proto/gar.proto
+// source: proto/ax.proto
 
 package proto
 
@@ -172,21 +172,21 @@ var AgentService_ServiceDesc = grpc.ServiceDesc{
 			ClientStreams: true,
 		},
 	},
-	Metadata: "proto/gar.proto",
+	Metadata: "proto/ax.proto",
 }
 
 const (
-	GARService_Exec_FullMethodName          = "/proto.GARService/Exec"
-	GARService_Fork_FullMethodName          = "/proto.GARService/Fork"
-	GARService_RegisterAgent_FullMethodName = "/proto.GARService/RegisterAgent"
+	AXService_Exec_FullMethodName          = "/proto.AXService/Exec"
+	AXService_Fork_FullMethodName          = "/proto.AXService/Fork"
+	AXService_RegisterAgent_FullMethodName = "/proto.AXService/RegisterAgent"
 )
 
-// GARServiceClient is the client API for GARService service.
+// AXServiceClient is the client API for AXService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// GARService defines the gRPC service for GAR operations
-type GARServiceClient interface {
+// AXService defines the gRPC service for AX operations
+type AXServiceClient interface {
 	// Exec executes an agentic task or resumes an existing one with streaming responses
 	// If the execution id already exists, it will be resumed from the last checkpoint.
 	Exec(ctx context.Context, in *ExecRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResponse], error)
@@ -196,17 +196,17 @@ type GARServiceClient interface {
 	RegisterAgent(ctx context.Context, in *RegisterAgentRequest, opts ...grpc.CallOption) (*RegisterAgentResponse, error)
 }
 
-type gARServiceClient struct {
+type aXServiceClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewGARServiceClient(cc grpc.ClientConnInterface) GARServiceClient {
-	return &gARServiceClient{cc}
+func NewAXServiceClient(cc grpc.ClientConnInterface) AXServiceClient {
+	return &aXServiceClient{cc}
 }
 
-func (c *gARServiceClient) Exec(ctx context.Context, in *ExecRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResponse], error) {
+func (c *aXServiceClient) Exec(ctx context.Context, in *ExecRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &GARService_ServiceDesc.Streams[0], GARService_Exec_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &AXService_ServiceDesc.Streams[0], AXService_Exec_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -221,34 +221,34 @@ func (c *gARServiceClient) Exec(ctx context.Context, in *ExecRequest, opts ...gr
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type GARService_ExecClient = grpc.ServerStreamingClient[ExecResponse]
+type AXService_ExecClient = grpc.ServerStreamingClient[ExecResponse]
 
-func (c *gARServiceClient) Fork(ctx context.Context, in *ForkRequest, opts ...grpc.CallOption) (*ForkResponse, error) {
+func (c *aXServiceClient) Fork(ctx context.Context, in *ForkRequest, opts ...grpc.CallOption) (*ForkResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ForkResponse)
-	err := c.cc.Invoke(ctx, GARService_Fork_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, AXService_Fork_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *gARServiceClient) RegisterAgent(ctx context.Context, in *RegisterAgentRequest, opts ...grpc.CallOption) (*RegisterAgentResponse, error) {
+func (c *aXServiceClient) RegisterAgent(ctx context.Context, in *RegisterAgentRequest, opts ...grpc.CallOption) (*RegisterAgentResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(RegisterAgentResponse)
-	err := c.cc.Invoke(ctx, GARService_RegisterAgent_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, AXService_RegisterAgent_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// GARServiceServer is the server API for GARService service.
-// All implementations must embed UnimplementedGARServiceServer
+// AXServiceServer is the server API for AXService service.
+// All implementations must embed UnimplementedAXServiceServer
 // for forward compatibility.
 //
-// GARService defines the gRPC service for GAR operations
-type GARServiceServer interface {
+// AXService defines the gRPC service for AX operations
+type AXServiceServer interface {
 	// Exec executes an agentic task or resumes an existing one with streaming responses
 	// If the execution id already exists, it will be resumed from the last checkpoint.
 	Exec(*ExecRequest, grpc.ServerStreamingServer[ExecResponse]) error
@@ -256,115 +256,115 @@ type GARServiceServer interface {
 	Fork(context.Context, *ForkRequest) (*ForkResponse, error)
 	// RegisterAgent registers a new agent with the controller
 	RegisterAgent(context.Context, *RegisterAgentRequest) (*RegisterAgentResponse, error)
-	mustEmbedUnimplementedGARServiceServer()
+	mustEmbedUnimplementedAXServiceServer()
 }
 
-// UnimplementedGARServiceServer must be embedded to have
+// UnimplementedAXServiceServer must be embedded to have
 // forward compatible implementations.
 //
 // NOTE: this should be embedded by value instead of pointer to avoid a nil
 // pointer dereference when methods are called.
-type UnimplementedGARServiceServer struct{}
+type UnimplementedAXServiceServer struct{}
 
-func (UnimplementedGARServiceServer) Exec(*ExecRequest, grpc.ServerStreamingServer[ExecResponse]) error {
+func (UnimplementedAXServiceServer) Exec(*ExecRequest, grpc.ServerStreamingServer[ExecResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method Exec not implemented")
 }
-func (UnimplementedGARServiceServer) Fork(context.Context, *ForkRequest) (*ForkResponse, error) {
+func (UnimplementedAXServiceServer) Fork(context.Context, *ForkRequest) (*ForkResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Fork not implemented")
 }
-func (UnimplementedGARServiceServer) RegisterAgent(context.Context, *RegisterAgentRequest) (*RegisterAgentResponse, error) {
+func (UnimplementedAXServiceServer) RegisterAgent(context.Context, *RegisterAgentRequest) (*RegisterAgentResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RegisterAgent not implemented")
 }
-func (UnimplementedGARServiceServer) mustEmbedUnimplementedGARServiceServer() {}
-func (UnimplementedGARServiceServer) testEmbeddedByValue()                    {}
+func (UnimplementedAXServiceServer) mustEmbedUnimplementedAXServiceServer() {}
+func (UnimplementedAXServiceServer) testEmbeddedByValue()                   {}
 
-// UnsafeGARServiceServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to GARServiceServer will
+// UnsafeAXServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to AXServiceServer will
 // result in compilation errors.
-type UnsafeGARServiceServer interface {
-	mustEmbedUnimplementedGARServiceServer()
+type UnsafeAXServiceServer interface {
+	mustEmbedUnimplementedAXServiceServer()
 }
 
-func RegisterGARServiceServer(s grpc.ServiceRegistrar, srv GARServiceServer) {
-	// If the following call pancis, it indicates UnimplementedGARServiceServer was
+func RegisterAXServiceServer(s grpc.ServiceRegistrar, srv AXServiceServer) {
+	// If the following call pancis, it indicates UnimplementedAXServiceServer was
 	// embedded by pointer and is nil.  This will cause panics if an
 	// unimplemented method is ever invoked, so we test this at initialization
 	// time to prevent it from happening at runtime later due to I/O.
 	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
 		t.testEmbeddedByValue()
 	}
-	s.RegisterService(&GARService_ServiceDesc, srv)
+	s.RegisterService(&AXService_ServiceDesc, srv)
 }
 
-func _GARService_Exec_Handler(srv interface{}, stream grpc.ServerStream) error {
+func _AXService_Exec_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(ExecRequest)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(GARServiceServer).Exec(m, &grpc.GenericServerStream[ExecRequest, ExecResponse]{ServerStream: stream})
+	return srv.(AXServiceServer).Exec(m, &grpc.GenericServerStream[ExecRequest, ExecResponse]{ServerStream: stream})
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type GARService_ExecServer = grpc.ServerStreamingServer[ExecResponse]
+type AXService_ExecServer = grpc.ServerStreamingServer[ExecResponse]
 
-func _GARService_Fork_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _AXService_Fork_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ForkRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(GARServiceServer).Fork(ctx, in)
+		return srv.(AXServiceServer).Fork(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: GARService_Fork_FullMethodName,
+		FullMethod: AXService_Fork_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GARServiceServer).Fork(ctx, req.(*ForkRequest))
+		return srv.(AXServiceServer).Fork(ctx, req.(*ForkRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _GARService_RegisterAgent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _AXService_RegisterAgent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RegisterAgentRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(GARServiceServer).RegisterAgent(ctx, in)
+		return srv.(AXServiceServer).RegisterAgent(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: GARService_RegisterAgent_FullMethodName,
+		FullMethod: AXService_RegisterAgent_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GARServiceServer).RegisterAgent(ctx, req.(*RegisterAgentRequest))
+		return srv.(AXServiceServer).RegisterAgent(ctx, req.(*RegisterAgentRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-// GARService_ServiceDesc is the grpc.ServiceDesc for GARService service.
+// AXService_ServiceDesc is the grpc.ServiceDesc for AXService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
-var GARService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "proto.GARService",
-	HandlerType: (*GARServiceServer)(nil),
+var AXService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "proto.AXService",
+	HandlerType: (*AXServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "Fork",
-			Handler:    _GARService_Fork_Handler,
+			Handler:    _AXService_Fork_Handler,
 		},
 		{
 			MethodName: "RegisterAgent",
-			Handler:    _GARService_RegisterAgent_Handler,
+			Handler:    _AXService_RegisterAgent_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
 		{
 			StreamName:    "Exec",
-			Handler:       _GARService_Exec_Handler,
+			Handler:       _AXService_Exec_Handler,
 			ServerStreams: true,
 		},
 	},
-	Metadata: "proto/gar.proto",
+	Metadata: "proto/ax.proto",
 }

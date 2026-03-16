@@ -19,7 +19,7 @@ package proto;
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/struct.proto";
 
-option go_package = "github.com/google/gar/proto";
+option go_package = "github.com/google/ax/proto";
 
 // ProcessRequest is an input to an agent.
 message ProcessRequest {
@@ -174,8 +174,8 @@ message RegisterAgentRequest {
 message RegisterAgentResponse {
 }
 
-// GARService defines the gRPC service for GAR operations
-service GARService {
+// AXService defines the gRPC service for AX operations
+service AXService {
   // Exec executes an agentic task or resumes an existing one with streaming responses
   // If the execution id already exists, it will be resumed from the last checkpoint.
   rpc Exec(ExecRequest) returns (stream ExecResponse);

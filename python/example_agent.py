@@ -14,13 +14,13 @@
 
 #!/usr/bin/env python3
 """
-Example Python agent using the GAR framework.
+Example Python agent using the AX.
 
 This demonstrates a simple agent that uppercases input text.
 """
 
-from gar import Agent
-import proto.gar_pb2 as pb2
+from ax import Agent
+import proto.ax_pb2 as pb2
 
 
 def process(execution_id, inputs):

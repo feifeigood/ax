@@ -1,8 +1,8 @@
-# gar
+# Agent eXecutor (AX)
 
 🚧 This project is in active development and may introduce breaking changes to capabilities and APIs until the 1.0 release. 🚧
 
-GAR, a short for Google Agent Runtime, is a single-writer agent orchestrator system built in Go. It provides a minimal runtime that coordinates agentic loops, manages executions with event logging, and communicates with both local and remote agents via streaming protocols.
+AX, a short for Agent eXecutor, is a single-writer agent orchestrator system built in Go. It provides a minimal runtime that coordinates agentic loops, manages executions with event logging, and communicates with both local and remote agents via streaming protocols.
 
 ## Features
 
@@ -30,63 +30,63 @@ Built-in consistency and resumability features:
 ```
 
 As agents move from simple interactions to "autonomous workers," most developers
-will need what GAR provides: a way to manage state, ensure reliability, and audit
+will need what AX provides: a way to manage state, ensure reliability, and audit
 the process through a structured event log. It is a "runtime" in the same way 
-Kubernetes is a runtime for containers. GAR provides the plumbing so developers
+Kubernetes is a runtime for containers. AX provides the plumbing so developers
 can focus on the logic.
 
 ## Installation
 
-Install the gar CLI directly from the repository:
+Install the ax CLI directly from the repository:
 
 ```bash
-go install github.com/google/gar/cmd/gar@latest
+go install github.com/google/ax/cmd/ax@latest
 ```
 
 ### Verify Installation
 
-Check that gar is installed correctly:
+Check that ax is installed correctly:
 
 ```bash
-gar --help
+ax --help
 ```
 
-You should see the gar CLI usage information.
+You should see the ax CLI usage information.
 
 ## Quick Start
 
 ### 1. Run exec
 
 The CLI provides an easy way to execute by using the
-agents and built-in tools already linked into the GAR binary.
+agents and built-in tools already linked into the AX binary.
 
 ```bash
-# Using default gar.yaml
-gar exec --input "Can you list me this directory?"
+# Using default ax.yaml
+ax exec --input "Can you list me this directory?"
 
 # Using a custom configuration
-gar exec --input "Can you list me this directory?" --config my-config.yaml
+ax exec --input "Can you list me this directory?" --config my-config.yaml
 ```
 
 You can continue an execution any time:
 
 ```bash
-gar exec --id exec123 --input "Show me the contents of README.md"
+ax exec --id exec123 --input "Show me the contents of README.md"
 ```
 
 Instead of running the default planner agent, you can run any registered agent:
 
 ```bash
-gar exec --agent coding --input "Can you list me this directory?"
+ax exec --agent coding --input "Can you list me this directory?"
 ```
 
-### 2. Run Remote Agent with GAR Server
+### 2. Run Remote Agent with AX Server
 
 Most developers want to register their custom remote agents.
 
-This example demonstrates how the GAR server executes remote agents through the `AgentService.Process` RPC. You can run this in two ways:
+This example demonstrates how the AX server executes remote agents through the `AgentService.Process` RPC. You can run this in two ways:
 
-This is the standard way to run GAR, separating the controller from the execution client.
+This is the standard way to run AX, separating the controller from the execution client.
 
 **Terminal 1** - Start the remote agent server:
 ```bash
@@ -94,24 +94,24 @@ go run examples/remote_agent/main.go
 ```
 The remote agent runs as a gRPC server implementing `AgentService` on port `:50051`.
 
-**Terminal 2** - Start the GAR controller server:
+**Terminal 2** - Start the AX controller server:
 ```bash
-gar serve
+ax serve
 ```
-The GAR server exposes the `GARService` on port `:8494`.
+The server exposes the `AXService` on port `:8494`.
 
 **Terminal 3** - Register the remote agent and execute:
 ```bash
-# Register the remote agent with gar
-gar register \
+# Register the remote agent
+ax register \
     --server localhost:8494 \
     --agent-id uppercase-agent \
     --agent-name "Uppercase Agent" \
     --agent-description "Converts input text to uppercase." \
     --agent-addr localhost:50051
 
-# Execute - once server address is specified, gar will coordinate the remote agent via Process RPC accordingly
-gar exec \
+# Execute - once server address is specified, ax will coordinate the remote agent via Process RPC accordingly
+ax exec \
     --server localhost:8494 \
     --id task123 \
     --input "Hello, can you uppercase what I just said?"
@@ -119,14 +119,14 @@ gar exec \
 
 ## Usage
 
-### GAR CLI
+### CLI
 
-The `gar` command provides several subcommands:
+The `ax` command provides several subcommands:
 
 #### Execute
 
 ```bash
-gar exec \
+ax exec \
     --input <text> \
     [--id <id>] \
     [--agent <id>] \
@@ -140,22 +140,22 @@ Options:
 - `--input`: Input message to send to agents (required)
 - `--id`: Unique identifier (optional, generates UUID if not provided, or resumes if exists)
 - `--agent`: Agent ID to use (optional, defaults to planner)
-- `--server`: gRPC controller server address (optional. If not provided, runs with a built-in GAR server)
-- `--config`: Path to YAML configuration file (only used with a built-in GAR server, default: "gar.yaml")
+- `--server`: gRPC controller server address (optional. If not provided, runs with a built-in server)
+- `--config`: Path to YAML configuration file (only used with a built-in server, default: "ax.yaml")
 
 **Examples:**
 
 ```bash
 # Execute a new execution
-gar exec --input "Hello agents!"
+ax exec --input "Hello agents!"
 
 # Resume an existing execution with new input
-gar exec --id abc123 --input "Ok, now let's do something else..."
+ax exec --id abc123 --input "Ok, now let's do something else..."
 
-# Execute using server mode (connect to gar serve)
-gar exec --server localhost:8494 --input "Hello agents!"
+# Execute using server mode
+ax exec --server localhost:8494 --input "Hello agents!"
 
-gar exec --agent coding --input "Hello coding agent, write me a cool Go program!"
+ax exec --agent coding --input "Hello coding agent, write me a cool Go program!"
 ```
 
 #### Fork an Event Log
@@ -163,7 +163,7 @@ gar exec --agent coding --input "Hello coding agent, write me a cool Go program!
 Fork an existing agentic event log from a specific checkpoint (or the latest state) into a new event log.
 
 ```bash
-gar fork \
+ax fork \
     --src-id <id> \
     [--src-checkpoint <id>] \
     [--dest-id <id>] \
@@ -180,19 +180,19 @@ Options:
 
 ```bash
 # Fork from the latest state
-gar fork --src-id abc123
+ax fork --src-id abc123
 
 # Fork from a specific checkpoint
-gar fork --src-id abc123 --src-checkpoint "550e..."
+ax fork --src-id abc123 --src-checkpoint "550e..."
 
 # Fork from a specific checkpoint to a new event log with a specific new ID
-gar fork --src-id abc123 --src-checkpoint "550e..." --dest-id new-id 
+ax fork --src-id abc123 --src-checkpoint "550e..." --dest-id new-id
 ```
 
 #### Register a Remote Agent
 
 ```bash
-gar register \
+ax register \
     --agent-id <id> \
     --agent-addr <address> \
     --agent-name <name> \
@@ -210,15 +210,15 @@ Options:
 #### Run Server
 
 ```bash
-gar serve [--config <path>]
+ax serve [--config <path>]
 ```
 
 Starts the controller as a gRPC server using a YAML configuration file.
 
 Options:
-- `--config`: Path to YAML configuration file (default: "gar.yaml")
+- `--config`: Path to YAML configuration file (default: "ax.yaml")
 
-Example configuration file (`gar.yaml`):
+Example configuration file (`ax.yaml`):
 ```yaml
 server:
   address: ":8494"
@@ -262,11 +262,11 @@ registry:
 
 Example:
 ```bash
-# Start server with default config (gar.yaml)
-gar serve
+# Start server with default config (ax.yaml)
+ax serve
 
 # Start server with custom config
-gar serve --config my-config.yaml
+ax serve --config my-config.yaml
 ```
 
 ### Checkpoints
@@ -277,12 +277,12 @@ Checkpoints provide a mechanism to save and resume state at specific points. Eve
 
 ```bash
 # Fork from a checkpoint to a new event log
-gar fork --src-id task123 \
+ax fork --src-id task123 \
   --src-checkpoint "550e8400-e29b-41d4-a716-446655440000" \
   --dest-id task456
 
 # Resume from the forked event log
-gar exec --id task456 \
+ax exec --id task456 \
   --input "Try different approach"
 ```
 
@@ -294,9 +294,9 @@ Event logs use the `Event` message available in the protobuf.
 
 ### Skills
 
-GAR includes built-in support for the agentskills.io discovery and execution protocol.
+AX includes built-in support for the agentskills.io discovery and execution protocol.
 
-The planner automatically discovers skills from `~/.agents/skills` by default (or a custom directory specified in `gar.yaml`). These skills are provided to the planner as tools, allowing it to seamlessly read skill instructions and execute their scripts.
+The planner automatically discovers skills from `~/.agents/skills` by default (or a custom directory specified in `ax.yaml`). These skills are provided to the planner as tools, allowing it to seamlessly read skill instructions and execute their scripts.
 
 ### Bash Tool
 
@@ -306,7 +306,7 @@ For safety and control, any execution initiated by the bash tool requires explic
 
 ### Gemini Agent
 
-GAR includes a built-in Gemini agent that can be used to generate text based on a given prompt. The agent is registered as `gemini`.
+AX includes a built-in Gemini agent that can be used to generate text based on a given prompt. The agent is registered as `gemini`.
 
 ## Building Custom Agents
 
@@ -316,22 +316,22 @@ See `examples/local_agent/main.go` for a complete implementation.
 
 ### Remote Agent
 
-Remote agents run as gRPC servers implementing the `AgentService` interface defined in `proto/gar.proto`. The gar controller executes remote agents by calling their `Process` RPC with bidirectional streaming.
+Remote agents run as gRPC servers implementing the `AgentService` interface defined in `proto/ax.proto`. The controller executes remote agents by calling their `Process` RPC with bidirectional streaming.
 
 See `examples/remote_agent/main.go` for a complete implementation.
 
 **Workflow:**
 1. Remote agent starts as gRPC server on a port (e.g., :50051)
-2. Start gar controller: `gar serve`
-3. Register with gar: `gar register --agent-id my-agent --agent-name "My Agent" --agent-description "Agent description" --agent-addr localhost:50051`
-4. When gar executes an execution, it calls the agent's `Process` RPC
-5. GAR streams input content → Agent processes → Agent streams output back
+2. Start the server: `ax serve`
+3. Register the agent: `ax register --agent-id my-agent --agent-name "My Agent" --agent-description "Agent description" --agent-addr localhost:50051`
+4. When the server executes, it calls the agent's `Process` RPC
+5. AX streams input content → Agent processes → Agent streams output back
 
 See `examples/remote_agent/main.go` for a complete implementation.
 
-### Sandbox Agent (GKE Sandbox Integration)
+### GKE Sandbox Agents
 
-GAR supports dynamically provisioning secure, isolated agents on Google Kubernetes Engine (GKE) via the [Agent Sandbox](https://github.com/kubernetes-sigs/agent-sandbox) feature. When a component requires a Sandbox Agent, the GAR server requests a temporary remote agent container in the cluster, establishes a secure connection locally (using port-forwarding via a proxy service), and cleans up the sandbox claim automatically upon closing.
+AX supports dynamically provisioning secure, isolated agents on Google Kubernetes Engine (GKE) via the [Agent Sandbox](https://github.com/kubernetes-sigs/agent-sandbox) feature. When a component requires a Sandbox Agent, the AX server requests a temporary remote agent container in the cluster, establishes a secure connection locally (using port-forwarding via a proxy service), and cleans up the sandbox claim automatically upon closing.
 
 #### Architecture
 Traffic flows from Localhost -> `kubectl port-forward` -> Router Service -> Sandbox Pod. This requires no public IP and allows your local development environment to orchestrate sandboxes running on remote GKE clusters, Kind, or Minikube.
@@ -360,7 +360,7 @@ kubectl exec $POD_NAME -- touch /app/.done
 kubectl expose deployment sandbox-router --port=8080 --target-port=8080
 ```
 
-To use a Sandbox Agent, specify it in your `gar.yaml` configuration using the `sandbox` type:
+To use a Sandbox Agent, specify it in your `ax.yaml` configuration:
 
 ```yaml
 registry:
@@ -374,28 +374,27 @@ registry:
 
 #### End-to-End Example (Uppercase Agent)
 
-GAR provides a complete example of a Sandbox Agent in `examples/sandbox_agent/`. It receives text input via gRPC and returns the same text converted to uppercase.
+AX provides a complete example of a Sandbox Agent in `examples/k8s_sandbox_agent/`. It receives text input via gRPC and returns the same text converted to uppercase.
 
-You can test this agent end-to-end using the `gar` binary, which exercises the full `SandboxAgent` lifecycle (provisioning, port-forwarding, and remote execution).
+You can test this agent end-to-end using the `ax` binary, which exercises the full `SandboxAgent` lifecycle (provisioning, port-forwarding, and remote execution).
 
 **1. Build the Agent Image**
-From the root of the GAR repository:
+From the root of the AX repository:
 ```bash
-docker build -t gar-uppercase:latest -f examples/sandbox_agent/Dockerfile .
+docker build -t ax-uppercase:latest -f examples/sandbox_agent/Dockerfile .
 ```
 
 **2. Publish Image to Registry**
 When deploying to a cluster, you can host the agent container image in **any standard container registry** accessible by your Kubernetes cluster (e.g., Docker Hub, Google Artifact Registry, GitHub Container Registry).
-- For local testing (Minikube/Kind), load the image directly: `minikube image load gar-uppercase:latest`
-- For production, update the `image` field in `examples/sandbox_agent/sandbox-template-and-pool.yaml` to your full registry path.
+- For production, update the `image` field in `examples/k8s_sandbox_agent/sandbox-template-and-pool.yaml` to your full registry path.
 
 Once the image is available, register the SandboxTemplate:
 ```bash
-kubectl apply -f examples/sandbox_agent/sandbox-template-and-pool.yaml
+kubectl apply -f examples/k8s_sandbox_agent/sandbox-template-and-pool.yaml
 ```
 
-**3. Configure gar.yaml**
-Ensure your `gar.yaml` references this sandbox agent:
+**3. Configure ax.yaml**
+Ensure your `ax.yaml` references this sandbox agent:
 ```yaml
 registry:
   k8s_sandbox_agents:
@@ -405,19 +404,18 @@ registry:
       use_router: true
 ```
 
-**4. Run the GAR Server**
+**4. Run the Server**
 ```bash
-gar serve --config gar.yaml
+ax serve --config ax.yaml
 ```
 
 **5. Run the Agent**
 In a separate terminal:
 ```bash
-gar exec --input "use the uppercase agent to convert 'hello world'"
+ax exec --input "use the uppercase agent to convert 'hello world'"
 ```
 
 The system will dynamically create a `SandboxClaim`, establish a connection via `kubectl port-forward`, execute the code securely, and return the result.
-
 
 
 #### Viewing Sandbox Logs
@@ -428,20 +426,20 @@ If you want to monitor the internal agent output or see if your gVisor sandbox r
    ```
 2. Fetch the logs for your specific sandbox claim:
    ```bash
-   kubectl logs gar-claim-uppercase-<hash_id> 
-   # To tail live logs: kubectl logs -f gar-claim-uppercase-<hash_id>
+   kubectl logs ax-claim-uppercase-<hash_id> 
+   # To tail live logs: kubectl logs -f ax-claim-uppercase-<hash_id>
    ```
 
 ### Remote Python Agent
 
-Python agents can be built using the GAR agent framework. First, install dependencies and generate Python gRPC code:
+Python agents can be built using the AX agent framework. First, install dependencies and generate Python gRPC code:
 
 ```bash
 # Install dependencies
 pip install grpcio grpcio-tools
 
 # Generate Python code from proto file
-python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. proto/gar.proto
+python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. proto/ax.proto
 ```
 
 See `examples/python_agent/agent.py` for a complete implementation.
@@ -451,15 +449,15 @@ See `examples/python_agent/agent.py` for a complete implementation.
 # Start the Python agent
 python agent.py
 
-# Register with gar (in another terminal)
-gar register \
+# Register the agent (in another terminal)
+ax register \
   --server localhost:8494 \
   --agent-id "text-processing-agent" \
   --agent-name "Text Processing Agent" \
   --agent-description "An agent that processes text to lower or upper case the inputs." \
   --agent-addr localhost:50051
 
-gar exec \
+ax exec \
   --server localhost:8494 \
   --id task123 \
   --input "Hello, can you uppercase what I just said?"

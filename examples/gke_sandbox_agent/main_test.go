@@ -19,7 +19,7 @@ import (
 	"strings"
 	"fmt"
 
-	"github.com/google/gar/proto"
+	"github.com/google/ax/proto"
 )
 
 func TestExtractLatestPayload(t *testing.T) {

@@ -18,7 +18,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/google/gar/proto"
+	"github.com/google/ax/proto"
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 )
@@ -62,14 +62,14 @@ func runFork(cmd *cobra.Command, args []string) error {
 	}
 	defer conn.Close()
 
-	client := proto.NewGARServiceClient(conn)
+	client := proto.NewAXServiceClient(conn)
 
 	_, err = Fork(ctx, client, forkSourceID, forkCheckpointID, forkDestID)
 	return err
 }
 
 // Fork forks a execution from a checkpoint and returns the new execution ID.
-func Fork(ctx context.Context, client proto.GARServiceClient, sourceID, checkpointID, destID string) (string, error) {
+func Fork(ctx context.Context, client proto.AXServiceClient, sourceID, checkpointID, destID string) (string, error) {
 	resp, err := client.Fork(ctx, &proto.ForkRequest{
 		SrcId:           sourceID,
 		SrcCheckpointId: checkpointID,

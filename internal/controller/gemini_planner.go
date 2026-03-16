@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/gar/agent"
-	"github.com/google/gar/internal/skills"
-	"github.com/google/gar/proto"
+	"github.com/google/ax/agent"
+	"github.com/google/ax/internal/skills"
+	"github.com/google/ax/proto"
 	"github.com/google/uuid"
 	"google.golang.org/genai"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -39,7 +39,7 @@ func NewGeminiPlannerAgent(ctx context.Context, registry *Registry, config Gemin
 		config.GeminiConfig.Timeout = 30 * time.Second
 	}
 	if config.GeminiConfig.Model == "" {
-		config.GeminiConfig.Model = os.Getenv("GAR_GEMINI_MODEL")
+		config.GeminiConfig.Model = os.Getenv("AX_GEMINI_MODEL")
 		if config.GeminiConfig.Model == "" {
 			config.GeminiConfig.Model = "gemini-3-flash-preview"
 		}

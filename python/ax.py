@@ -13,9 +13,9 @@
 # limitations under the License.
 
 """
-GAR Agent Framework for Python
+AX Agent Framework for Python
 
-A simple framework for building Python agents that work with the GAR orchestrator.
+A simple framework for building Python agents that work with the AX orchestrator.
 """
 
 import grpc
@@ -94,12 +94,12 @@ class Agent:
         """
         # Import proto files (assuming they've been generated)
         try:
-            import proto.gar_pb2 as pb2
-            import proto.gar_pb2_grpc as pb2_grpc
+            import proto.ax_pb2 as pb2
+            import proto.ax_pb2_grpc as pb2_grpc
         except ImportError:
             raise ImportError(
                 "Proto files not found. Generate them first:\n"
-                "  python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. proto/gar.proto"
+                "  python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. proto/ax.proto"
             )
 
         server = grpc.server(futures.ThreadPoolExecutor(max_workers=max_workers))

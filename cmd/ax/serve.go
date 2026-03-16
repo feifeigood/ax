@@ -23,11 +23,11 @@ import (
 	"path"
 	"syscall"
 
-	"github.com/google/gar/agent"
-	"github.com/google/gar/internal/config"
-	"github.com/google/gar/internal/controller"
-	"github.com/google/gar/internal/controller/task"
-	"github.com/google/gar/internal/server"
+	"github.com/google/ax/agent"
+	"github.com/google/ax/internal/config"
+	"github.com/google/ax/internal/controller"
+	"github.com/google/ax/internal/controller/task"
+	"github.com/google/ax/internal/server"
 	"github.com/spf13/cobra"
 )
 
@@ -38,13 +38,13 @@ var (
 var serveCmd = &cobra.Command{
 	Use:   "serve",
 	Short: "Run controller as a gRPC server",
-	Long: `Run the GAR controller as a gRPC server.
-Loads configuration from a YAML file (default: gar.yaml).`,
+	Long: `Run the AX controller as a gRPC server.
+Loads configuration from a YAML file (default: ax.yaml).`,
 	RunE: runServe,
 }
 
 func init() {
-	serveCmd.Flags().StringVar(&serveConfigFile, "config", "gar.yaml", "Path to YAML configuration file")
+	serveCmd.Flags().StringVar(&serveConfigFile, "config", "ax.yaml", "Path to YAML configuration file")
 }
 
 func runServe(cmd *cobra.Command, args []string) error {
@@ -53,7 +53,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 	// Load configuration from YAML file
 	cfg, err := config.LoadFromFile(serveConfigFile)
 	if err != nil {
-		return fmt.Errorf("error loading config file '%s': %w\nTip: Create a config file with 'gar serve --help' to see an example", serveConfigFile, err)
+		return fmt.Errorf("error loading config file '%s': %w\nTip: Create a config file with 'ax serve --help' to see an example", serveConfigFile, err)
 	}
 
 	// Validate configuration
@@ -80,7 +80,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 		srv.GracefulStop()
 	}()
 
-	log.Printf("Starting GAR server at %s...\n", cfg.Server.Address)
+	log.Printf("Starting AX server at %s...\n", cfg.Server.Address)
 	if err := srv.Serve(cfg.Server.Address); err != nil {
 		return fmt.Errorf("error serving: %w", err)
 	}
@@ -99,7 +99,7 @@ func newControllerFromConfig(ctx context.Context, cfg *config.Config) (*controll
 	plannerBuilder := func(ctx context.Context, r *controller.Registry) (agent.Agent, error) {
 		// The builder defines which planner to use.
 		// Currently, it uses the Gemini planner.
-		// Gemini config can be customized via environment variables (GEMINI_API_KEY, GAR_GEMINI_MODEL)
+		// Gemini config can be customized via environment variables (GEMINI_API_KEY, AX_GEMINI_MODEL)
 		// TODO(lhuan): allow other planners based on cfg.PlannerType
 		return controller.NewGeminiPlannerAgent(ctx, r, controller.GeminiPlannerConfig{
 			GeminiConfig: controller.GeminiConfig{

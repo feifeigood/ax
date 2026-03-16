@@ -25,7 +25,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/google/gar/proto"
+	"github.com/google/ax/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )

@@ -37,8 +37,8 @@ WORKDIR /app
 COPY --from=builder /app/bin/uppercase /usr/local/bin/uppercase
 
 # Create a non-root user matching expected Kubernetes security context best practices
-RUN addgroup -S gar && adduser -S gar -G gar
-USER gar
+RUN addgroup -S ax && adduser -S ax -G ax
+USER ax
 
 # Expose standard remote agent port
 EXPOSE 8494

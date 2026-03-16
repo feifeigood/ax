@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/gar/agent"
-	"github.com/google/gar/internal/historyutil"
-	"github.com/google/gar/proto"
+	"github.com/google/ax/agent"
+	"github.com/google/ax/internal/historyutil"
+	"github.com/google/ax/proto"
 	"github.com/google/uuid"
 )
 

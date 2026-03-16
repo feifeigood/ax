@@ -21,7 +21,7 @@ import (
 	"os"
 	"sync"
 
-	"github.com/google/gar/proto"
+	"github.com/google/ax/proto"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 

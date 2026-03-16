@@ -24,7 +24,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/gar/internal/sandboxclient"
+	"github.com/google/ax/internal/sandboxclient"
 	"google.golang.org/grpc/metadata"
 )
 
@@ -91,7 +91,7 @@ func (a *KubernetesSandboxAgent) Process(ctx context.Context, t *Task, e TaskExe
 	if len(safeID) > 20 {
 		safeID = safeID[:20] // Keep it short for k8s names
 	}
-	claimName := fmt.Sprintf("gar-claim-%s-%s", a.config.ID, safeID)
+	claimName := fmt.Sprintf("ax-claim-%s-%s", a.config.ID, safeID)
 
 	// 1. Create Ephemeral SandboxClaim (Ignore AlreadyExists errors if it's already created this execution)
 	if err := a.client.CreateClaim(ctx, claimName, a.config.SandboxTemplateRef); err != nil {

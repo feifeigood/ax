@@ -18,7 +18,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/gar/internal/config"
+	"github.com/google/ax/internal/config"
 )
 
 // HealthMonitor manages the periodic health checking of agents.

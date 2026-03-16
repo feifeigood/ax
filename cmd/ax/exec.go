@@ -22,11 +22,11 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/google/gar/agent"
-	"github.com/google/gar/cmd/gar/internal"
-	"github.com/google/gar/internal/config"
-	"github.com/google/gar/internal/controller"
-	"github.com/google/gar/proto"
+	"github.com/google/ax/agent"
+	"github.com/google/ax/cmd/ax/internal"
+	"github.com/google/ax/internal/config"
+	"github.com/google/ax/internal/controller"
+	"github.com/google/ax/proto"
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 )
@@ -51,8 +51,8 @@ func init() {
 	execCmd.Flags().StringVar(&execID, "id", "", "ID (optional, generates UUID if not provided)")
 	execCmd.Flags().StringVar(&execAgentID, "agent", "", "Agent ID (optional, planner is used if not specified)")
 	execCmd.Flags().StringVar(&execInput, "input", "", "Input message to send (optional)")
-	execCmd.Flags().StringVar(&execServerAddr, "server", "", "gRPC controller server address (if specified, connects to remote server; otherwise runs with a local built-in GAR server)")
-	execCmd.Flags().StringVar(&execConfigFile, "config", "gar.yaml", "Path to YAML configuration file (only used with a local built-in GAR server)")
+	execCmd.Flags().StringVar(&execServerAddr, "server", "", "gRPC controller server address (if specified, connects to remote server; otherwise runs with a local built-in AX server)")
+	execCmd.Flags().StringVar(&execConfigFile, "config", "ax.yaml", "Path to YAML configuration file (only used with a local built-in AX server)")
 }
 
 // TODO(jbd): Add multimodal input flags, e.g. --input-image.
@@ -251,7 +251,7 @@ func runExecServer(ctx context.Context, d *internal.Display, id string, agentID 
 	}
 	defer conn.Close()
 
-	client := proto.NewGARServiceClient(conn)
+	client := proto.NewAXServiceClient(conn)
 	stream, err := client.Exec(ctx, &proto.ExecRequest{
 		Id:      id,
 		AgentId: agentID,

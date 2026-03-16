@@ -18,7 +18,7 @@
 # AGENT SEGREGATION:
 # To support multiple different agents, you MUST create a separate SandboxTemplate
 # and SandboxWarmPool for each agent with different sandbox requirements. 
-# The `sandboxTemplateRef` in the WarmPool and `gar.yaml` maps the GAR logic to the specific isolated environment.
+# The `sandboxTemplateRef` in the WarmPool and `ax.yaml` maps the AX logic to the specific isolated environment.
 #
 # For more details on GKE Agent Sandbox container requirements, see:
 # https://docs.cloud.google.com/kubernetes-engine/docs/how-to/agent-sandbox
@@ -33,7 +33,7 @@ spec:
       runtimeClassName: gvisor
       containers:
       - name: agent
-        image: us-central1-docker.pkg.dev/a2a-ae-demo-eoeg5x/gar-repo/gar-uppercase:latest
+        image: us-central1-docker.pkg.dev/a2a-ae-demo-eoeg5x/ax-repo/ax-uppercase:latest
         imagePullPolicy: Always
         env:
         - name: PORT

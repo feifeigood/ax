@@ -19,7 +19,7 @@ package agent
 import (
 	"context"
 
-	"github.com/google/gar/proto"
+	"github.com/google/ax/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 

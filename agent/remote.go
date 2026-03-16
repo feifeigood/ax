@@ -25,7 +25,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 
-	"github.com/google/gar/proto"
+	"github.com/google/ax/proto"
 )
 
 // RemoteAgent is a gRPC client that implements the Agent interface.

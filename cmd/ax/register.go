@@ -18,7 +18,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/google/gar/proto"
+	"github.com/google/ax/proto"
 	"github.com/spf13/cobra"
 )
 
@@ -57,7 +57,7 @@ func runRegister(cmd *cobra.Command, args []string) error {
 	}
 	defer conn.Close()
 
-	client := proto.NewGARServiceClient(conn)
+	client := proto.NewAXServiceClient(conn)
 
 	// Register remote agent
 	_, err = client.RegisterAgent(ctx, &proto.RegisterAgentRequest{

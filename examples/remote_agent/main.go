@@ -23,7 +23,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/google/gar/proto"
+	"github.com/google/ax/proto"
 	"github.com/google/uuid"
 )
 

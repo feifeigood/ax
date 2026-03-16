@@ -14,7 +14,7 @@
 
 package historyutil
 
-import "github.com/google/gar/proto"
+import "github.com/google/ax/proto"
 
 // WaitsForConfirmation returns true if the last message in the history
 // is a confirmation question waiting for user input.
