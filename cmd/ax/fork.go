@@ -24,10 +24,10 @@ import (
 )
 
 var (
-	forkSourceID string
+	forkSourceID     string
 	forkCheckpointID string
-	forkDestID string
-	forkServerAddr string
+	forkDestID       string
+	forkServerAddr   string
 )
 
 var forkCmd = &cobra.Command{

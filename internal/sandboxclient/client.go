@@ -75,7 +75,6 @@ func NewClient(namespace string) (*Client, error) {
 	}, nil
 }
 
-
 // CreateClaim provisions an ephemeral sandbox execution environment.
 func (c *Client) CreateClaim(ctx context.Context, claimName, templateRef string) error {
 	claim := &unstructured.Unstructured{

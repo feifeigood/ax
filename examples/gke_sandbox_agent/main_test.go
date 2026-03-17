@@ -15,9 +15,9 @@
 package main
 
 import (
-	"testing"
-	"strings"
 	"fmt"
+	"strings"
+	"testing"
 
 	"github.com/google/ax/proto"
 )

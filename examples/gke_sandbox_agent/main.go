@@ -50,7 +50,7 @@ func (s *server) Process(stream grpc.BidiStreamingServer[proto.ProcessRequest, p
 		}
 
 		var outputs []*proto.Content
-		
+
 		if len(req.Contents) > 0 {
 			// Find the most recent message from the "user" in the history
 			var targetText string
