@@ -16,7 +16,7 @@
 """
 Example Python agent using the AX.
 
-This demonstrates a simple agent that uppercases input text.
+This demonstrates a simple agent that echoes the input.
 """
 
 from ax import Agent
@@ -33,7 +33,7 @@ def process(execution_id, inputs):
                         pb2.Content(
                             role="assistant",
                             text=pb2.TextContent(
-                                text=f"Python processed (execution {execution_id}): {content.text.text.upper()}"
+                                text=f"Echoed (in execution {execution_id}): {content.text.text}"
                             )
                         )
                     ]

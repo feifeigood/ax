@@ -456,15 +456,15 @@ python python/example_agent.py
 # Register the agent (in another terminal)
 ax register \
   --server localhost:8494 \
-  --agent-id "text-processing-agent" \
-  --agent-name "Text Processing Agent" \
-  --agent-description "An agent that processes text to lower or upper case the inputs." \
+  --agent-id "echo-agent" \
+  --agent-name "Echo Agent" \
+  --agent-description "An agent that echoes the input." \
   --agent-addr localhost:50051
 
 ax exec \
   --server localhost:8494 \
   --id task123 \
-  --input "Hello, can you uppercase what I just said?"
+  --input "Hello, can you echo what I just said?"
 ```
 
 ## License
