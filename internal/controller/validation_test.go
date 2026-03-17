@@ -27,22 +27,22 @@ func TestValidateID(t *testing.T) {
 		{
 			name:    "valid lowercase",
 			id:      "task123",
-			wantErr:   false,
+			wantErr: false,
 		},
 		{
 			name:    "valid mixed",
 			id:      "Task-ID_123",
-			wantErr:   false,
+			wantErr: false,
 		},
 		{
 			name:    "valid simple",
 			id:      "Task-ID",
-			wantErr:   false,
+			wantErr: false,
 		},
 		{
 			name:    "valid underscore",
 			id:      "task_id",
-			wantErr:   false,
+			wantErr: false,
 		},
 		{
 			name:    "invalid space",

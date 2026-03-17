@@ -26,9 +26,9 @@ import (
 type EventLogBuilder func() (EventLog, error)
 
 type taskExecutor struct {
-	id        string
-	eventLog  EventLog
-	registry  map[string]agent.Agent
+	id       string
+	eventLog EventLog
+	registry map[string]agent.Agent
 }
 
 func newTaskID(parent, child string) string {
@@ -40,9 +40,9 @@ func newTaskID(parent, child string) string {
 
 func DefaultExecutor(eventLog EventLog, registry map[string]agent.Agent) agent.TaskExecutor {
 	return &taskExecutor{
-		id:        "",
-		eventLog:  eventLog,
-		registry:  registry,
+		id:       "",
+		eventLog: eventLog,
+		registry: registry,
 	}
 }
 
@@ -78,9 +78,9 @@ func (tm *taskExecutor) exec(
 	allInputs []*proto.Content,
 	o agent.OutputHandler) error {
 	child := &taskExecutor{
-		id:        t.ID,
-		eventLog:  tm.eventLog,
-		registry:  tm.registry,
+		id:       t.ID,
+		eventLog: tm.eventLog,
+		registry: tm.registry,
 	}
 
 	var allOutputs []*proto.Content

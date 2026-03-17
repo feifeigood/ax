@@ -87,7 +87,7 @@ func TestRunScript(t *testing.T) {
 
 	ctx := context.Background()
 	s := Skill{Dir: skillDir, Name: "test-skill"}
-	
+
 	result, err := s.RunScript(ctx, "hello.sh", []string{"world"})
 	if err != nil {
 		t.Fatalf("RunScript() failed: %v", err)

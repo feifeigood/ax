@@ -36,7 +36,7 @@ type Display struct {
 
 	userStyle       lipgloss.Style
 	checkpointStyle lipgloss.Style
-	idStyle    lipgloss.Style
+	idStyle         lipgloss.Style
 
 	loadingVisible atomic.Bool
 	loadingStopCh  chan bool

@@ -63,7 +63,7 @@ func main() {
 		}
 
 		log.Printf("Proxying request %s to %s", req.URL.Path, targetURL)
-		
+
 		req.URL.Scheme = target.Scheme
 		req.URL.Host = target.Host
 		req.Host = target.Host

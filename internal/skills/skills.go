@@ -51,12 +51,12 @@ type ScriptResult struct {
 // DefaultDir returns the default system-wide directory for discovering skills.
 // It resolves to ~/.agents/skills on all platforms.
 func DefaultDir() string {
-    homeDir, err := os.UserHomeDir()
-    if err != nil {
-        // Fallback to Unix HOME if UserHomeDir fails (though rare).
-        homeDir = os.Getenv("HOME")
-    }
-    return filepath.Join(homeDir, ".agents", "skills")
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		// Fallback to Unix HOME if UserHomeDir fails (though rare).
+		homeDir = os.Getenv("HOME")
+	}
+	return filepath.Join(homeDir, ".agents", "skills")
 }
 
 // Discover scans dir for agentskills.io-compatible skill directories and
@@ -134,8 +134,8 @@ func (s Skill) RunScript(ctx context.Context, script string, args []string) (*Sc
 
 	cmd := exec.CommandContext(ctx, scriptPath, args...)
 	cmd.Dir = s.Dir
-	
-	var stdout, stderr bytes.Buffer	
+
+	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
