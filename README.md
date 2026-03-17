@@ -443,15 +443,15 @@ To build a Python agent, first set up your environment by installing dependencie
 pip install grpcio grpcio-tools
 
 # Generate Python code from proto file
-python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. proto/ax.proto
+python -m grpc_tools.protoc -I. --python_out=python --grpc_python_out=python proto/ax.proto
 ```
 
-See `examples/python_agent/agent.py` for a complete implementation.
+See `python/example_agent.py` for a complete implementation.
 
 **Register and use:**
 ```bash
 # Start the Python agent
-python agent.py
+python python/example_agent.py
 
 # Register the agent (in another terminal)
 ax register \

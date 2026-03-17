@@ -25,13 +25,19 @@ import proto.ax_pb2 as pb2
 
 def process(execution_id, inputs):
     """Process incoming content list and yield responses"""
-    for content in inputs:
-        yield pb2.Content(
-            role="assistant",
-            type="text",
-            mimetype="text/plain",
-            data=f"Python processed (execution {execution_id}): {content.data.upper()}"
-        )
+    for req in inputs:
+        for content in req.contents:
+            if content.HasField("text"):
+                yield pb2.ProcessResponse(
+                    contents=[
+                        pb2.Content(
+                            role="assistant",
+                            text=pb2.TextContent(
+                                text=f"Python processed (execution {execution_id}): {content.text.text.upper()}"
+                            )
+                        )
+                    ]
+                )
 
 
 def health_check():

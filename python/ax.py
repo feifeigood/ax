@@ -28,10 +28,9 @@ class Agent:
     Agent provides a simple framework for building Python agents.
 
     Usage:
+        import proto.ax_pb2 as pb2
         def process(execution_id, inputs):
-            for content in inputs:
-                yield Content(role="assistant", type="text",
-                             mimetype="text/plain", data=f"Processed: {content.data}")
+            # Implement the agent...
 
         agent = Agent(process_func=process)
         agent.serve(port=50051)
@@ -99,7 +98,7 @@ class Agent:
         except ImportError:
             raise ImportError(
                 "Proto files not found. Generate them first:\n"
-                "  python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. proto/ax.proto"
+                "  python -m grpc_tools.protoc -I. --python_out=python --grpc_python_out=python proto/ax.proto"
             )
 
         server = grpc.server(futures.ThreadPoolExecutor(max_workers=max_workers))
