@@ -18,7 +18,6 @@ package controller
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"sync"
@@ -28,6 +27,8 @@ import (
 	"github.com/google/ax/internal/controller/task"
 	"github.com/google/ax/internal/testagent"
 	"github.com/google/ax/proto"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
@@ -147,7 +148,6 @@ func (d *Controller) Fork(ctx context.Context, sourceID, sourceCheckpoint, destI
 	if destID == "" {
 		return fmt.Errorf("destination ID is required")
 	}
-
 	return status.Errorf(codes.Unimplemented, "forking is not supported yet")
 }
 
