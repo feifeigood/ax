@@ -98,9 +98,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
 .timeline-card{background:#fff;border-radius:10px;padding:14px 18px;box-shadow:0 1px 4px rgba(0,0,0,.08);flex-shrink:0}
 .card-title{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:#6c7086;margin-bottom:10px;font-weight:600}
-.tl-rows{display:flex;flex-direction:column;gap:5px}
+.tl-rows{display:flex;flex-direction:column;gap:6px}
 .tl-row{display:flex;align-items:center;gap:10px}
-.tl-label{width:120px;flex-shrink:0;font-size:11px;font-family:monospace;color:#4a4a6a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tl-label{width:220px;flex-shrink:0;font-size:11px;font-family:monospace;color:#4a4a6a;word-break:break-all}
 .tl-track{flex:1;height:18px;background:#f0f0f0;border-radius:4px;position:relative}
 .tl-bar{height:100%;border-radius:4px;position:absolute;display:flex;align-items:center;padding:0 5px;min-width:6px;cursor:default}
 .tl-bar span{font-size:10px;color:#fff;white-space:nowrap;overflow:hidden;text-shadow:0 0 3px rgba(0,0,0,.3)}
