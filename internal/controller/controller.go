@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"sync"
@@ -146,9 +147,8 @@ func (d *Controller) Fork(ctx context.Context, sourceID, sourceCheckpoint, destI
 	if destID == "" {
 		return fmt.Errorf("destination ID is required")
 	}
-	panic("not yet implemented")
 
-	return nil
+	return status.Errorf(codes.Unimplemented, "forking is not supported yet")
 }
 
 // Registry returns the agent registry.
