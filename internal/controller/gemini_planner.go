@@ -7,8 +7,8 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
-	"time"
 
+	"github.com/golang/protobuf/ptypes/duration"
 	"github.com/google/ax/agent"
 	"github.com/google/ax/internal/skills"
 	"github.com/google/ax/proto"
@@ -19,7 +19,7 @@ import (
 
 // GeminiPlannerConfig configures the Gemini-based planner.
 type GeminiPlannerConfig struct {
-	GeminiConfig GeminiConfig
+	GeminiConfig *proto.GeminiConfig
 	SkillsDir    string // Directory for discovering skills (optional)
 	MaxSteps     int    // Max steps (default: 100)
 }
@@ -35,19 +35,16 @@ type geminiPlannerAgent struct {
 
 // NewGeminiPlannerAgent creates a new Gemini-based agent.
 func NewGeminiPlannerAgent(ctx context.Context, registry *Registry, config GeminiPlannerConfig) (agent.Agent, error) {
-	if config.GeminiConfig.Timeout == 0 {
-		config.GeminiConfig.Timeout = 30 * time.Second
+	if config.GeminiConfig == nil {
+		config.GeminiConfig = &proto.GeminiConfig{}
+	}
+	if config.GeminiConfig.Timeout == nil {
+		config.GeminiConfig.Timeout = &duration.Duration{Seconds: 30}
 	}
 	if config.GeminiConfig.Model == "" {
 		config.GeminiConfig.Model = os.Getenv("AX_GEMINI_MODEL")
 		if config.GeminiConfig.Model == "" {
 			config.GeminiConfig.Model = "gemini-3-flash-preview"
-		}
-	}
-	if config.GeminiConfig.APIKey == "" {
-		config.GeminiConfig.APIKey = os.Getenv("GEMINI_API_KEY")
-		if config.GeminiConfig.APIKey == "" {
-			return nil, fmt.Errorf("GEMINI_API_KEY not set and no API key provided in config")
 		}
 	}
 
@@ -78,7 +75,7 @@ Guidelines:
 	}
 
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
-		APIKey: config.GeminiConfig.APIKey,
+		APIKey: os.Getenv("GEMINI_API_KEY"),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Gemini client: %w", err)
@@ -157,7 +154,7 @@ func (p *geminiPlannerAgent) process(ctx context.Context, t *agent.Task, handler
 	}
 
 	contents := protoToContents(inputs)
-	ctx, cancel := context.WithTimeout(ctx, p.config.GeminiConfig.Timeout)
+	ctx, cancel := context.WithTimeout(ctx, p.config.GeminiConfig.Timeout.AsDuration())
 	defer cancel()
 
 	resp, err := p.client.Models.GenerateContent(ctx, p.config.GeminiConfig.Model, contents, &genai.GenerateContentConfig{

@@ -24,6 +24,7 @@ import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	anypb "google.golang.org/protobuf/types/known/anypb"
+	durationpb "google.golang.org/protobuf/types/known/durationpb"
 	structpb "google.golang.org/protobuf/types/known/structpb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
@@ -1257,6 +1258,76 @@ func (*RegisterAgentResponse) Descriptor() ([]byte, []int) {
 	return file_proto_ax_proto_rawDescGZIP(), []int{18}
 }
 
+// GeminiConfig is the configuration for a Gemini agent.
+type GeminiConfig struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Model        string               `protobuf:"bytes,1,opt,name=model,proto3" json:"model,omitempty"`                                   // e.g. "gemini-3-flash-preview"
+	SystemPrompt string               `protobuf:"bytes,2,opt,name=system_prompt,json=systemPrompt,proto3" json:"system_prompt,omitempty"` // System prompt for the agent
+	MaxTokens    int32                `protobuf:"varint,3,opt,name=max_tokens,json=maxTokens,proto3" json:"max_tokens,omitempty"`         // Maximum number of tokens to generate
+	Timeout      *durationpb.Duration `protobuf:"bytes,4,opt,name=timeout,proto3" json:"timeout,omitempty"`                               // e.g. "10s"
+}
+
+func (x *GeminiConfig) Reset() {
+	*x = GeminiConfig{}
+	mi := &file_proto_ax_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GeminiConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GeminiConfig) ProtoMessage() {}
+
+func (x *GeminiConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_ax_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GeminiConfig.ProtoReflect.Descriptor instead.
+func (*GeminiConfig) Descriptor() ([]byte, []int) {
+	return file_proto_ax_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *GeminiConfig) GetModel() string {
+	if x != nil {
+		return x.Model
+	}
+	return ""
+}
+
+func (x *GeminiConfig) GetSystemPrompt() string {
+	if x != nil {
+		return x.SystemPrompt
+	}
+	return ""
+}
+
+func (x *GeminiConfig) GetMaxTokens() int32 {
+	if x != nil {
+		return x.MaxTokens
+	}
+	return 0
+}
+
+func (x *GeminiConfig) GetTimeout() *durationpb.Duration {
+	if x != nil {
+		return x.Timeout
+	}
+	return nil
+}
+
 var File_proto_ax_proto protoreflect.FileDescriptor
 
 var file_proto_ax_proto_rawDesc = []byte{
@@ -1267,6 +1338,8 @@ var file_proto_ax_proto_rawDesc = []byte{
 	0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2f, 0x73, 0x74, 0x72, 0x75, 0x63, 0x74,
 	0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x1a, 0x19, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2f, 0x70,
 	0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2f, 0x61, 0x6e, 0x79, 0x2e, 0x70, 0x72, 0x6f, 0x74,
+	0x6f, 0x1a, 0x1e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62,
+	0x75, 0x66, 0x2f, 0x64, 0x75, 0x72, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x2e, 0x70, 0x72, 0x6f, 0x74,
 	0x6f, 0x22, 0x3c, 0x0a, 0x0e, 0x50, 0x72, 0x6f, 0x63, 0x65, 0x73, 0x73, 0x52, 0x65, 0x71, 0x75,
 	0x65, 0x73, 0x74, 0x12, 0x2a, 0x0a, 0x08, 0x63, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x73, 0x18,
 	0x01, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x0e, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x43, 0x6f,
@@ -1406,6 +1479,16 @@ var file_proto_ax_proto_rawDesc = []byte{
 	0x28, 0x09, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x3a, 0x02, 0x38, 0x01, 0x42, 0x08, 0x0a,
 	0x06, 0x63, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x22, 0x17, 0x0a, 0x15, 0x52, 0x65, 0x67, 0x69, 0x73,
 	0x74, 0x65, 0x72, 0x41, 0x67, 0x65, 0x6e, 0x74, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65,
+	0x22, 0x9d, 0x01, 0x0a, 0x0c, 0x47, 0x65, 0x6d, 0x69, 0x6e, 0x69, 0x43, 0x6f, 0x6e, 0x66, 0x69,
+	0x67, 0x12, 0x14, 0x0a, 0x05, 0x6d, 0x6f, 0x64, 0x65, 0x6c, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09,
+	0x52, 0x05, 0x6d, 0x6f, 0x64, 0x65, 0x6c, 0x12, 0x23, 0x0a, 0x0d, 0x73, 0x79, 0x73, 0x74, 0x65,
+	0x6d, 0x5f, 0x70, 0x72, 0x6f, 0x6d, 0x70, 0x74, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0c,
+	0x73, 0x79, 0x73, 0x74, 0x65, 0x6d, 0x50, 0x72, 0x6f, 0x6d, 0x70, 0x74, 0x12, 0x1d, 0x0a, 0x0a,
+	0x6d, 0x61, 0x78, 0x5f, 0x74, 0x6f, 0x6b, 0x65, 0x6e, 0x73, 0x18, 0x03, 0x20, 0x01, 0x28, 0x05,
+	0x52, 0x09, 0x6d, 0x61, 0x78, 0x54, 0x6f, 0x6b, 0x65, 0x6e, 0x73, 0x12, 0x33, 0x0a, 0x07, 0x74,
+	0x69, 0x6d, 0x65, 0x6f, 0x75, 0x74, 0x18, 0x04, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x19, 0x2e, 0x67,
+	0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x44,
+	0x75, 0x72, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x52, 0x07, 0x74, 0x69, 0x6d, 0x65, 0x6f, 0x75, 0x74,
 	0x2a, 0x58, 0x0a, 0x05, 0x53, 0x74, 0x61, 0x74, 0x65, 0x12, 0x15, 0x0a, 0x11, 0x53, 0x54, 0x41,
 	0x54, 0x45, 0x5f, 0x55, 0x4e, 0x53, 0x50, 0x45, 0x43, 0x49, 0x46, 0x49, 0x45, 0x44, 0x10, 0x00,
 	0x12, 0x11, 0x0a, 0x0d, 0x53, 0x54, 0x41, 0x54, 0x45, 0x5f, 0x50, 0x45, 0x4e, 0x44, 0x49, 0x4e,
@@ -1451,7 +1534,7 @@ func file_proto_ax_proto_rawDescGZIP() []byte {
 }
 
 var file_proto_ax_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_proto_ax_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
+var file_proto_ax_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
 var file_proto_ax_proto_goTypes = []any{
 	(State)(0),                      // 0: proto.State
 	(*ProcessRequest)(nil),          // 1: proto.ProcessRequest
@@ -1473,18 +1556,20 @@ var file_proto_ax_proto_goTypes = []any{
 	(*RemoteAgentConfig)(nil),       // 17: proto.RemoteAgentConfig
 	(*RegisterAgentRequest)(nil),    // 18: proto.RegisterAgentRequest
 	(*RegisterAgentResponse)(nil),   // 19: proto.RegisterAgentResponse
-	nil,                             // 20: proto.RegisterAgentRequest.MetadataEntry
-	(*structpb.Struct)(nil),         // 21: google.protobuf.Struct
-	(*timestamppb.Timestamp)(nil),   // 22: google.protobuf.Timestamp
-	(*anypb.Any)(nil),               // 23: google.protobuf.Any
+	(*GeminiConfig)(nil),            // 20: proto.GeminiConfig
+	nil,                             // 21: proto.RegisterAgentRequest.MetadataEntry
+	(*structpb.Struct)(nil),         // 22: google.protobuf.Struct
+	(*timestamppb.Timestamp)(nil),   // 23: google.protobuf.Timestamp
+	(*anypb.Any)(nil),               // 24: google.protobuf.Any
+	(*durationpb.Duration)(nil),     // 25: google.protobuf.Duration
 }
 var file_proto_ax_proto_depIdxs = []int32{
 	9,  // 0: proto.ProcessRequest.contents:type_name -> proto.Content
 	9,  // 1: proto.ProcessResponse.contents:type_name -> proto.Content
 	4,  // 2: proto.ConfirmationContent.approval:type_name -> proto.ApprovalDecision
 	5,  // 3: proto.ConfirmationContent.decline:type_name -> proto.DeclineDecision
-	21, // 4: proto.FunctionCallContent.args:type_name -> google.protobuf.Struct
-	21, // 5: proto.FunctionResponseContent.response:type_name -> google.protobuf.Struct
+	22, // 4: proto.FunctionCallContent.args:type_name -> google.protobuf.Struct
+	22, // 5: proto.FunctionResponseContent.response:type_name -> google.protobuf.Struct
 	3,  // 6: proto.Content.text:type_name -> proto.TextContent
 	6,  // 7: proto.Content.confirmation:type_name -> proto.ConfirmationContent
 	7,  // 8: proto.Content.function_call:type_name -> proto.FunctionCallContent
@@ -1492,28 +1577,29 @@ var file_proto_ax_proto_depIdxs = []int32{
 	9,  // 10: proto.ExecutionEvent.inputs:type_name -> proto.Content
 	9,  // 11: proto.ExecutionEvent.outputs:type_name -> proto.Content
 	0,  // 12: proto.ExecutionEvent.state:type_name -> proto.State
-	22, // 13: proto.ExecutionEvent.timestamp:type_name -> google.protobuf.Timestamp
-	23, // 14: proto.ExecRequest.agent_config:type_name -> google.protobuf.Any
+	23, // 13: proto.ExecutionEvent.timestamp:type_name -> google.protobuf.Timestamp
+	24, // 14: proto.ExecRequest.agent_config:type_name -> google.protobuf.Any
 	9,  // 15: proto.ExecRequest.inputs:type_name -> proto.Content
 	9,  // 16: proto.ExecResponse.outputs:type_name -> proto.Content
 	0,  // 17: proto.ExecResponse.state:type_name -> proto.State
-	20, // 18: proto.RegisterAgentRequest.metadata:type_name -> proto.RegisterAgentRequest.MetadataEntry
+	21, // 18: proto.RegisterAgentRequest.metadata:type_name -> proto.RegisterAgentRequest.MetadataEntry
 	17, // 19: proto.RegisterAgentRequest.remote:type_name -> proto.RemoteAgentConfig
-	1,  // 20: proto.AgentService.Process:input_type -> proto.ProcessRequest
-	11, // 21: proto.AgentService.HealthCheck:input_type -> proto.HealthCheckRequest
-	13, // 22: proto.AXService.Exec:input_type -> proto.ExecRequest
-	15, // 23: proto.AXService.Fork:input_type -> proto.ForkRequest
-	18, // 24: proto.AXService.RegisterAgent:input_type -> proto.RegisterAgentRequest
-	2,  // 25: proto.AgentService.Process:output_type -> proto.ProcessResponse
-	12, // 26: proto.AgentService.HealthCheck:output_type -> proto.HealthCheckResponse
-	14, // 27: proto.AXService.Exec:output_type -> proto.ExecResponse
-	16, // 28: proto.AXService.Fork:output_type -> proto.ForkResponse
-	19, // 29: proto.AXService.RegisterAgent:output_type -> proto.RegisterAgentResponse
-	25, // [25:30] is the sub-list for method output_type
-	20, // [20:25] is the sub-list for method input_type
-	20, // [20:20] is the sub-list for extension type_name
-	20, // [20:20] is the sub-list for extension extendee
-	0,  // [0:20] is the sub-list for field type_name
+	25, // 20: proto.GeminiConfig.timeout:type_name -> google.protobuf.Duration
+	1,  // 21: proto.AgentService.Process:input_type -> proto.ProcessRequest
+	11, // 22: proto.AgentService.HealthCheck:input_type -> proto.HealthCheckRequest
+	13, // 23: proto.AXService.Exec:input_type -> proto.ExecRequest
+	15, // 24: proto.AXService.Fork:input_type -> proto.ForkRequest
+	18, // 25: proto.AXService.RegisterAgent:input_type -> proto.RegisterAgentRequest
+	2,  // 26: proto.AgentService.Process:output_type -> proto.ProcessResponse
+	12, // 27: proto.AgentService.HealthCheck:output_type -> proto.HealthCheckResponse
+	14, // 28: proto.AXService.Exec:output_type -> proto.ExecResponse
+	16, // 29: proto.AXService.Fork:output_type -> proto.ForkResponse
+	19, // 30: proto.AXService.RegisterAgent:output_type -> proto.RegisterAgentResponse
+	26, // [26:31] is the sub-list for method output_type
+	21, // [21:26] is the sub-list for method input_type
+	21, // [21:21] is the sub-list for extension type_name
+	21, // [21:21] is the sub-list for extension extendee
+	0,  // [0:21] is the sub-list for field type_name
 }
 
 func init() { file_proto_ax_proto_init() }
@@ -1540,7 +1626,7 @@ func file_proto_ax_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_proto_ax_proto_rawDesc,
 			NumEnums:      1,
-			NumMessages:   20,
+			NumMessages:   21,
 			NumExtensions: 0,
 			NumServices:   2,
 		},

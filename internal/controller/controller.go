@@ -108,13 +108,7 @@ func (d *Controller) Exec(ctx context.Context, id string, agentID string, agentC
 	}
 	registry := d.registry.Map()
 	registry[plannerAgentID] = planner
-	registry["gemini"], err = NewGeminiAgent(ctx, GeminiConfig{})
-	if err != nil {
-		return err
-	}
-	o := func(resp *proto.ProcessResponse) error {
-		return handler(resp)
-	}
+	registry["gemini"] = NewGeminiAgent()
 
 	// For testing only! Remove this once the project is stable.
 	// TODO(jbd): Remove this before the release.
@@ -136,7 +130,7 @@ func (d *Controller) Exec(ctx context.Context, id string, agentID string, agentC
 		AgentID: agentID,
 		Inputs:  incoming.Contents,
 		Config:  agentConfig,
-	}, o)
+	}, handler)
 }
 
 // Fork forks an execution from a source execution.

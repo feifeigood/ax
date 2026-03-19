@@ -68,12 +68,12 @@ type PlannerConfig struct {
 // Note: API key is not configurable here for security reasons.
 // Set GEMINI_API_KEY environment variable instead.
 type GeminiPlannerConfig struct {
-	Model         string        `yaml:"model,omitempty"` // Model name
-	Temperature   float32       `yaml:"temperature,omitempty"`
-	MaxTokens     int32         `yaml:"max_tokens,omitempty"`
-	Timeout       time.Duration `yaml:"timeout,omitempty"`
-	SystemPrompt  string        `yaml:"system_prompt,omitempty"`
-	SkillsDir     string        `yaml:"skills_dir,omitempty"` // Directory to discover skills from
+	Model        string  `yaml:"model,omitempty"` // Model name
+	Temperature  float32 `yaml:"temperature,omitempty"`
+	MaxTokens    int32   `yaml:"max_tokens,omitempty"`
+	Timeout      string  `yaml:"timeout,omitempty"`
+	SystemPrompt string  `yaml:"system_prompt,omitempty"`
+	SkillsDir    string  `yaml:"skills_dir,omitempty"` // Directory to discover skills from
 }
 
 // RemoteAgentConfig configures a remote agent to register on startup.

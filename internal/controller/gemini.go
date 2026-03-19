@@ -20,67 +20,63 @@ import (
 	"fmt"
 	"os"
 	"runtime"
-	"time"
 
+	"github.com/golang/protobuf/ptypes/duration"
 	"github.com/google/ax/agent"
 	"github.com/google/ax/proto"
 	"google.golang.org/genai"
 )
 
-// GeminiConfig configures the Gemini agent.
-type GeminiConfig struct {
-	APIKey       string        // Google AI API key (for programmatic use only; if empty, uses GEMINI_API_KEY env var - recommended)
-	Model        string        // Model name (default: gemini-3-flash-preview)
-	MaxTokens    int32         // Max output tokens (default: 8192)
-	Timeout      time.Duration // Request timeout (default: 60s)
-	SystemPrompt string        // Custom system prompt (optional)
-}
-
 // GeminiAgent implements task.Agent using Gemini.
 type GeminiAgent struct {
-	config GeminiConfig
-	client *genai.Client
 }
 
 // NewGeminiAgent creates a new Gemini agent.
-func NewGeminiAgent(ctx context.Context, config GeminiConfig) (*GeminiAgent, error) {
-	if config.Timeout == 0 {
-		config.Timeout = 30 * time.Second
+func NewGeminiAgent() *GeminiAgent {
+	return &GeminiAgent{}
+}
+
+func (a *GeminiAgent) config(t *agent.Task) (*proto.GeminiConfig, error) {
+	if t.Config == nil {
+		return &proto.GeminiConfig{
+			Model:   "gemini-3-flash-preview",
+			Timeout: &duration.Duration{Seconds: 30},
+		}, nil
 	}
-	if config.Model == "" {
-		config.Model = "gemini-3-flash-preview"
+
+	var cfg proto.GeminiConfig
+	if err := t.Config.UnmarshalTo(&cfg); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal Gemini config: %w", err)
 	}
-	if config.APIKey == "" {
-		config.APIKey = os.Getenv("GEMINI_API_KEY")
-		if config.APIKey == "" {
-			return nil, fmt.Errorf("GEMINI_API_KEY not set and no API key provided in config")
-		}
-	}
-	client, err := genai.NewClient(ctx, &genai.ClientConfig{
-		APIKey: config.APIKey,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Gemini client: %w", err)
-	}
-	return &GeminiAgent{
-		config: config,
-		client: client,
-	}, nil
+	return &cfg, nil
 }
 
 func (a *GeminiAgent) Process(ctx context.Context, t *agent.Task, e agent.TaskExecutor, handler agent.OutputHandler) error {
+	cfg, err := a.config(t)
+	if err != nil {
+		return err
+	}
+
+	client, err := genai.NewClient(ctx, &genai.ClientConfig{
+		APIKey: os.Getenv("GEMINI_API_KEY"),
+		// TODO(jbd): Support Vertex credentials.
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create Gemini client: %w", err)
+	}
+
 	inputs := t.Inputs
 	contents := protoToContents(inputs)
-	ctx, cancel := context.WithTimeout(ctx, a.config.Timeout)
+	ctx, cancel := context.WithTimeout(ctx, cfg.Timeout.AsDuration())
 	defer cancel()
 
 	var systemPrompt *genai.Content
-	if a.config.SystemPrompt != "" {
-		systemPrompt = genai.Text(a.config.SystemPrompt)[0]
+	if cfg.SystemPrompt != "" {
+		systemPrompt = genai.Text(cfg.SystemPrompt)[0]
 	}
-	resp, err := a.client.Models.GenerateContent(ctx, a.config.Model, contents, &genai.GenerateContentConfig{
+	resp, err := client.Models.GenerateContent(ctx, cfg.Model, contents, &genai.GenerateContentConfig{
 		SystemInstruction: systemPrompt,
-		MaxOutputTokens:   a.config.MaxTokens,
+		MaxOutputTokens:   cfg.MaxTokens,
 		CandidateCount:    1,
 	})
 	if err != nil {

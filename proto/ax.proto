@@ -19,6 +19,7 @@ package proto;
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/any.proto";
+import "google/protobuf/duration.proto";
 
 option go_package = "github.com/google/ax/proto";
 
@@ -186,4 +187,12 @@ service AXService {
 
   // RegisterAgent registers a new agent with the controller
   rpc RegisterAgent(RegisterAgentRequest) returns (RegisterAgentResponse);
+}
+
+// GeminiConfig is the configuration for a Gemini agent.
+message GeminiConfig {
+  string model = 1;                       // e.g. "gemini-3-flash-preview"
+  string system_prompt = 2;               // System prompt for the agent
+  int32 max_tokens = 3;                   // Maximum number of tokens to generate
+  google.protobuf.Duration timeout = 4;   // e.g. "10s"
 }

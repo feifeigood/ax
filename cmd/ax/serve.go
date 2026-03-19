@@ -21,13 +21,16 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/google/ax/agent"
 	"github.com/google/ax/internal/config"
 	"github.com/google/ax/internal/controller"
 	"github.com/google/ax/internal/controller/task"
 	"github.com/google/ax/internal/server"
+	"github.com/google/ax/proto"
 	"github.com/spf13/cobra"
+	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 var (
@@ -99,11 +102,15 @@ func newControllerFromConfig(ctx context.Context, cfg *config.Config) (*controll
 		// Currently, it uses the Gemini planner.
 		// Gemini config can be customized via environment variables (GEMINI_API_KEY, AX_GEMINI_MODEL)
 		// TODO(lhuan): allow other planners based on cfg.PlannerType
+		timeout, err := time.ParseDuration(cfg.Planner.Gemini.Timeout)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse duration: %v", err)
+		}
 		return controller.NewGeminiPlannerAgent(ctx, r, controller.GeminiPlannerConfig{
-			GeminiConfig: controller.GeminiConfig{
+			GeminiConfig: &proto.GeminiConfig{
 				Model:        cfg.Planner.Gemini.Model,
 				MaxTokens:    cfg.Planner.Gemini.MaxTokens,
-				Timeout:      cfg.Planner.Gemini.Timeout,
+				Timeout:      durationpb.New(timeout),
 				SystemPrompt: cfg.Planner.Gemini.SystemPrompt,
 			},
 			SkillsDir: cfg.Planner.Gemini.SkillsDir,
