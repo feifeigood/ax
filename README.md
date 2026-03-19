@@ -118,11 +118,9 @@ ax exec \
 
 ## Usage
 
-### CLI
-
 The `ax` command provides several subcommands:
 
-#### Execute
+### Execute
 
 ```bash
 ax exec \
@@ -158,7 +156,7 @@ ax exec --server localhost:8494 --input "Hello agents!"
 ax exec --agent coding --input "Hello coding agent, write me a cool Go program!"
 ```
 
-#### Fork an Event Log
+### Fork
 
 Fork an existing agentic event log from a specific checkpoint (or the latest state)
 into a new event log.
@@ -190,12 +188,13 @@ ax fork --src-id abc123 --src-checkpoint "550e..."
 ax fork --src-id abc123 --src-checkpoint "550e..." --dest-id new-id
 ```
 
-#### Trace Execution
+
+### Trace
 
 Visualize the trace of an agentic execution in a Web UI, directly fetching from the SQLite event log.
 
 ```bash
-ax trace <execution-id> [--server <server-address>] [--config <file>]
+ax trace --id <id> [--server <server-address>] [--config <file>]
 ```
 
 This will parse the execution logs and spin up a local web server (defaulting to e.g. `http://localhost:8080`), automatically opening it in your browser.
@@ -208,13 +207,13 @@ Options:
 
 ```bash
 # Trace on default server localhost:8080
-ax trace 1a6e0b29-87c2-4af0-81ac-0c73bf8fa293
+ax trace --id 1a6e0b29-87c2-4af0-81ac-0c73bf8fa293
 
 # Trace on a custom server address and port
-ax trace 1a6e0b29-87c2-4af0-81ac-0c73bf8fa293 --server 0.0.0.0:9090
+ax trace --id 1a6e0b29-87c2-4af0-81ac-0c73bf8fa293 --addr 0.0.0.0:9090
 ```
 
-#### Register a Remote Agent
+### Register
 
 ```bash
 ax register \
@@ -232,7 +231,7 @@ Options:
 - `--agent-description`: Description of agent capabilities (required)
 - `--server`: gRPC controller server address (default: "localhost:8494")
 
-#### Run Server
+#### Serve
 
 ```bash
 ax serve [--config <path>]
@@ -293,25 +292,7 @@ ax serve
 ax serve --config my-config.yaml
 ```
 
-### Checkpoints
-
-Checkpoints provide a mechanism to save and resume state at specific points.
-Every content event can create a checkpoint with a unique UUID.
-
-**Usage Examples:**
-
-```bash
-# Fork from a checkpoint to a new event log
-ax fork --src-id task123 \
-  --src-checkpoint "550e8400-e29b-41d4-a716-446655440000" \
-  --dest-id task456
-
-# Resume from the forked event log
-ax exec --id task456 \
-  --input "Try different approach"
-```
-
-### Event Log Format
+## Event Log Format
 
 Event logs use the `ExecutionEvent` message available in the protobuf.
 
