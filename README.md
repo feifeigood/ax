@@ -1,6 +1,7 @@
 # Agent eXecutor (AX)
 
-🚧 This project is in active development and may introduce breaking changes to capabilities and APIs until the 1.0 release. 🚧
+> [!WARNING]
+> 🚧 This project is in active development and may introduce breaking changes.
 
 AX, a short for Agent eXecutor, is a single-writer agent orchestrator system built in Go. It provides a minimal runtime that coordinates agentic loops, manages executions with event logging, and communicates with both local and remote agents via streaming protocols.
 
