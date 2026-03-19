@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/google/ax/proto"
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 // SQLiteEventLog is a durable EventLog that persists events in a SQLite database.
@@ -30,11 +30,14 @@ type SQLiteEventLog struct {
 	db *sql.DB
 }
 
+const sqliteBusyTimeout = 10 * time.Second
+
 // OpenSQLiteEventLog opens (or creates) a SQLite database at path and initializes the event log schema.
 func OpenSQLiteEventLog(path string) (*SQLiteEventLog, error) {
-	db, err := sql.Open("sqlite3", path)
+	dsn := fmt.Sprintf("%s?_pragma=busy_timeout(%d)", path, sqliteBusyTimeout.Milliseconds())
+	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
-		return nil, fmt.Errorf("sqlite_eventlog: open %s: %w", path, err)
+		return nil, fmt.Errorf("sqlite_eventlog: open %s: %w", dsn, err)
 	}
 
 	// Create table if it doesn't exist
