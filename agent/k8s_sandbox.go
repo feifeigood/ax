@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/google/ax/internal/sandboxclient"
+	"github.com/google/ax/proto"
 	"google.golang.org/grpc/metadata"
 )
 
@@ -81,13 +82,13 @@ func (a *KubernetesSandboxAgent) HealthCheck(ctx context.Context) error {
 	return nil
 }
 
-func (a *KubernetesSandboxAgent) Process(ctx context.Context, t *Task, e TaskExecutor, o OutputHandler) error {
+func (a *KubernetesSandboxAgent) Connect(ctx context.Context, execID string, start *proto.AgentStart, e Executor, o OutputHandler) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	// Use the id deterministically so interactive executions reuse the same sandbox pod,
 	// rather than spawning a new pod for every exchanged message.
-	safeID := strings.ReplaceAll(t.ID, "-", "")
+	safeID := strings.ReplaceAll(execID, "-", "")
 	if len(safeID) > 20 {
 		safeID = safeID[:20] // Keep it short for k8s names
 	}
@@ -198,7 +199,7 @@ func (a *KubernetesSandboxAgent) Process(ctx context.Context, t *Task, e TaskExe
 	defer remoteAgent.Close()
 
 	// Forward the request!
-	return remoteAgent.Process(ctx, t, e, o)
+	return remoteAgent.Connect(ctx, execID, start, e, o)
 }
 
 func findAvailablePort() (int, error) {

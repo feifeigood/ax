@@ -22,17 +22,17 @@ import (
 )
 
 // agentFunc adapts a simple string→string function into the agent.Agent interface.
-type agentFunc func(input []*proto.Content, tm agent.TaskExecutor, o agent.OutputHandler)
+type agentFunc func(input []*proto.Content, tm agent.Executor, o agent.OutputHandler)
 
-func (f agentFunc) Process(ctx context.Context, t *agent.Task, tm agent.TaskExecutor, o agent.OutputHandler) error {
-	f(t.Inputs, tm, o)
+func (f agentFunc) Connect(ctx context.Context, execID string, start *proto.AgentStart, tm agent.Executor, o agent.OutputHandler) error {
+	f(start.Contents, tm, o)
 	return nil
 }
 
 func (f agentFunc) HealthCheck(_ context.Context) error { return nil }
 func (f agentFunc) Close() error                        { return nil }
 
-func AgentFunc(fn func(input []*proto.Content, tm agent.TaskExecutor, o agent.OutputHandler)) agent.Agent {
+func AgentFunc(fn func(input []*proto.Content, tm agent.Executor, o agent.OutputHandler)) agent.Agent {
 	return agentFunc(fn)
 }
 

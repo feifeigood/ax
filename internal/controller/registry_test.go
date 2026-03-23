@@ -31,14 +31,14 @@ import (
 
 // MockAgent is a mock implementation of the Agent interface for testing.
 type MockAgent struct {
-	processFunc     func(ctx context.Context, t *agent.Task, e agent.TaskExecutor, o agent.OutputHandler) error
+	ProcessFunc     func(ctx context.Context, execID string, start *proto.AgentStart, e agent.Executor, o agent.OutputHandler) error
 	healthCheckFunc func(ctx context.Context) error
 	closeFunc       func() error
 }
 
-func (m *MockAgent) Process(ctx context.Context, t *agent.Task, e agent.TaskExecutor, o agent.OutputHandler) error {
-	if m.processFunc != nil {
-		return m.processFunc(ctx, t, e, o)
+func (m *MockAgent) Connect(ctx context.Context, execID string, start *proto.AgentStart, e agent.Executor, o agent.OutputHandler) error {
+	if m.ProcessFunc != nil {
+		return m.ProcessFunc(ctx, execID, start, e, o)
 	}
 	return nil
 }

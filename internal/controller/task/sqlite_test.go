@@ -35,7 +35,7 @@ func TestSQLiteEventLog_AppendAndEvents(t *testing.T) {
 	defer log.Close()
 
 	ev1 := &proto.ExecutionEvent{
-		TaskId:    "task-1",
+		ExecId:    "task-1",
 		State:     proto.State_STATE_PENDING,
 		Timestamp: timestamppb.Now(),
 		Inputs: []*proto.Content{
@@ -44,7 +44,7 @@ func TestSQLiteEventLog_AppendAndEvents(t *testing.T) {
 	}
 
 	ev2 := &proto.ExecutionEvent{
-		TaskId:    "task-1",
+		ExecId:    "task-1",
 		State:     proto.State_STATE_COMPLETED,
 		Timestamp: timestamppb.Now(),
 		Outputs: []*proto.Content{
@@ -68,10 +68,10 @@ func TestSQLiteEventLog_AppendAndEvents(t *testing.T) {
 		t.Fatalf("expected 2 events, got %d", len(events))
 	}
 
-	if events[0].TaskId != "task-1" || events[0].State != proto.State_STATE_PENDING {
+	if events[0].ExecId != "task-1" || events[0].State != proto.State_STATE_PENDING {
 		t.Errorf("ev1 metadata mismatch")
 	}
-	if events[1].TaskId != "task-1" || events[1].State != proto.State_STATE_COMPLETED {
+	if events[1].ExecId != "task-1" || events[1].State != proto.State_STATE_COMPLETED {
 		t.Errorf("ev2 metadata mismatch")
 	}
 }
@@ -96,7 +96,7 @@ func TestSQLiteEventLog_ConcurrentAppend(t *testing.T) {
 			defer wg.Done()
 			for j := 0; j < numEvents; j++ {
 				ev := &proto.ExecutionEvent{
-					TaskId:    "task-concurrent",
+					ExecId:    "task-concurrent",
 					State:     proto.State(agentIdx % 4), // distribute states 0-3
 					Timestamp: timestamppb.Now(),
 				}

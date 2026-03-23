@@ -49,7 +49,7 @@ type Content struct {
 }
 
 type ExecutionEvent struct {
-	TaskID    string    `json:"task_id"`
+	ExecID    string    `json:"exec_id"`
 	AgentID   string    `json:"agent_id"`
 	Inputs    []Content `json:"inputs"`
 	Outputs   []Content `json:"outputs"`
@@ -58,13 +58,13 @@ type ExecutionEvent struct {
 }
 
 type TaskTrace struct {
-	TaskID  string           `json:"task_id"`
+	ExecID  string           `json:"exec_id"`
 	AgentID string           `json:"agent_id"`
 	Events  []ExecutionEvent `json:"events"`
 }
 
 type TraceData struct {
-	RootTaskID string      `json:"root_task_id"`
+	RootExecID string      `json:"root_exec_id"`
 	Tasks      []TaskTrace `json:"tasks"`
 }
 
@@ -107,24 +107,24 @@ func runTrace(cmd *cobra.Command, args []string) error {
 	return serveTraceUI(listener, data, indexHTML)
 }
 
-func loadTraceData(rootTaskID string) (*TraceData, error) {
+func loadTraceData(rootExecID string) (*TraceData, error) {
 	// The trace command uses the config provided by --config flag
 	configPath := traceConfigFile
 
-	events, err := fetchEventsFromDB(configPath, rootTaskID)
+	events, err := fetchEventsFromDB(configPath, rootExecID)
 	if err != nil {
 		return nil, err
 	}
 
 	data := &TraceData{
-		RootTaskID: rootTaskID,
-		Tasks:      buildTaskTraces(rootTaskID, events),
+		RootExecID: rootExecID,
+		Tasks:      buildTaskTraces(rootExecID, events),
 	}
 
 	return data, nil
 }
 
-func fetchEventsFromDB(configPath string, rootTaskID string) ([]*proto.ExecutionEvent, error) {
+func fetchEventsFromDB(configPath string, rootExecID string) ([]*proto.ExecutionEvent, error) {
 	cfg, err := config.LoadFromFile(configPath)
 	if err != nil {
 		return nil, fmt.Errorf("error loading config: %w", err)
@@ -137,7 +137,7 @@ func fetchEventsFromDB(configPath string, rootTaskID string) ([]*proto.Execution
 	defer evLog.Close()
 
 	ctx := context.Background()
-	events, err := evLog.EventsByPrefix(ctx, rootTaskID)
+	events, err := evLog.EventsByPrefix(ctx, rootExecID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query trace events: %w", err)
 	}
@@ -145,17 +145,17 @@ func fetchEventsFromDB(configPath string, rootTaskID string) ([]*proto.Execution
 	return events, nil
 }
 
-func buildTaskTraces(rootTaskID string, events []*proto.ExecutionEvent) []TaskTrace {
+func buildTaskTraces(rootExecID string, events []*proto.ExecutionEvent) []TaskTrace {
 	tasksMap := make(map[string][]ExecutionEvent)
 
 	for _, protoEv := range events {
-		taskID := protoEv.TaskId
-		ev := extractExecutionEvent(taskID, protoEv)
-		tasksMap[taskID] = append(tasksMap[taskID], ev)
+		exID := protoEv.ExecId
+		ev := extractExecutionEvent(exID, protoEv)
+		tasksMap[exID] = append(tasksMap[exID], ev)
 	}
 
 	var tasks []TaskTrace
-	for taskID, evs := range tasksMap {
+	for execID, evs := range tasksMap {
 		agentID := ""
 		for _, ev := range evs {
 			if ev.AgentID != "" {
@@ -164,7 +164,7 @@ func buildTaskTraces(rootTaskID string, events []*proto.ExecutionEvent) []TaskTr
 			}
 		}
 		tasks = append(tasks, TaskTrace{
-			TaskID:  taskID,
+			ExecID:  execID,
 			AgentID: agentID,
 			Events:  evs,
 		})
@@ -172,13 +172,13 @@ func buildTaskTraces(rootTaskID string, events []*proto.ExecutionEvent) []TaskTr
 
 	// Root task first, then sub-tasks sorted by name.
 	sort.Slice(tasks, func(i, j int) bool {
-		if tasks[i].TaskID == rootTaskID {
+		if tasks[i].ExecID == rootExecID {
 			return true
 		}
-		if tasks[j].TaskID == rootTaskID {
+		if tasks[j].ExecID == rootExecID {
 			return false
 		}
-		return tasks[i].TaskID < tasks[j].TaskID
+		return tasks[i].ExecID < tasks[j].ExecID
 	})
 
 	return tasks
@@ -206,9 +206,9 @@ func extractContents(protoContents []*proto.Content) []Content {
 	return results
 }
 
-func extractExecutionEvent(taskID string, protoEv *proto.ExecutionEvent) ExecutionEvent {
+func extractExecutionEvent(execID string, protoEv *proto.ExecutionEvent) ExecutionEvent {
 	ev := ExecutionEvent{
-		TaskID:  taskID,
+		ExecID:  execID,
 		AgentID: protoEv.AgentId,
 	}
 	if protoEv.Timestamp != nil {

@@ -31,14 +31,14 @@ type taskExecutor struct {
 	registry map[string]agent.Agent
 }
 
-func newTaskID(parent, child string) string {
+func newExecID(parent, child string) string {
 	if parent == "" {
 		return child
 	}
 	return parent + "-" + child
 }
 
-func DefaultExecutor(eventLog EventLog, registry map[string]agent.Agent) agent.TaskExecutor {
+func DefaultExecutor(eventLog EventLog, registry map[string]agent.Agent) agent.Executor {
 	return &taskExecutor{
 		id:       "",
 		eventLog: eventLog,
@@ -46,14 +46,14 @@ func DefaultExecutor(eventLog EventLog, registry map[string]agent.Agent) agent.T
 	}
 }
 
-func (tm *taskExecutor) Exec(ctx context.Context, t *agent.Task, o agent.OutputHandler) error {
-	t.ID = newTaskID(tm.id, t.ID)
-	a, ok := tm.registry[t.AgentID]
+func (tm *taskExecutor) Exec(ctx context.Context, execID string, start *proto.AgentStart, o agent.OutputHandler) error {
+	execID = newExecID(tm.id, execID)
+	a, ok := tm.registry[start.AgentId]
 	if !ok {
 		return errors.New("no agent found")
 	}
 
-	allInputs, state, err := history(ctx, tm.eventLog, t.ID)
+	allInputs, state, err := history(ctx, tm.eventLog, execID)
 	if err != nil {
 		return err
 	}
@@ -61,24 +61,25 @@ func (tm *taskExecutor) Exec(ctx context.Context, t *agent.Task, o agent.OutputH
 	if state == proto.State_STATE_COMPLETED {
 		return nil
 	}
-	return tm.exec(ctx, t, tm.eventLog, a, allInputs, o)
+	return tm.exec(ctx, execID, start, tm.eventLog, a, allInputs, o)
 }
 
 func (tm *taskExecutor) exec(
 	ctx context.Context,
-	t *agent.Task,
+	execID string,
+	start *proto.AgentStart,
 	el EventLog,
 	a agent.Agent,
 	allInputs []*proto.Content,
 	o agent.OutputHandler) error {
 	child := &taskExecutor{
-		id:       t.ID,
+		id:       execID,
 		eventLog: tm.eventLog,
 		registry: tm.registry,
 	}
 
 	var allOutputs []*proto.Content
-	outputBuffer := func(outgoing *proto.ProcessResponse) error {
+	outputBuffer := func(outgoing *proto.AgentOutputs) error {
 		allOutputs = append(allOutputs, outgoing.Contents...)
 		if o != nil {
 			return o(outgoing)
@@ -86,29 +87,24 @@ func (tm *taskExecutor) exec(
 		return nil
 	}
 
-	allInputs = append(allInputs, t.Inputs...)
-	if err := logPending(ctx, el, t); err != nil {
-		return err
-	}
-
+	allInputs = append(allInputs, start.Contents...)
 	if len(allInputs) == 0 {
 		return errors.New("no inputs")
 	}
+	if err := logPending(ctx, el, execID, start); err != nil {
+		return err
+	}
 
-	if err := a.Process(ctx, &agent.Task{
-		ID:      t.ID,
-		AgentID: t.AgentID,
-		Inputs:  allInputs,
-		Config:  t.Config,
-	}, child, outputBuffer); err != nil {
-		_ = logFailed(ctx, el, t) // Attempt to log failure, but prioritize returning the original error.
+	start.Contents = allInputs
+	if err := a.Connect(ctx, execID, start, child, outputBuffer); err != nil {
+		_ = logFailed(ctx, el, execID, start) // Attempt to log failure, but prioritize returning the original error.
 		return err
 	}
 
 	if len(allOutputs) > 0 {
 		// Log all the outputs at once.
 		// TODO: Log only at checkpoints.
-		if err := logOutputs(ctx, el, t, allOutputs); err != nil {
+		if err := logOutputs(ctx, el, execID, start, allOutputs); err != nil {
 			return err
 		}
 
@@ -116,14 +112,14 @@ func (tm *taskExecutor) exec(
 		if last.GetConfirmation() == nil || last.GetConfirmation().GetQuestion() == "" {
 			// Log completed only if we are not waiting
 			// for an answer to a confirmation.
-			return logCompleted(ctx, el, t)
+			return logCompleted(ctx, el, execID, start)
 		}
 	}
 	return nil
 }
 
-func history(ctx context.Context, el EventLog, taskID string) ([]*proto.Content, proto.State, error) {
-	events, err := el.Events(ctx, taskID)
+func history(ctx context.Context, el EventLog, execID string) ([]*proto.Content, proto.State, error) {
+	events, err := el.Events(ctx, execID)
 	if err != nil {
 		return nil, proto.State_STATE_UNSPECIFIED, err
 	}
@@ -132,7 +128,7 @@ func history(ctx context.Context, el EventLog, taskID string) ([]*proto.Content,
 	var state proto.State
 
 	for _, event := range events {
-		if event.TaskId != taskID {
+		if event.ExecId != execID {
 			continue
 		}
 		// Reset after the status change ensure
@@ -154,39 +150,39 @@ func history(ctx context.Context, el EventLog, taskID string) ([]*proto.Content,
 	return history, state, nil
 }
 
-func logPending(ctx context.Context, el EventLog, t *agent.Task) error {
+func logPending(ctx context.Context, el EventLog, execID string, start *proto.AgentStart) error {
 	return el.Append(ctx, &proto.ExecutionEvent{
 		Timestamp: timestamppb.Now(),
-		TaskId:    t.ID,
-		AgentId:   t.AgentID,
-		Inputs:    t.Inputs,
+		ExecId:    execID,
+		AgentId:   start.AgentId,
+		Inputs:    start.Contents,
 		State:     proto.State_STATE_PENDING,
 	})
 }
 
-func logFailed(ctx context.Context, el EventLog, t *agent.Task) error {
+func logFailed(ctx context.Context, el EventLog, execID string, start *proto.AgentStart) error {
 	return el.Append(ctx, &proto.ExecutionEvent{
 		Timestamp: timestamppb.Now(),
-		TaskId:    t.ID,
-		AgentId:   t.AgentID,
+		ExecId:    execID,
+		AgentId:   start.AgentId,
 		State:     proto.State_STATE_FAILED,
 	})
 }
 
-func logCompleted(ctx context.Context, el EventLog, t *agent.Task) error {
+func logCompleted(ctx context.Context, el EventLog, execID string, start *proto.AgentStart) error {
 	return el.Append(ctx, &proto.ExecutionEvent{
 		Timestamp: timestamppb.Now(),
-		TaskId:    t.ID,
-		AgentId:   t.AgentID,
+		ExecId:    execID,
+		AgentId:   start.AgentId,
 		State:     proto.State_STATE_COMPLETED,
 	})
 }
 
-func logOutputs(ctx context.Context, el EventLog, t *agent.Task, outputs []*proto.Content) error {
+func logOutputs(ctx context.Context, el EventLog, execID string, start *proto.AgentStart, outputs []*proto.Content) error {
 	return el.Append(ctx, &proto.ExecutionEvent{
 		Timestamp: timestamppb.Now(),
-		TaskId:    t.ID,
-		AgentId:   t.AgentID,
+		ExecId:    execID,
+		AgentId:   start.AgentId,
 		Outputs:   outputs,
 	})
 }

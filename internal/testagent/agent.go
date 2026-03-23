@@ -27,8 +27,8 @@ func Agents() map[string]agent.Agent {
 
 type CodingAgent struct{}
 
-// Process handles processing of input content with callback handler.
-func (a *CodingAgent) Process(ctx context.Context, t *agent.Task, e agent.TaskExecutor, o agent.OutputHandler) error {
+// Connect handles processing of input content with callback handler.
+func (a *CodingAgent) Connect(ctx context.Context, execID string, start *proto.AgentStart, e agent.Executor, o agent.OutputHandler) error {
 	exec := NewExecutor(e, o)
 
 	var history []*proto.Content
@@ -43,11 +43,10 @@ func (a *CodingAgent) Process(ctx context.Context, t *agent.Task, e agent.TaskEx
 				},
 			},
 		}
-		inputs = append(inputs, t.Inputs...)
-		outputs, err := exec.Exec(ctx, &agent.Task{
-			ID:      "code",
-			AgentID: "gemini",
-			Inputs:  inputs,
+		inputs = append(inputs, start.Contents...)
+		outputs, err := exec.Exec(ctx, "code", &proto.AgentStart{
+			AgentId: "gemini",
+			Contents:  inputs,
 		})
 		if err != nil {
 			return err
@@ -56,10 +55,9 @@ func (a *CodingAgent) Process(ctx context.Context, t *agent.Task, e agent.TaskEx
 	}
 
 	{
-		outputs, err := exec.Exec(ctx, &agent.Task{
-			ID:      "docker",
-			AgentID: "docker-build",
-			Inputs:  history,
+		outputs, err := exec.Exec(ctx, "docker", &proto.AgentStart{
+			AgentId: "docker-build",
+			Contents:  history,
 		})
 		if err != nil {
 			return err
@@ -74,10 +72,9 @@ func (a *CodingAgent) Process(ctx context.Context, t *agent.Task, e agent.TaskEx
 		if err != nil {
 			return err
 		}
-		outputs, err := exec.Exec(ctx, &agent.Task{
-			ID:      "deploy",
-			AgentID: "kubernetes-deploy",
-			Inputs:  history,
+		outputs, err := exec.Exec(ctx, "deploy", &proto.AgentStart{
+			AgentId: "kubernetes-deploy",
+			Contents:  history,
 			Config:  config,
 		})
 		if err != nil {
@@ -98,10 +95,9 @@ func (a *CodingAgent) Process(ctx context.Context, t *agent.Task, e agent.TaskEx
 		if err != nil {
 			return err
 		}
-		outputs, err := exec.Exec(ctx, &agent.Task{
-			ID:      "deploy-more",
-			AgentID: "kubernetes-deploy",
-			Inputs:  history,
+		outputs, err := exec.Exec(ctx, "deploy-more", &proto.AgentStart{
+			AgentId: "kubernetes-deploy",
+			Contents:  history,
 			Config:  config,
 		})
 		if err != nil {
@@ -114,7 +110,7 @@ func (a *CodingAgent) Process(ctx context.Context, t *agent.Task, e agent.TaskEx
 		}
 	}
 
-	if err := o(&proto.ProcessResponse{
+	if err := o(&proto.AgentOutputs{
 		Contents: []*proto.Content{{
 			Role: "assistant",
 			Content: &proto.Content_Text{
@@ -136,10 +132,9 @@ func (a *CodingAgent) Process(ctx context.Context, t *agent.Task, e agent.TaskEx
 				},
 			},
 		})
-		_, err := exec.Exec(ctx, &agent.Task{
-			ID:      "summarize",
-			AgentID: "gemini",
-			Inputs:  history,
+		_, err := exec.Exec(ctx, "summarize", &proto.AgentStart{
+			AgentId: "gemini",
+			Contents:  history,
 		})
 		if err != nil {
 			return err
@@ -162,17 +157,17 @@ var pendingRegions = make(map[string][]string) // not for production
 
 type KubernetesDeployAgent struct{}
 
-func (a *KubernetesDeployAgent) Process(ctx context.Context, t *agent.Task, e agent.TaskExecutor, o agent.OutputHandler) error {
+func (a *KubernetesDeployAgent) Connect(ctx context.Context, execID string, start *proto.AgentStart, e agent.Executor, o agent.OutputHandler) error {
 	exec := NewExecutor(e, o)
 
-	approved, conf := historyutil.HasConfirmationAnswer(t.Inputs)
+	approved, conf := historyutil.HasConfirmationAnswer(start.Contents)
 	if conf != nil && pendingRegions[conf.Id] != nil {
 		if !approved {
 			return nil
 		}
 
 		regions := pendingRegions[conf.Id]
-		if err := o(&proto.ProcessResponse{
+		if err := o(&proto.AgentOutputs{
 			Contents: []*proto.Content{{
 				Role: "assistant",
 				Content: &proto.Content_Text{
@@ -187,10 +182,9 @@ func (a *KubernetesDeployAgent) Process(ctx context.Context, t *agent.Task, e ag
 
 		for _, region := range regions {
 			if region != "us-central1" {
-				_, err := exec.Exec(ctx, &agent.Task{
-					ID:      "mirror-" + region,
-					AgentID: "docker-mirror",
-					Inputs: []*proto.Content{
+				_, err := exec.Exec(ctx, "mirror-" + region, &proto.AgentStart{
+					AgentId: "docker-mirror",
+					Contents: []*proto.Content{
 						{
 							Role: "user",
 							Content: &proto.Content_Text{
@@ -205,7 +199,7 @@ func (a *KubernetesDeployAgent) Process(ctx context.Context, t *agent.Task, e ag
 					return err
 				}
 			}
-			if err := o(&proto.ProcessResponse{
+			if err := o(&proto.AgentOutputs{
 				Contents: []*proto.Content{{
 					Role: "assistant",
 					Content: &proto.Content_Text{
@@ -217,7 +211,7 @@ func (a *KubernetesDeployAgent) Process(ctx context.Context, t *agent.Task, e ag
 			}); err != nil {
 				return err
 			}
-			if err := o(&proto.ProcessResponse{
+			if err := o(&proto.AgentOutputs{
 				Contents: []*proto.Content{{
 					Role: "assistant",
 					Content: &proto.Content_Text{
@@ -231,7 +225,7 @@ func (a *KubernetesDeployAgent) Process(ctx context.Context, t *agent.Task, e ag
 			}
 
 			time.Sleep(1500 * time.Millisecond)
-			if err := o(&proto.ProcessResponse{
+			if err := o(&proto.AgentOutputs{
 				Contents: []*proto.Content{{
 					Role: "assistant",
 					Content: &proto.Content_Text{
@@ -248,11 +242,11 @@ func (a *KubernetesDeployAgent) Process(ctx context.Context, t *agent.Task, e ag
 		return nil
 	}
 
-	if t.Config == nil {
-		return fmt.Errorf("no config for id=%v", t.ID)
+	if start.Config == nil {
+		return fmt.Errorf("no config for id=%v", execID)
 	}
 	var config testagentpb.KubernetesDeployAgentConfig
-	if err := t.Config.UnmarshalTo(&config); err != nil {
+	if err := start.Config.UnmarshalTo(&config); err != nil {
 		return err
 	}
 	if len(config.Regions) == 0 {
@@ -261,7 +255,7 @@ func (a *KubernetesDeployAgent) Process(ctx context.Context, t *agent.Task, e ag
 
 	confID := uuid.NewString()
 	pendingRegions[confID] = config.Regions
-	return o(&proto.ProcessResponse{
+	return o(&proto.AgentOutputs{
 		Contents: []*proto.Content{{
 			Role: "assistant",
 			Content: &proto.Content_Confirmation{
@@ -284,27 +278,27 @@ func (a *KubernetesDeployAgent) Close() error {
 }
 
 type Executor struct {
-	exec    agent.TaskExecutor
+	exec    agent.Executor
 	handler agent.OutputHandler
 }
 
-func NewExecutor(e agent.TaskExecutor, o agent.OutputHandler) *Executor {
+func NewExecutor(e agent.Executor, o agent.OutputHandler) *Executor {
 	return &Executor{
 		exec:    e,
 		handler: o,
 	}
 }
 
-func (e *Executor) Exec(ctx context.Context, t *agent.Task) ([]*proto.Content, error) {
+func (e *Executor) Exec(ctx context.Context, execID string, start *proto.AgentStart) ([]*proto.Content, error) {
 	var outputs []*proto.Content
-	if t.ID == "" {
+	if execID == "" {
 		var err error
-		t.ID, err = randomHex(8)
+		execID, err = randomHex(8)
 		if err != nil {
 			return nil, err
 		}
 	}
-	if err := e.exec.Exec(ctx, t, func(resp *proto.ProcessResponse) error {
+	if err := e.exec.Exec(ctx, execID, start, func(resp *proto.AgentOutputs) error {
 		outputs = append(outputs, resp.Contents...)
 		return e.handler(resp)
 	}); err != nil {

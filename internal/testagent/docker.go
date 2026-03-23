@@ -10,8 +10,8 @@ import (
 
 type DockerBuilderAgent struct{}
 
-func (a *DockerBuilderAgent) Process(ctx context.Context, t *agent.Task, e agent.TaskExecutor, o agent.OutputHandler) error {
-	o(&proto.ProcessResponse{
+func (a *DockerBuilderAgent) Connect(ctx context.Context, execID string, start *proto.AgentStart, e agent.Executor, o agent.OutputHandler) error {
+	o(&proto.AgentOutputs{
 		Contents: []*proto.Content{{
 			Role: "assistant",
 			Content: &proto.Content_Text{
@@ -23,7 +23,7 @@ func (a *DockerBuilderAgent) Process(ctx context.Context, t *agent.Task, e agent
 	})
 
 	time.Sleep(500 * time.Millisecond)
-	o(&proto.ProcessResponse{
+	o(&proto.AgentOutputs{
 		Contents: []*proto.Content{{
 			Role: "assistant",
 			Content: &proto.Content_Text{
@@ -35,7 +35,7 @@ func (a *DockerBuilderAgent) Process(ctx context.Context, t *agent.Task, e agent
 	})
 
 	time.Sleep(1000 * time.Millisecond)
-	o(&proto.ProcessResponse{
+	o(&proto.AgentOutputs{
 		Contents: []*proto.Content{{
 			Role: "assistant",
 			Content: &proto.Content_Text{
@@ -59,8 +59,8 @@ func (a *DockerBuilderAgent) Close() error {
 
 type DockerMirrorAgent struct{}
 
-func (a *DockerMirrorAgent) Process(ctx context.Context, t *agent.Task, e agent.TaskExecutor, o agent.OutputHandler) error {
-	o(&proto.ProcessResponse{
+func (a *DockerMirrorAgent) Connect(ctx context.Context, execID string, start *proto.AgentStart, e agent.Executor, o agent.OutputHandler) error {
+	o(&proto.AgentOutputs{
 		Contents: []*proto.Content{{
 			Role: "assistant",
 			Content: &proto.Content_Text{
@@ -72,7 +72,7 @@ func (a *DockerMirrorAgent) Process(ctx context.Context, t *agent.Task, e agent.
 	})
 
 	time.Sleep(2000 * time.Millisecond)
-	o(&proto.ProcessResponse{
+	o(&proto.AgentOutputs{
 		Contents: []*proto.Content{{
 			Role: "assistant",
 			Content: &proto.Content_Text{

@@ -38,7 +38,7 @@ func (s *server) HealthCheck(ctx context.Context, req *proto.HealthCheckRequest)
 	return &proto.HealthCheckResponse{Healthy: true, Message: "upper_case_agent is running"}, nil
 }
 
-func (s *server) Process(stream grpc.BidiStreamingServer[proto.ProcessRequest, proto.ProcessResponse]) error {
+func (s *server) Connect(stream grpc.BidiStreamingServer[proto.AgentMessage, proto.AgentMessage]) error {
 	for {
 		// Read input from the orchestrator
 		req, err := stream.Recv()
@@ -50,12 +50,12 @@ func (s *server) Process(stream grpc.BidiStreamingServer[proto.ProcessRequest, p
 		}
 
 		var outputs []*proto.Content
-
-		if len(req.Contents) > 0 {
+		start := req.GetStart()
+		if start != nil && len(start.Contents) > 0 {
 			// Find the most recent message from the "user" in the history
 			var targetText string
-			for i := len(req.Contents) - 1; i >= 0; i-- {
-				if text := req.Contents[i].GetText(); text != nil && req.Contents[i].Role == "user" {
+			for i := len(start.Contents) - 1; i >= 0; i-- {
+				if text := start.Contents[i].GetText(); text != nil && start.Contents[i].Role == "user" {
 					targetText = text.Text
 					break
 				}
@@ -89,8 +89,13 @@ func (s *server) Process(stream grpc.BidiStreamingServer[proto.ProcessRequest, p
 
 		if len(outputs) > 0 {
 			// Send response back via gRPC
-			if err := stream.Send(&proto.ProcessResponse{
-				Contents: outputs,
+			if err := stream.Send(&proto.AgentMessage{
+				ExecId: req.ExecId,
+				Msg: &proto.AgentMessage_Outputs{
+					Outputs: &proto.AgentOutputs{
+						Contents: outputs,
+					},
+				},
 			}); err != nil {
 				return err
 			}

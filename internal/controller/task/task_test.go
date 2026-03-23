@@ -43,13 +43,13 @@ func (m *MemoryEventLog) Append(_ context.Context, event *proto.ExecutionEvent) 
 	return nil
 }
 
-func (m *MemoryEventLog) Events(_ context.Context, taskID string) ([]*proto.ExecutionEvent, error) {
+func (m *MemoryEventLog) Events(_ context.Context, execID string) ([]*proto.ExecutionEvent, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	out := make([]*proto.ExecutionEvent, 0)
 	for _, ev := range m.events {
-		if ev.TaskId == taskID {
+		if ev.ExecId == execID {
 			out = append(out, ev)
 		}
 	}
@@ -84,19 +84,17 @@ func Example() {
 	ctx := context.Background()
 
 	registry := map[string]agent.Agent{
-		"planner": AgentFunc(func(inputs []*proto.Content, tm agent.TaskExecutor, o agent.OutputHandler) {
-			if err := tm.Exec(ctx, &agent.Task{
-				ID:      "deep-research-task",
-				AgentID: "deep-research",
-				Inputs:  inputs,
+		"planner": AgentFunc(func(inputs []*proto.Content, tm agent.Executor, o agent.OutputHandler) {
+			if err := tm.Exec(ctx, "deep-research-task", &proto.AgentStart{
+				AgentId:  "deep-research",
+				Contents: inputs,
 			}, o); err != nil {
 				return
 			}
 
-			if err := tm.Exec(ctx, &agent.Task{
-				ID:      "pub-med-lookup-task",
-				AgentID: "pub-med-index",
-				Inputs:  inputs,
+			if err := tm.Exec(ctx, "pub-med-lookup-task", &proto.AgentStart{
+				AgentId:  "pub-med-index",
+				Contents: inputs,
 			}, o); err != nil {
 				return
 			}
@@ -104,10 +102,9 @@ func Example() {
 	}
 
 	tm := DefaultExecutor(memoryEventLog(), registry)
-	if err := tm.Exec(ctx, &agent.Task{
-		ID:      "test",
-		AgentID: "planner",
-		Inputs:  []*proto.Content{text("user", "Hello, I'd like to research cancer treatment options.")},
+	if err := tm.Exec(ctx, "test", &proto.AgentStart{
+		AgentId:  "planner",
+		Contents: []*proto.Content{text("user", "Hello, I'd like to research cancer treatment options.")},
 	}, nil); err != nil {
 		log.Fatal(err)
 	}
@@ -117,24 +114,23 @@ func TestTaskManager(t *testing.T) {
 	ctx := context.Background()
 
 	registry := map[string]agent.Agent{
-		"root": AgentFunc(func(inputs []*proto.Content, tm agent.TaskExecutor, o agent.OutputHandler) {
-			if err := tm.Exec(ctx, &agent.Task{
-				ID:      "child-task",
-				AgentID: "child",
-				Inputs:  inputs,
+		"root": AgentFunc(func(inputs []*proto.Content, tm agent.Executor, o agent.OutputHandler) {
+			if err := tm.Exec(ctx, "child-task", &proto.AgentStart{
+				AgentId:  "child",
+				Contents: inputs,
 			}, o); err != nil {
 				t.Fatal(err)
 			}
 			if o != nil {
-				o(&proto.ProcessResponse{
+				o(&proto.AgentOutputs{
 					Contents: []*proto.Content{text("assistant", "root done")},
 				})
 			}
 		}),
-		"child": AgentFunc(func(inputs []*proto.Content, tm agent.TaskExecutor, o agent.OutputHandler) {
+		"child": AgentFunc(func(inputs []*proto.Content, tm agent.Executor, o agent.OutputHandler) {
 			time.Sleep(100 * time.Millisecond)
 			if o != nil {
-				o(&proto.ProcessResponse{
+				o(&proto.AgentOutputs{
 					Contents: []*proto.Content{text("assistant", "child done")},
 				})
 			}
@@ -142,10 +138,9 @@ func TestTaskManager(t *testing.T) {
 	}
 
 	tm := DefaultExecutor(memoryEventLog(), registry)
-	if err := tm.Exec(ctx, &agent.Task{
-		ID:      "root-task",
-		AgentID: "root",
-		Inputs:  []*proto.Content{text("user", "hello!")},
+	if err := tm.Exec(ctx, "root-task", &proto.AgentStart{
+		AgentId:  "root",
+		Contents: []*proto.Content{text("user", "hello!")},
 	}, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -156,15 +151,14 @@ func TestFanout(t *testing.T) {
 
 	var executions atomic.Int32
 	registry := map[string]agent.Agent{
-		"root": AgentFunc(func(inputs []*proto.Content, tm agent.TaskExecutor, o agent.OutputHandler) {
+		"root": AgentFunc(func(inputs []*proto.Content, tm agent.Executor, o agent.OutputHandler) {
 			var g errgroup.Group
 			for i := 0; i < 50; i++ {
 				i := i // Capture loop variable.
 				g.Go(func() error {
-					return tm.Exec(ctx, &agent.Task{
-						ID:      fmt.Sprintf("child-%d", i),
-						AgentID: "child",
-						Inputs:  inputs,
+					return tm.Exec(ctx, fmt.Sprintf("child-%d", i), &proto.AgentStart{
+						AgentId:  "child",
+						Contents: inputs,
 					}, nil)
 				})
 			}
@@ -172,12 +166,12 @@ func TestFanout(t *testing.T) {
 				t.Fatal(err)
 			}
 			if o != nil {
-				o(&proto.ProcessResponse{
+				o(&proto.AgentOutputs{
 					Contents: []*proto.Content{text("assistant", "root done")},
 				})
 			}
 		}),
-		"child": AgentFunc(func(inputs []*proto.Content, tm agent.TaskExecutor, o agent.OutputHandler) {
+		"child": AgentFunc(func(inputs []*proto.Content, tm agent.Executor, o agent.OutputHandler) {
 			executions.Add(1)
 			time.Sleep(100 * time.Millisecond)
 
@@ -185,10 +179,9 @@ func TestFanout(t *testing.T) {
 			for i := 0; i < 2; i++ {
 				i := i // Capture loop variable.
 				g.Go(func() error {
-					return tm.Exec(ctx, &agent.Task{
-						ID:      fmt.Sprintf("child2-%d", i),
-						AgentID: "child2",
-						Inputs:  inputs,
+					return tm.Exec(ctx, fmt.Sprintf("child2-%d", i), &proto.AgentStart{
+						AgentId:  "child2",
+						Contents: inputs,
 					}, nil)
 				})
 			}
@@ -196,16 +189,16 @@ func TestFanout(t *testing.T) {
 				t.Fatal(err)
 			}
 			if o != nil {
-				o(&proto.ProcessResponse{
+				o(&proto.AgentOutputs{
 					Contents: []*proto.Content{text("assistant", "child done")},
 				})
 			}
 		}),
-		"child2": AgentFunc(func(inputs []*proto.Content, tm agent.TaskExecutor, o agent.OutputHandler) {
+		"child2": AgentFunc(func(inputs []*proto.Content, tm agent.Executor, o agent.OutputHandler) {
 			executions.Add(1)
 			time.Sleep(100 * time.Millisecond)
 			if o != nil {
-				o(&proto.ProcessResponse{
+				o(&proto.AgentOutputs{
 					Contents: []*proto.Content{text("assistant", "child2 done")},
 				})
 			}
@@ -213,10 +206,9 @@ func TestFanout(t *testing.T) {
 	}
 
 	tm := DefaultExecutor(memoryEventLog(), registry)
-	if err := tm.Exec(ctx, &agent.Task{
-		ID:      "root-task",
-		AgentID: "root",
-		Inputs:  []*proto.Content{text("user", "hello!")},
+	if err := tm.Exec(ctx, "root-task", &proto.AgentStart{
+		AgentId:  "root",
+		Contents: []*proto.Content{text("user", "hello!")},
 	}, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -235,21 +227,20 @@ func TestConfirmation(t *testing.T) {
 	confID := "test-conf-id"
 	var childDone atomic.Bool
 	registry := map[string]agent.Agent{
-		"root": AgentFunc(func(inputs []*proto.Content, tm agent.TaskExecutor, o agent.OutputHandler) {
-			if err := tm.Exec(ctx, &agent.Task{
-				ID:      "child-task",
-				AgentID: "child",
-				Inputs:  inputs,
+		"root": AgentFunc(func(inputs []*proto.Content, tm agent.Executor, o agent.OutputHandler) {
+			if err := tm.Exec(ctx, "child-task", &proto.AgentStart{
+				AgentId:  "child",
+				Contents: inputs,
 			}, o); err != nil {
 				t.Fatal(err)
 			}
 		}),
-		"child": AgentFunc(func(inputs []*proto.Content, tm agent.TaskExecutor, o agent.OutputHandler) {
+		"child": AgentFunc(func(inputs []*proto.Content, tm agent.Executor, o agent.OutputHandler) {
 			if runCount == 0 {
 				runCount++
 				log.Println("Asking for the question...")
 				if o != nil {
-					o(&proto.ProcessResponse{
+					o(&proto.AgentOutputs{
 						Contents: []*proto.Content{{
 							Content: &proto.Content_Confirmation{
 								Confirmation: &proto.ConfirmationContent{Id: confID, Question: "proceed?"},
@@ -267,7 +258,7 @@ func TestConfirmation(t *testing.T) {
 
 			childDone.Store(true)
 			if o != nil {
-				o(&proto.ProcessResponse{
+				o(&proto.AgentOutputs{
 					Contents: []*proto.Content{text("assistant", "child done")},
 				})
 			}
@@ -277,10 +268,9 @@ func TestConfirmation(t *testing.T) {
 	tm := DefaultExecutor(eventLog, registry)
 
 	// First run: child returns a confirmation request.
-	if err := tm.Exec(ctx, &agent.Task{
-		ID:      "root-task",
-		AgentID: "root",
-		Inputs:  []*proto.Content{text("user", "hello!")},
+	if err := tm.Exec(ctx, "root-task", &proto.AgentStart{
+		AgentId:  "root",
+		Contents: []*proto.Content{text("user", "hello!")},
 	}, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -297,10 +287,9 @@ func TestConfirmation(t *testing.T) {
 			},
 		},
 	}
-	if err := tm.Exec(ctx, &agent.Task{
-		ID:      "root-task",
-		AgentID: "root",
-		Inputs:  []*proto.Content{approval},
+	if err := tm.Exec(ctx, "root-task", &proto.AgentStart{
+		AgentId:  "root",
+		Contents: []*proto.Content{approval},
 	}, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -315,24 +304,23 @@ func TestResume(t *testing.T) {
 	eventLog := memoryEventLog()
 
 	registry := map[string]agent.Agent{
-		"root": AgentFunc(func(inputs []*proto.Content, tm agent.TaskExecutor, o agent.OutputHandler) {
-			if err := tm.Exec(ctx, &agent.Task{
-				ID:      "child-task",
-				AgentID: "child",
-				Inputs:  inputs,
+		"root": AgentFunc(func(inputs []*proto.Content, tm agent.Executor, o agent.OutputHandler) {
+			if err := tm.Exec(ctx, "child-task", &proto.AgentStart{
+				AgentId:  "child",
+				Contents: inputs,
 			}, nil); err != nil {
 				t.Fatal(err)
 			}
 			if o != nil {
-				o(&proto.ProcessResponse{
+				o(&proto.AgentOutputs{
 					Contents: []*proto.Content{text("assistant", "root done")},
 				})
 			}
 		}),
-		"child": AgentFunc(func(inputs []*proto.Content, tm agent.TaskExecutor, o agent.OutputHandler) {
+		"child": AgentFunc(func(inputs []*proto.Content, tm agent.Executor, o agent.OutputHandler) {
 			time.Sleep(100 * time.Millisecond)
 			if o != nil {
-				o(&proto.ProcessResponse{
+				o(&proto.AgentOutputs{
 					Contents: []*proto.Content{text("assistant", "child done")},
 				})
 			}
@@ -340,10 +328,9 @@ func TestResume(t *testing.T) {
 	}
 
 	tm := DefaultExecutor(eventLog, registry)
-	if err := tm.Exec(ctx, &agent.Task{
-		ID:      "root-task",
-		AgentID: "root",
-		Inputs:  []*proto.Content{text("user", "hello!")},
+	if err := tm.Exec(ctx, "root-task", &proto.AgentStart{
+		AgentId:  "root",
+		Contents: []*proto.Content{text("user", "hello!")},
 	}, nil); err != nil {
 		t.Fatal(err)
 	}

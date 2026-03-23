@@ -16,19 +16,21 @@ package agent
 
 import (
 	"context"
+
+	"github.com/google/ax/proto"
 	"fmt"
 )
 
 // LocalAgent wraps a local (in-process) agent implementation.
 // It implements the Agent interface for agents running in the same process as the controller.
 type LocalAgent struct {
-	processFunc     func(ctx context.Context, t *Task, e TaskExecutor, o OutputHandler) error
+	processFunc     func(ctx context.Context, execID string, start *proto.AgentStart, e Executor, o OutputHandler) error
 	healthCheckFunc func(ctx context.Context) error
 }
 
 // LocalAgentConfig configures a local agent.
 type LocalAgentConfig struct {
-	ProcessFunc     func(ctx context.Context, t *Task, e TaskExecutor, o OutputHandler) error
+	ProcessFunc     func(ctx context.Context, execID string, start *proto.AgentStart, e Executor, o OutputHandler) error
 	HealthCheckFunc func(ctx context.Context) error
 }
 
@@ -49,9 +51,9 @@ func NewLocalAgent(config LocalAgentConfig) (*LocalAgent, error) {
 	}, nil
 }
 
-// Process handles processing of input content with callback handler.
-func (a *LocalAgent) Process(ctx context.Context, t *Task, e TaskExecutor, o OutputHandler) error {
-	return a.processFunc(ctx, t, e, o)
+// Connect handles processing of input content with callback handler.
+func (a *LocalAgent) Connect(ctx context.Context, execID string, start *proto.AgentStart, e Executor, o OutputHandler) error {
+	return a.processFunc(ctx, execID, start, e, o)
 }
 
 // HealthCheck checks if the agent is healthy.

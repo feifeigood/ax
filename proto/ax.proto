@@ -23,16 +23,24 @@ import "google/protobuf/duration.proto";
 
 option go_package = "github.com/google/ax/proto";
 
-// ProcessRequest is an input to an agent.
-message ProcessRequest {
-  repeated Content contents = 1;
+message AgentStart {
+  string agent_id = 1;
+  google.protobuf.Any config = 2;
+  repeated Content contents = 3;
 }
 
-// ProcessResponse is an output from an agent.
-// It can be returned in a streaming fashion.
-message ProcessResponse {
-  string checkpoint_id = 1;
-  repeated Content contents = 2;
+message AgentOutputs {
+  repeated Content contents = 1;
+  string checkpoint_id = 2;
+  // TODO: Add awaiting_more field.
+}
+
+message AgentMessage {
+  string exec_id = 1;
+  oneof msg {
+    AgentStart start = 2;
+    AgentOutputs outputs = 3;
+  }
 }
 
 // TextContent represents a text content.
@@ -98,12 +106,12 @@ message Content {
 // to record the actions taken place in the executor.
 // The executor can replay the events for resumability.
 message ExecutionEvent {
-  string task_id = 2;
-  string agent_id = 3;
-  repeated Content inputs = 4;
-  repeated Content outputs = 5;
-  State state = 6;
-  google.protobuf.Timestamp timestamp = 7;
+  string exec_id = 1;
+  string agent_id = 2;
+  repeated Content inputs = 3;
+  repeated Content outputs = 4;
+  State state = 5;
+  google.protobuf.Timestamp timestamp = 6;
   // string checkpoint_id = 10;
 }
 
@@ -118,8 +126,8 @@ message HealthCheckResponse {
 
 // AgentService defines the gRPC service for agent communication
 service AgentService {
-  // Process handles bidirectional streaming of content between controller and agent
-  rpc Process(stream ProcessRequest) returns (stream ProcessResponse);
+  // Connect is used by agents to connect to the controller.
+  rpc Connect(stream AgentMessage) returns (stream AgentMessage);
 
   // HealthCheck checks if the agent is healthy and responsive
   rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);

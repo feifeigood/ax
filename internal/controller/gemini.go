@@ -40,8 +40,8 @@ func NewGeminiAgent() *GeminiAgent {
 	return &GeminiAgent{}
 }
 
-func (a *GeminiAgent) config(t *agent.Task) (*proto.GeminiConfig, error) {
-	if t.Config == nil {
+func (a *GeminiAgent) config(start *proto.AgentStart) (*proto.GeminiConfig, error) {
+	if start.Config == nil {
 		return &proto.GeminiConfig{
 			Model:   "gemini-3-flash-preview",
 			Timeout: &duration.Duration{Seconds: 30},
@@ -49,14 +49,14 @@ func (a *GeminiAgent) config(t *agent.Task) (*proto.GeminiConfig, error) {
 	}
 
 	var cfg proto.GeminiConfig
-	if err := t.Config.UnmarshalTo(&cfg); err != nil {
+	if err := start.Config.UnmarshalTo(&cfg); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal Gemini config: %w", err)
 	}
 	return &cfg, nil
 }
 
-func (a *GeminiAgent) Process(ctx context.Context, t *agent.Task, e agent.TaskExecutor, handler agent.OutputHandler) error {
-	cfg, err := a.config(t)
+func (a *GeminiAgent) Connect(ctx context.Context, execID string, start *proto.AgentStart, e agent.Executor, handler agent.OutputHandler) error {
+	cfg, err := a.config(start)
 	if err != nil {
 		return err
 	}
@@ -69,7 +69,7 @@ func (a *GeminiAgent) Process(ctx context.Context, t *agent.Task, e agent.TaskEx
 		return fmt.Errorf("failed to create Gemini client: %w", err)
 	}
 
-	inputs := t.Inputs
+	inputs := start.Contents
 	contents := protoToContents(inputs)
 	ctx, cancel := context.WithTimeout(ctx, cfg.Timeout.AsDuration())
 	defer cancel()
@@ -102,7 +102,7 @@ func (a *GeminiAgent) Process(ctx context.Context, t *agent.Task, e agent.TaskEx
 		}
 		if part.Text != "" {
 			respCount++
-			if err := handler(&proto.ProcessResponse{
+			if err := handler(&proto.AgentOutputs{
 				Contents: []*proto.Content{{
 					Role: "model",
 					Content: &proto.Content_Text{
@@ -171,7 +171,7 @@ func (t *BashTool) HandleCall(ctx context.Context, fc *genai.FunctionCall, o age
 	if err != nil {
 		return err
 	}
-	return o(&proto.ProcessResponse{
+	return o(&proto.AgentOutputs{
 		Contents: []*proto.Content{
 			{
 				Content: &proto.Content_FunctionCall{
@@ -198,7 +198,7 @@ func (t *BashTool) HandleExecute(ctx context.Context, fc *genai.FunctionCall, ap
 		// Declined, nothing to do in terms of executing any commands.
 		// But we still have to finish with a function response,
 		// not to keep the previously log function call hanging forever.
-		return o(&proto.ProcessResponse{
+		return o(&proto.AgentOutputs{
 			Contents: []*proto.Content{
 				{
 					Role: "assistant",
@@ -229,7 +229,7 @@ func (t *BashTool) HandleExecute(ctx context.Context, fc *genai.FunctionCall, ap
 	if err != nil {
 		return fmt.Errorf("failed to convert function response to structpb: %w", err)
 	}
-	return o(&proto.ProcessResponse{
+	return o(&proto.AgentOutputs{
 		Contents: []*proto.Content{
 			{
 				Role: "assistant",
@@ -293,7 +293,7 @@ func (t *SkillsTool) HandleCall(ctx context.Context, fc *genai.FunctionCall, o a
 		script, _ := fc.Args["script"].(string)
 		question := fmt.Sprintf("Can I run script %q from skill %q?", script, skill)
 
-		return o(&proto.ProcessResponse{
+		return o(&proto.AgentOutputs{
 			Contents: []*proto.Content{
 				{
 					Content: &proto.Content_FunctionCall{
@@ -314,7 +314,7 @@ func (t *SkillsTool) HandleCall(ctx context.Context, fc *genai.FunctionCall, o a
 				}},
 		})
 	}
-	return o(&proto.ProcessResponse{
+	return o(&proto.AgentOutputs{
 		Contents: []*proto.Content{
 			{
 				Content: &proto.Content_FunctionCall{
@@ -333,7 +333,7 @@ func (t *SkillsTool) HandleExecute(ctx context.Context, fc *genai.FunctionCall, 
 		// Declined, nothing to do in terms of executing any commands.
 		// But we still have to finish with a function response,
 		// not to keep the previously log function call hanging forever.
-		return o(&proto.ProcessResponse{
+		return o(&proto.AgentOutputs{
 			Contents: []*proto.Content{
 				{
 					Role: "assistant",
@@ -385,7 +385,7 @@ func (t *SkillsTool) HandleExecute(ctx context.Context, fc *genai.FunctionCall, 
 	if err != nil {
 		return fmt.Errorf("failed to convert function response to structpb: %w", err)
 	}
-	return o(&proto.ProcessResponse{
+	return o(&proto.AgentOutputs{
 		Contents: []*proto.Content{
 			{
 				Role: "assistant",

@@ -64,9 +64,9 @@ func (a *RemoteAgent) connect() (*grpc.ClientConn, error) {
 	return conn, nil
 }
 
-// Process handles processing of input content with the remote agent.
-func (a *RemoteAgent) Process(ctx context.Context, t *Task, e TaskExecutor, o OutputHandler) error {
-	ctx = metadata.AppendToOutgoingContext(ctx, "execution-id", t.ID)
+// Connect handles processing of input content with the remote agent.
+func (a *RemoteAgent) Connect(ctx context.Context, execID string, start *proto.AgentStart, e Executor, o OutputHandler) error {
+	ctx = metadata.AppendToOutgoingContext(ctx, "execution-id", execID)
 	conn, err := a.connect()
 	if err != nil {
 		return fmt.Errorf("failed to connect: %w", err)
@@ -74,13 +74,17 @@ func (a *RemoteAgent) Process(ctx context.Context, t *Task, e TaskExecutor, o Ou
 	defer conn.Close()
 
 	client := proto.NewAgentServiceClient(conn)
-	stream, err := client.Process(ctx)
+	stream, err := client.Connect(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to create stream: %w", err)
 	}
 
-	// Send all inputs to the remote agent
-	if err := stream.Send(&proto.ProcessRequest{Contents: t.Inputs}); err != nil {
+	if err := stream.Send(&proto.AgentMessage{
+		ExecId: execID,
+		Msg: &proto.AgentMessage_Start{
+			Start: start,
+		},
+	}); err != nil {
 		return fmt.Errorf("failed to send content: %w", err)
 	}
 
@@ -100,16 +104,21 @@ func (a *RemoteAgent) Process(ctx context.Context, t *Task, e TaskExecutor, o Ou
 			return fmt.Errorf("failed to receive content: %w", err)
 		}
 
-		// Call the handler with the received content
-		if err := o(resp); err != nil {
-			return fmt.Errorf("handler error: %w", err)
-		}
-
-		// Check for context cancellation
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
+		switch msg := resp.Msg.(type) {
+		case *proto.AgentMessage_Start:
+			// Start a new agent call
+			if err := e.Exec(stream.Context(), resp.ExecId, msg.Start, o); err != nil {
+				return fmt.Errorf("failed to execute: %w", err)
+			}
+		case *proto.AgentMessage_Outputs:
+			if resp.ExecId != execID {
+				return fmt.Errorf("received content for different execution id: %s != %s", resp.ExecId, execID)
+			}
+			if err := o(msg.Outputs); err != nil {
+				return fmt.Errorf("handler error: %w", err)
+			}
 		default:
+			return fmt.Errorf("unknown message type: %T", msg)
 		}
 	}
 }

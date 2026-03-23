@@ -46,7 +46,7 @@ func serveTraceUI(listener net.Listener, data *TraceData, rawHTML string) error 
 	}
 	url := fmt.Sprintf("http://%s", addr)
 
-	fmt.Printf("Starting trace viewer for %s...\n", data.RootTaskID)
+	fmt.Printf("Starting trace viewer for %s...\n", data.RootExecID)
 	fmt.Printf("Opening browser to %s\n", url)
 	fmt.Printf("Press Ctrl+C to exit.\n")
 
@@ -258,7 +258,7 @@ function renderTrace(data){
     const ts=t.events.map(e=>new Date(e.timestamp).getTime());
     const start=ts.length?Math.min(...ts):null;
     const end=ts.length?Math.max(...ts):null;
-    return{taskID:t.task_id,start,end};
+    return{execID:t.exec_id,start,end};
   });
   taskTimes.sort((a,b)=>{
     if(a.start==null)return 1;
@@ -274,31 +274,31 @@ function renderTrace(data){
   });
   const span=maxT-minT||1;
 
-  let html='<div class="trace-hdr"><div class="label">Trace</div><div class="tid">'+esc(data.root_task_id)+'</div></div>';
+  let html='<div class="trace-hdr"><div class="label">Trace</div><div class="tid">'+esc(data.root_exec_id)+'</div></div>';
 
   html+='<div class="timeline-card"><div class="card-title">Timeline</div><div class="tl-rows">';
-  taskTimes.forEach(({taskID,start,end},i)=>{
-    const shortName=taskID===data.root_task_id?'root':taskID.slice(data.root_task_id.length+1);
+  taskTimes.forEach(({execID,start,end},i)=>{
+    const shortName=execID===data.root_exec_id?'root':execID.slice(data.root_exec_id.length+1);
     const left=start!=null?((start-minT)/span*100).toFixed(2):0;
     const width=start!=null?Math.max((end-start)/span*100,0.4).toFixed(2):0;
     const dur=end-start;
     const durStr=dur<1000?dur+'ms':(dur/1000).toFixed(2)+'s';
     const colorCls='c'+(i%7);
     html+='<div class="tl-row">'
-      +'<div class="tl-label" title="'+esc(taskID)+'">'+esc(shortName)+'</div>'
-      +'<div class="tl-track"><div class="tl-bar '+colorCls+'" style="left:'+left+'%;width:'+width+'%;cursor:pointer" title="'+esc(durStr)+'" onclick="scrollToCard(\''+esc(taskID)+'\')"><span>'+esc(durStr)+'</span></div></div>'
+      +'<div class="tl-label" title="'+esc(execID)+'">'+esc(shortName)+'</div>'
+      +'<div class="tl-track"><div class="tl-bar '+colorCls+'" style="left:'+left+'%;width:'+width+'%;cursor:pointer" title="'+esc(durStr)+'" onclick="scrollToCard(\''+esc(execID)+'\')"><span>'+esc(durStr)+'</span></div></div>'
       +'</div>';
   });
   html+='</div></div>';
 
   // Task sections
   data.tasks.forEach((task,i)=>{
-    const shortName=task.task_id===data.root_task_id?'root':task.task_id.slice(data.root_task_id.length+1);
+    const shortName=task.exec_id===data.root_exec_id?'root':task.exec_id.slice(data.root_exec_id.length+1);
     const lastState=getLastState(task.events);
     const stateClass=lastState?lastState.toLowerCase().replace('state_',''):'';
     const stateBadge=lastState?'<span class="state-badge '+esc(stateClass)+'">'+esc(lastState.replace('STATE_',''))+'</span>':'';
 
-    html+='<div class="task-card" id="card-'+esc(task.task_id)+'">'
+    html+='<div class="task-card" id="card-'+esc(task.exec_id)+'">'
       +'<div class="task-card-hdr collapsed" onclick="toggleCard(this)">'
       +'<span class="expand-ico">▼</span>'
       +'<span class="task-name">'+esc(shortName)+'</span>'
@@ -313,8 +313,8 @@ function renderTrace(data){
   document.getElementById('main').innerHTML=html;
 }
 
-function scrollToCard(taskID){
-  const el=document.getElementById('card-'+taskID);
+function scrollToCard(execID){
+  const el=document.getElementById('card-'+execID);
   if(!el)return;
   const hdr=el.querySelector('.task-card-hdr');
   const body=el.querySelector('.task-card-body');

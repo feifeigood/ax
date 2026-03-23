@@ -95,7 +95,7 @@ func main() {
 
 	log.Printf("ID: %s\n", execID)
 
-	handler := agent.OutputHandler(func(outgoing *proto.ProcessResponse) error {
+	handler := agent.OutputHandler(func(outgoing *proto.AgentOutputs) error {
 		for _, c := range outgoing.Contents {
 			if textContent := c.GetText(); textContent != nil {
 				fmt.Printf("Output received: %s\n", textContent.Text)
@@ -104,28 +104,42 @@ func main() {
 		return nil
 	})
 
-	req := &proto.ProcessRequest{
-		Contents: inputs,
+	req := &proto.AgentMessage{
+		ExecId: execID,
+		Msg: &proto.AgentMessage_Start{
+			Start: &proto.AgentStart{
+				AgentId:  "planner",
+				Contents: inputs,
+			},
+		},
 	}
 
 	for i := 0; i < 4; i++ {
 		log.Printf("\n--- Executing step %d ---\n", i+1)
-		if err := c.Exec(ctx, execID, "", nil, req, handler); err != nil {
+		if err := c.Exec(ctx, req, handler); err != nil {
 			log.Fatalf("Error executing step %d: %v\n", i+1, err)
 		}
 		// Subsequent execs just ask the planner to continue processing the existing history
-		req = &proto.ProcessRequest{}
+		req = &proto.AgentMessage{
+			ExecId: execID,
+			Msg: &proto.AgentMessage_Start{
+				Start: &proto.AgentStart{
+					AgentId:  "planner",
+					Contents: inputs,
+				},
+			},
+		}
 	}
 }
 
 func createLocalAgent() (*agent.LocalAgent, error) {
-	processFunc := func(ctx context.Context, t *agent.Task, e agent.TaskExecutor, handler agent.OutputHandler) error {
-		for _, content := range t.Inputs {
+	processFunc := func(ctx context.Context, execID string, start *proto.AgentStart, e agent.Executor, handler agent.OutputHandler) error {
+		for _, content := range start.Contents {
 			textContent := content.GetText()
 			if textContent == nil {
 				continue
 			}
-			if err := handler(&proto.ProcessResponse{
+			if err := handler(&proto.AgentOutputs{
 				Contents: []*proto.Content{
 					{
 						Role: "assistant",
@@ -155,9 +169,9 @@ func (m *mockPlanner) ID() string                            { return "__planner
 func (m *mockPlanner) Name() string                          { return "Mock Planner" }
 func (m *mockPlanner) HealthCheck(ctx context.Context) error { return nil }
 func (m *mockPlanner) Close() error                          { return nil }
-func (m *mockPlanner) Process(ctx context.Context, t *agent.Task, e agent.TaskExecutor, handler agent.OutputHandler) error {
+func (m *mockPlanner) Connect(ctx context.Context, execID string, start *proto.AgentStart, e agent.Executor, handler agent.OutputHandler) error {
 	var lastText string
-	for _, c := range t.Inputs {
+	for _, c := range start.Contents {
 		if textMsg := c.GetText(); textMsg != nil {
 			lastText = textMsg.Text
 		}
@@ -165,52 +179,49 @@ func (m *mockPlanner) Process(ctx context.Context, t *agent.Task, e agent.TaskEx
 
 	// Step 1: User -> Local
 	if strings.HasPrefix(lastText, "Send the word") {
-		inputs := append(t.Inputs, &proto.Content{
+		inputs := append(start.Contents, &proto.Content{
 			Role: "assistant",
 			Content: &proto.Content_Text{
 				Text: &proto.TextContent{Text: "oRanGe"},
 			},
 		})
-		return e.Exec(ctx, &agent.Task{
-			ID:      "local-echo",
-			AgentID: "local-echo-agent",
-			Inputs:  inputs,
+		return e.Exec(ctx, "local-echo", &proto.AgentStart{
+			AgentId:  "local-echo-agent",
+			Contents: inputs,
 		}, handler)
 	}
 
 	// Step 2: Local -> Remote
 	if lastText == "orange" {
-		inputs := append(t.Inputs, &proto.Content{
+		inputs := append(start.Contents, &proto.Content{
 			Role: "assistant",
 			Content: &proto.Content_Text{
 				Text: &proto.TextContent{Text: lastText},
 			},
 		})
-		return e.Exec(ctx, &agent.Task{
-			ID:      "remote-text",
-			AgentID: "remote-text-processor",
-			Inputs:  inputs,
+		return e.Exec(ctx, "remote-text", &proto.AgentStart{
+			AgentId:  "remote-text-processor",
+			Contents: inputs,
 		}, handler)
 	}
 
 	// Step 3: Remote -> Sandbox
 	if strings.HasPrefix(lastText, "Remote Prefix:") {
-		inputs := append(t.Inputs, &proto.Content{
+		inputs := append(start.Contents, &proto.Content{
 			Role: "assistant",
 			Content: &proto.Content_Text{
 				Text: &proto.TextContent{Text: lastText},
 			},
 		})
-		return e.Exec(ctx, &agent.Task{
-			ID:      "uppercase-task",
-			AgentID: "uppercase",
-			Inputs:  inputs,
+		return e.Exec(ctx, "uppercase-task", &proto.AgentStart{
+			AgentId:  "uppercase",
+			Contents: inputs,
 		}, handler)
 	}
 
 	// Final step: Sandbox -> Done
 	if strings.Contains(lastText, "UPPERCASE") {
-		return handler(&proto.ProcessResponse{
+		return handler(&proto.AgentOutputs{
 			Contents: []*proto.Content{{
 				Role: "assistant",
 				Content: &proto.Content_Text{

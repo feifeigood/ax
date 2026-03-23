@@ -73,7 +73,6 @@ Guidelines:
 	}
 
 	// TODO(jbd): Enable skills tool.
-
 	return &geminiPlannerAgent{
 		client:   client,
 		bashTool: &BashTool{},
@@ -82,24 +81,22 @@ Guidelines:
 	}, nil
 }
 
-func (p *geminiPlannerAgent) Process(ctx context.Context, t *agent.Task, e agent.TaskExecutor, handler agent.OutputHandler) error {
+func (p *geminiPlannerAgent) Connect(ctx context.Context, execID string, start *proto.AgentStart, e agent.Executor, handler agent.OutputHandler) error {
 	var outputs []*proto.Content
-	var outputCapturer = func(resp *proto.ProcessResponse) error {
+	var outputCapturer = func(resp *proto.AgentOutputs) error {
 		outputs = append(outputs, resp.Contents...)
 		return handler(resp)
 	}
-
-	nextAgentID, err := p.process(ctx, t, outputCapturer)
+	nextAgentID, err := p.process(ctx, start, outputCapturer)
 	if err != nil {
 		return err
 	}
 	if nextAgentID == "" {
 		return nil
 	}
-	if err := e.Exec(ctx, &agent.Task{
-		ID:      nextAgentID,
-		AgentID: nextAgentID,
-		Inputs:  append(t.Inputs, outputs...),
+	if err := e.Exec(ctx, nextAgentID, &proto.AgentStart{
+		AgentId:  nextAgentID,
+		Contents: append(start.Contents, outputs...),
 	}, handler); err != nil {
 		return err
 	}
@@ -114,13 +111,13 @@ func (p *geminiPlannerAgent) Close() error {
 	return nil
 }
 
-func (p *geminiPlannerAgent) process(ctx context.Context, t *agent.Task, handler agent.OutputHandler) (agentID string, err error) {
+func (p *geminiPlannerAgent) process(ctx context.Context, start *proto.AgentStart, handler agent.OutputHandler) (agentID string, err error) {
 	tools, err := agentsToTools(p.registry, p.bashTool, p.skillsTool)
 	if err != nil {
 		return "", fmt.Errorf("failed to convert agents to tools: %w", err)
 	}
 
-	inputs := t.Inputs
+	inputs := start.Contents
 	if fc, approved := p.handleConfirmationAnswer(inputs); fc != nil {
 		if p.bashTool.Name() == fc.Name {
 			return "", p.bashTool.HandleExecute(ctx, fc, approved, handler)
@@ -164,7 +161,7 @@ func (p *geminiPlannerAgent) process(ctx context.Context, t *agent.Task, handler
 		}
 
 		if part.Text != "" {
-			if err := handler(&proto.ProcessResponse{
+			if err := handler(&proto.AgentOutputs{
 				Contents: []*proto.Content{{
 					Role: "assistant",
 					Content: &proto.Content_Text{

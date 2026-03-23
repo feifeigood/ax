@@ -218,7 +218,7 @@ func runExecHeadless(ctx context.Context, d *internal.Display, id string, agentI
 	var checkpoint string
 	var outputs []*proto.Content
 	var confirmation *proto.ConfirmationContent
-	outputHandler := agent.OutputHandler(func(resp *proto.ProcessResponse) error {
+	outputHandler := agent.OutputHandler(func(resp *proto.AgentOutputs) error {
 		if resp.CheckpointId != "" {
 			checkpoint = resp.CheckpointId
 		}
@@ -232,8 +232,14 @@ func runExecHeadless(ctx context.Context, d *internal.Display, id string, agentI
 		displayContents(d, resp.Contents)
 		return nil
 	})
-	if err := execController.Exec(ctx, id, agentID, nil, &proto.ProcessRequest{
-		Contents: inputs,
+	if err := execController.Exec(ctx, &proto.AgentMessage{
+		ExecId: id,
+		Msg: &proto.AgentMessage_Start{
+			Start: &proto.AgentStart{
+				AgentId:  agentID,
+				Contents: inputs,
+			},
+		},
 	}, outputHandler); err != nil {
 		return nil, nil, fmt.Errorf("error executing with local server: %w", err)
 	}

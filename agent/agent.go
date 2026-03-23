@@ -20,31 +20,23 @@ import (
 	"context"
 
 	"github.com/google/ax/proto"
-	"google.golang.org/protobuf/types/known/anypb"
 )
 
 // OutputHandler is a callback function that handles output content from an agent.
 // It is called for each piece of content the agent generates.
-type OutputHandler func(outgoing *proto.ProcessResponse) error
+type OutputHandler func(outgoing *proto.AgentOutputs) error
 
-type Task struct {
-	ID      string
-	AgentID string
-	Inputs  []*proto.Content
-	Config  *anypb.Any // agent implementation specific configuration
-}
-
-type TaskExecutor interface {
-	Exec(ctx context.Context, t *Task, o OutputHandler) error
+type Executor interface {
+	Exec(ctx context.Context, execID string, start *proto.AgentStart, o OutputHandler) error
 }
 
 // Agent defines the common interface for both local and remote agents.
 // Agents process content using callback handlers.
 type Agent interface {
-	// Process handles processing of input content.
+	// Connect handles processing of input content.
 	// It calls the output handler for each piece of content generated.
 	// The handler may be called multiple times during processing.
-	Process(ctx context.Context, t *Task, e TaskExecutor, o OutputHandler) error
+	Connect(ctx context.Context, execID string, start *proto.AgentStart, e Executor, o OutputHandler) error
 
 	// HealthCheck checks if the agent is healthy and responsive.
 	// Returns an error if the agent is unhealthy or unreachable.

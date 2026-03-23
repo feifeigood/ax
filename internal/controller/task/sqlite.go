@@ -44,7 +44,7 @@ func OpenSQLiteEventLog(path string) (*SQLiteEventLog, error) {
 	if _, err := db.Exec(`
 		CREATE TABLE IF NOT EXISTS event_log (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			task_id TEXT NOT NULL,
+			exec_id TEXT NOT NULL,
 			state INTEGER NOT NULL,
 			payload TEXT NOT NULL,
 			timestamp DATETIME NOT NULL
@@ -54,7 +54,7 @@ func OpenSQLiteEventLog(path string) (*SQLiteEventLog, error) {
 	}
 
 	// Create index if it doesn't exist
-	if _, err := db.Exec(`CREATE INDEX IF NOT EXISTS idx_event_log_task_id ON event_log(task_id)`); err != nil {
+	if _, err := db.Exec(`CREATE INDEX IF NOT EXISTS idx_event_log_exec_id ON event_log(exec_id)`); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("sqlite_eventlog: create index: %w", err)
 	}
@@ -78,8 +78,8 @@ func (l *SQLiteEventLog) Append(ctx context.Context, event *proto.ExecutionEvent
 	}
 
 	_, err = l.db.ExecContext(ctx,
-		"INSERT INTO event_log (task_id, state, payload, timestamp) VALUES (?, ?, ?, ?)",
-		event.TaskId, event.State, string(payload), timestamp)
+		"INSERT INTO event_log (exec_id, state, payload, timestamp) VALUES (?, ?, ?, ?)",
+		event.ExecId, event.State, string(payload), timestamp)
 
 	if err != nil {
 		return fmt.Errorf("sqlite_eventlog: insert: %w", err)
@@ -90,7 +90,7 @@ func (l *SQLiteEventLog) Append(ctx context.Context, event *proto.ExecutionEvent
 
 // Events retrieves all events from the database ordered by insertion order.
 func (l *SQLiteEventLog) Events(ctx context.Context, id string) ([]*proto.ExecutionEvent, error) {
-	rows, err := l.db.QueryContext(ctx, "SELECT payload FROM event_log WHERE task_id = ?", id)
+	rows, err := l.db.QueryContext(ctx, "SELECT payload FROM event_log WHERE exec_id = ?", id)
 	if err != nil {
 		return nil, fmt.Errorf("sqlite_eventlog: query: %w", err)
 	}
@@ -118,9 +118,9 @@ func (l *SQLiteEventLog) Events(ctx context.Context, id string) ([]*proto.Execut
 	return events, nil
 }
 
-// EventsByPrefix retrieves all events from the database matching a task_id prefix, ordered by insertion order.
+// EventsByPrefix retrieves all events from the database matching a exec_id prefix, ordered by insertion order.
 func (l *SQLiteEventLog) EventsByPrefix(ctx context.Context, prefix string) ([]*proto.ExecutionEvent, error) {
-	rows, err := l.db.QueryContext(ctx, "SELECT payload FROM event_log WHERE task_id LIKE ? ORDER BY id", prefix+"%")
+	rows, err := l.db.QueryContext(ctx, "SELECT payload FROM event_log WHERE exec_id LIKE ? ORDER BY id", prefix+"%")
 	if err != nil {
 		return nil, fmt.Errorf("sqlite_eventlog: query: %w", err)
 	}

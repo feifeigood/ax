@@ -29,7 +29,6 @@ import (
 	"github.com/google/ax/proto"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/anypb"
 )
 
 const plannerAgentID = "__planner"
@@ -90,16 +89,16 @@ func New(ctx context.Context, config Config) (*Controller, error) {
 // Exec executes a new agentic loop execution or resumes an existing one.
 // If id is empty, a UUID will be generated.
 // If the execution already exists, it will be resumed with optional new inputs.
-func (d *Controller) Exec(ctx context.Context, id string, agentID string, agentConfig *anypb.Any, incoming *proto.ProcessRequest, handler agent.OutputHandler) error {
-	if id == "" {
+func (d *Controller) Exec(ctx context.Context, incoming *proto.AgentMessage, handler agent.OutputHandler) error {
+	if incoming.ExecId == "" {
 		return fmt.Errorf("id is required")
 	}
 
-	inFlight, cleanup := d.markInFlight(id)
+	inFlight, cleanup := d.markInFlight(incoming.ExecId)
 	defer cleanup()
 
 	if inFlight {
-		return fmt.Errorf("task %q is already in flight", id)
+		return fmt.Errorf("task %q is already in flight", incoming.ExecId)
 	}
 
 	planner, err := d.plannerBuilder(ctx, d.registry)
@@ -118,16 +117,15 @@ func (d *Controller) Exec(ctx context.Context, id string, agentID string, agentC
 		}
 	}
 
-	if agentID == "" {
-		agentID = plannerAgentID
+	start := incoming.GetStart()
+	if start == nil {
+		return fmt.Errorf("no start message")
+	}
+	if start.AgentId == "" {
+		start.AgentId = plannerAgentID
 	}
 	e := task.DefaultExecutor(d.eventLog, registry)
-	return e.Exec(ctx, &agent.Task{
-		ID:      id,
-		AgentID: agentID,
-		Inputs:  incoming.Contents,
-		Config:  agentConfig,
-	}, handler)
+	return e.Exec(ctx, incoming.ExecId, start, handler)
 }
 
 // Fork forks an execution from a source execution.

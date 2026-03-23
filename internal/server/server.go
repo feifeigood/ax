@@ -47,17 +47,22 @@ func New(c *controller.Controller) *Server {
 
 // Exec executes a new agentic task with streaming responses.
 func (s *Server) Exec(req *proto.ExecRequest, stream grpc.ServerStreamingServer[proto.ExecResponse]) error {
-	incoming := &proto.ProcessRequest{
-		Contents: req.Inputs,
-	}
 	// Create output handler to stream outputs back to client
-	outputHandler := agent.OutputHandler(func(outgoing *proto.ProcessResponse) error {
+	outputHandler := agent.OutputHandler(func(outgoing *proto.AgentOutputs) error {
 		return stream.Send(&proto.ExecResponse{
 			Outputs: outgoing.Contents,
 		})
 	})
-	return s.controller.Exec(
-		stream.Context(), req.Id, req.AgentId, req.AgentConfig, incoming, outputHandler)
+	return s.controller.Exec(stream.Context(), &proto.AgentMessage{
+		ExecId: req.Id,
+		Msg: &proto.AgentMessage_Start{
+			Start: &proto.AgentStart{
+				AgentId:  req.AgentId,
+				Config:   req.AgentConfig,
+				Contents: req.Inputs,
+			},
+		},
+	}, outputHandler)
 }
 
 func (s *Server) Fork(ctx context.Context, req *proto.ForkRequest) (*proto.ForkResponse, error) {

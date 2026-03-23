@@ -36,9 +36,9 @@ type server struct {
 	proto.UnimplementedAgentServiceServer
 }
 
-// Process implements bidirectional streaming for content processing.
+// Connect implements bidirectional streaming for agent processing.
 // This RPC is called by the gar controller when a session triggers this agent.
-func (s *server) Process(stream proto.AgentService_ProcessServer) error {
+func (s *server) Connect(stream grpc.BidiStreamingServer[proto.AgentMessage, proto.AgentMessage]) error {
 	for {
 		// Receive input content from gar controller
 		incoming, err := stream.Recv()
@@ -49,8 +49,13 @@ func (s *server) Process(stream proto.AgentService_ProcessServer) error {
 			return err
 		}
 
+		startMsg := incoming.GetStart()
+		if startMsg == nil {
+			continue // optionally wait for start
+		}
+
 		var contents []*proto.Content
-		for _, input := range incoming.Contents {
+		for _, input := range startMsg.Contents {
 			textContent := input.GetText()
 			if textContent == nil {
 				continue
@@ -71,9 +76,14 @@ func (s *server) Process(stream proto.AgentService_ProcessServer) error {
 			},
 		}
 
-		if err := stream.Send(&proto.ProcessResponse{
-			Contents:     []*proto.Content{last},
-			CheckpointId: uuid.New().String(),
+		if err := stream.Send(&proto.AgentMessage{
+			ExecId: incoming.ExecId,
+			Msg: &proto.AgentMessage_Outputs{
+				Outputs: &proto.AgentOutputs{
+					Contents:     []*proto.Content{last},
+					CheckpointId: uuid.New().String(),
+				},
+			},
 		}); err != nil {
 			return err
 		}
