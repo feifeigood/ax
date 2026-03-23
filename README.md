@@ -117,7 +117,7 @@ The server exposes the `AXService` on port `:8494` by default.
 ax exec \
     --server localhost:8494 \
     --id task123 \
-    --input "Hello, can you uppercase what I just said?"
+    --input "HELLO, CAN YOU LOWERCASE WHAT I JUST SAID?"
 ```
 
 ## Usage
