@@ -22,7 +22,7 @@ Built-in consistency and resumability features:
 ```
 ┌────────────────────────┐
 │      [Controller]      │                 ┌──────────────┐
-│  - Task Manager        │--(in process)---| local  agent |
+│  - Executor            │--(in process)---| local  agent |
 │  - Event Log           │                 └──────────────┘
 │  - Registry            │                 ┌──────────────┐
 │  - Local Agents        │--(gRPC stream)--| remote agent |
@@ -477,7 +477,7 @@ ax register \
 
 ax exec \
   --server localhost:8494 \
-  --id task123 \
+  --id exec123 \
   --input "Hello, can you echo what I just said?"
 ```
 
