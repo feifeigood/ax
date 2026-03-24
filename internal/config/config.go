@@ -54,9 +54,13 @@ type ServerConfig struct {
 	Address string `yaml:"address"` // Server address to listen on (e.g., ":8494")
 }
 
+type SQLiteConfig struct {
+	Filename string `yaml:"filename"` // SQLite file for event log storage
+}
+
 // EventLogConfig configures the event log storage.
 type EventLogConfig struct {
-	SQLiteFilename string `yaml:"db_filename"` // SQLite file for event log storage
+	SQLiteConfig SQLiteConfig `yaml:"sqlite"`
 }
 
 // PlannerConfig configures the planner.
@@ -131,8 +135,8 @@ func (c *Config) setDefaults() {
 	}
 
 	// EventLog defaults
-	if c.EventLog.SQLiteFilename == "" {
-		c.EventLog.SQLiteFilename = "eventlog/log.sqlite"
+	if c.EventLog.SQLiteConfig.Filename == "" {
+		c.EventLog.SQLiteConfig.Filename = "eventlog/log.sqlite"
 	}
 
 	// HealthCheck defaults
@@ -146,8 +150,8 @@ func (c *Config) Validate() error {
 	if c.Server.Address == "" {
 		return fmt.Errorf("server.address is required")
 	}
-	if c.EventLog.SQLiteFilename == "" {
-		return fmt.Errorf("eventlog.db_filename is required")
+	if c.EventLog.SQLiteConfig.Filename == "" {
+		return fmt.Errorf("eventlog.sqlite.filename is required")
 	}
 	// Validate health check
 	if c.HealthCheck.Enabled {
