@@ -20,6 +20,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/google/ax/agent"
@@ -92,15 +93,13 @@ func execLoop(ctx context.Context, id string, agentID string, input string) erro
 	d := internal.NewDisplay(id)
 	d.DisplayHeader()
 
-	if input == "" {
-		var err error
-		input, err = d.PromptForInput()
-		if err != nil {
-			return err
-		}
+	input, quit, err := promptUser(d, input)
+	if err != nil {
+		return err
 	}
-
-	d.DisplayInput(input)
+	if quit {
+		return nil
+	}
 	history := []*proto.Content{
 		{
 			Role: "user",
@@ -177,11 +176,13 @@ func execLoop(ctx context.Context, id string, agentID string, input string) erro
 		// for the upcoming executions.
 		history = resetHistory(history)
 
-		input, err = d.PromptForInput()
+		input, quit, err := promptUser(d, "")
 		if err != nil {
 			return err
 		}
-		d.DisplayInput(input)
+		if quit {
+			return nil
+		}
 		history = append(history, &proto.Content{
 			Role: "user",
 			Content: &proto.Content_Text{
@@ -330,4 +331,26 @@ func resetHistory(history []*proto.Content) []*proto.Content {
 		out = append(out, c)
 	}
 	return out
+}
+
+// promptUser loops until the user provides a non-empty input string.
+// It returns:
+//   - string: the valid user input
+//   - bool: true if the user entered a quit command
+//   - error: any error that occurred during prompting
+func promptUser(d *internal.Display, input string) (string, bool, error) {
+	for strings.TrimSpace(input) == "" {
+		var err error
+		input, err = d.PromptForInput()
+		if err != nil {
+			return "", false, err
+		}
+	}
+
+	d.DisplayInput(input)
+	if strings.ToLower(strings.TrimSpace(input)) == "q" {
+		fmt.Println("Goodbye!")
+		return "", true, nil
+	}
+	return input, false, nil
 }

@@ -112,7 +112,7 @@ func (d *Display) PromptForInput() (string, error) {
 	form := huh.NewForm(
 		huh.NewGroup(
 			huh.NewInput().
-				Placeholder("Enter prompt...").
+				Placeholder("Enter prompt... (type `q` to quit)").
 				Value(&userInput),
 		),
 	).WithWidth(boxWidth)
