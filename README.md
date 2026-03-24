@@ -315,9 +315,24 @@ For safety and control, any execution initiated by the bash tool requires explic
 
 AX includes a built-in Gemini agent that can be used to generate text based on a given prompt. The agent is registered as `gemini` and can be triggered as a standalone agent or used from custom agent implementations.
 
-```
+```bash
 ax exec --agent gemini \
   --input "Hello, how are you?"
+```
+
+#### Authentication
+
+The Gemini agent supports authentication using either Google AI Studio or Vertex AI:
+
+```bash
+# AI Studio API key based authentication.
+export GEMINI_API_KEY="your-api-key"
+
+# Vertex AI based authentication, ensure application
+# default credentials are set up, gcloud auth application-default login.
+export GCLOUD_PROJECT="your-project-id"
+export GCLOUD_LOCATION="us-central1"
+export GOOGLE_GENAI_USE_VERTEXAI=True
 ```
 
 ## Building Custom Agents
