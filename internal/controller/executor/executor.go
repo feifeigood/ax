@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package task
+package executor
 
 import (
 	"context"
@@ -25,7 +25,7 @@ import (
 
 type EventLogBuilder func() (EventLog, error)
 
-type taskExecutor struct {
+type defaultExecutor struct {
 	id       string
 	eventLog EventLog
 	registry map[string]agent.Agent
@@ -39,14 +39,14 @@ func newExecID(parent, child string) string {
 }
 
 func DefaultExecutor(eventLog EventLog, registry map[string]agent.Agent) agent.Executor {
-	return &taskExecutor{
+	return &defaultExecutor{
 		id:       "",
 		eventLog: eventLog,
 		registry: registry,
 	}
 }
 
-func (tm *taskExecutor) Exec(ctx context.Context, execID string, start *proto.AgentStart, o agent.OutputHandler) error {
+func (tm *defaultExecutor) Exec(ctx context.Context, execID string, start *proto.AgentStart, o agent.OutputHandler) error {
 	execID = newExecID(tm.id, execID)
 	a, ok := tm.registry[start.AgentId]
 	if !ok {
@@ -64,7 +64,7 @@ func (tm *taskExecutor) Exec(ctx context.Context, execID string, start *proto.Ag
 	return tm.exec(ctx, execID, start, tm.eventLog, a, allInputs, o)
 }
 
-func (tm *taskExecutor) exec(
+func (tm *defaultExecutor) exec(
 	ctx context.Context,
 	execID string,
 	start *proto.AgentStart,
@@ -72,7 +72,7 @@ func (tm *taskExecutor) exec(
 	a agent.Agent,
 	allInputs []*proto.Content,
 	o agent.OutputHandler) error {
-	child := &taskExecutor{
+	child := &defaultExecutor{
 		id:       execID,
 		eventLog: tm.eventLog,
 		registry: tm.registry,

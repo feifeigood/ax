@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/google/ax/internal/config"
-	"github.com/google/ax/internal/controller/task"
+	"github.com/google/ax/internal/controller/executor"
 	"github.com/google/ax/proto"
 	"github.com/spf13/cobra"
 )
@@ -130,7 +130,7 @@ func fetchEventsFromDB(configPath string, rootExecID string) ([]*proto.Execution
 		return nil, fmt.Errorf("error loading config: %w", err)
 	}
 
-	evLog, err := task.OpenSQLiteEventLog(cfg.EventLog.SQLiteConfig.Filename)
+	evLog, err := executor.OpenSQLiteEventLog(cfg.EventLog.SQLiteConfig.Filename)
 	if err != nil {
 		return nil, fmt.Errorf("could not open sqlite eventlog: %w", err)
 	}

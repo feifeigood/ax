@@ -24,7 +24,7 @@ import (
 
 	"github.com/google/ax/internal/agent"
 	"github.com/google/ax/internal/config"
-	"github.com/google/ax/internal/controller/task"
+	"github.com/google/ax/internal/controller/executor"
 	"github.com/google/ax/internal/testagent"
 	"github.com/google/ax/proto"
 	"google.golang.org/grpc/codes"
@@ -39,7 +39,7 @@ type Controller struct {
 	inFlightExecutionsMu sync.Mutex
 	inFlightExecutions   map[string]struct{}
 	registry             *Registry
-	eventLog             task.EventLog
+	eventLog             executor.EventLog
 	plannerBuilder       PlannerBuilder
 }
 
@@ -48,7 +48,7 @@ type PlannerBuilder func(ctx context.Context, r *Registry) (agent.Agent, error)
 
 // Config configures the controller.
 type Config struct {
-	EventLogBuilder task.EventLogBuilder
+	EventLogBuilder executor.EventLogBuilder
 	PlannerBuilder  PlannerBuilder
 	// TODO(jbd): Add CompacterBuilder.
 	HealthCheck config.HealthCheckConfig
@@ -98,7 +98,7 @@ func (d *Controller) Exec(ctx context.Context, incoming *proto.AgentMessage, han
 	defer cleanup()
 
 	if inFlight {
-		return fmt.Errorf("task %q is already in flight", incoming.ExecId)
+		return fmt.Errorf("execution %q is already in flight", incoming.ExecId)
 	}
 
 	planner, err := d.plannerBuilder(ctx, d.registry)
@@ -124,7 +124,7 @@ func (d *Controller) Exec(ctx context.Context, incoming *proto.AgentMessage, han
 	if start.AgentId == "" {
 		start.AgentId = plannerAgentID
 	}
-	e := task.DefaultExecutor(d.eventLog, registry)
+	e := executor.DefaultExecutor(d.eventLog, registry)
 	return e.Exec(ctx, incoming.ExecId, start, handler)
 }
 

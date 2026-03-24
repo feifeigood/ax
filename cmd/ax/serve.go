@@ -26,7 +26,7 @@ import (
 	"github.com/google/ax/internal/agent"
 	"github.com/google/ax/internal/config"
 	"github.com/google/ax/internal/controller"
-	"github.com/google/ax/internal/controller/task"
+	"github.com/google/ax/internal/controller/executor"
 	"github.com/google/ax/internal/server"
 	"github.com/google/ax/proto"
 	"github.com/spf13/cobra"
@@ -92,8 +92,8 @@ func runServe(cmd *cobra.Command, args []string) error {
 
 func newControllerFromConfig(ctx context.Context, cfg *config.Config) (*controller.Controller, error) {
 	// Create event log builder
-	eventLogBuilder := func() (task.EventLog, error) {
-		return task.OpenSQLiteEventLog(cfg.EventLog.SQLiteConfig.Filename)
+	eventLogBuilder := func() (executor.EventLog, error) {
+		return executor.OpenSQLiteEventLog(cfg.EventLog.SQLiteConfig.Filename)
 	}
 
 	// Create planner builder
