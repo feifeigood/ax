@@ -18,6 +18,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/google/ax/proto"
@@ -34,6 +36,11 @@ const sqliteBusyTimeout = 10 * time.Second
 
 // OpenSQLiteEventLog opens (or creates) a SQLite database at path and initializes the event log schema.
 func OpenSQLiteEventLog(path string) (*SQLiteEventLog, error) {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return nil, fmt.Errorf("sqlite_eventlog: mkdir %s: %w", dir, err)
+	}
+
 	dsn := fmt.Sprintf("%s?_pragma=busy_timeout(%d)", path, sqliteBusyTimeout.Milliseconds())
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {

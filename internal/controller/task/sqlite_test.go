@@ -16,6 +16,7 @@ package task
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -136,5 +137,26 @@ func TestSQLiteEventLog_Empty(t *testing.T) {
 
 	if len(events) != 0 {
 		t.Fatalf("expected 0 events, got %d", len(events))
+	}
+}
+
+func TestSQLiteEventLog_CreatesParentDirectory(t *testing.T) {
+	// Create a path with a non-existent parent directory
+	dbPath := filepath.Join(t.TempDir(), "newdir", "test.db")
+
+	log, err := OpenSQLiteEventLog(dbPath)
+	if err != nil {
+		t.Fatalf("failed to open sqlite event log and create directory: %v", err)
+	}
+	defer log.Close()
+
+	// Verify that the parent directory actually exists
+	if _, err := os.Stat(filepath.Dir(dbPath)); os.IsNotExist(err) {
+		t.Fatalf("expected parent directory to be created, but it does not exist")
+	}
+
+	// Verify that the database file was created
+	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
+		t.Fatalf("expected database file to be created, but it does not exist")
 	}
 }
