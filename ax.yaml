@@ -20,7 +20,8 @@ server:
 # Event log configuration
 eventlog:
   # SQLite file for event log storage
-  db_filename: "eventlog/log.sqlite"
+  sqlite:
+    filename: "eventlog/log.sqlite"
 
 health_check:
   # Whether to enable active health checking

@@ -93,7 +93,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 func newControllerFromConfig(ctx context.Context, cfg *config.Config) (*controller.Controller, error) {
 	// Create event log builder
 	eventLogBuilder := func() (task.EventLog, error) {
-		return task.OpenSQLiteEventLog(cfg.EventLog.SQLiteFilename)
+		return task.OpenSQLiteEventLog(cfg.EventLog.SQLiteConfig.Filename)
 	}
 
 	// Create planner builder

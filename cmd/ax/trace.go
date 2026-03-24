@@ -130,7 +130,7 @@ func fetchEventsFromDB(configPath string, rootExecID string) ([]*proto.Execution
 		return nil, fmt.Errorf("error loading config: %w", err)
 	}
 
-	evLog, err := task.OpenSQLiteEventLog(cfg.EventLog.SQLiteFilename)
+	evLog, err := task.OpenSQLiteEventLog(cfg.EventLog.SQLiteConfig.Filename)
 	if err != nil {
 		return nil, fmt.Errorf("could not open sqlite eventlog: %w", err)
 	}

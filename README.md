@@ -252,7 +252,8 @@ server:
   address: ":8494"
 
 eventlog:
-  db_filename: "eventlog/log.sqlite"
+  sqlite:
+    filename: "eventlog/log.sqlite"
 
 health_check:
   enabled: true
@@ -261,10 +262,7 @@ health_check:
 planner:
   gemini:
     model: "gemini-3-flash-preview"
-    temperature: 0.7
-    max_tokens: 8192
-    timeout: 60s
-    system_prompt: "..."
+    timeout: "60s"
     skills_dir: "./examples/skills"
 
 registry:
@@ -284,7 +282,6 @@ registry:
       use_router: true
       metadata:
        version: "1.0"
-
 ```
 
 Example:
