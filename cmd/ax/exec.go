@@ -38,6 +38,7 @@ var (
 	execInput      string
 	execServerAddr string
 	execConfigFile string
+	execResume     bool // allow resuming an execution without inputs
 )
 
 var execCmd = &cobra.Command{
@@ -54,6 +55,8 @@ func init() {
 	execCmd.Flags().StringVar(&execInput, "input", "", "Input message to send (optional)")
 	execCmd.Flags().StringVar(&execServerAddr, "server", "", "gRPC controller server address (if specified, connects to remote server; otherwise runs with a local built-in AX server)")
 	execCmd.Flags().StringVar(&execConfigFile, "config", "ax.yaml", "Path to YAML configuration file (only used with a local built-in AX server)")
+	execCmd.Flags().BoolVar(&execResume, "resume", false, "Resume an execution without inputs")
+	execCmd.MarkFlagsMutuallyExclusive("input", "resume")
 }
 
 // TODO(jbd): Add multimodal input flags, e.g. --input-image.
@@ -93,22 +96,25 @@ func execLoop(ctx context.Context, id string, agentID string, input string) erro
 	d := internal.NewDisplay(id)
 	d.DisplayHeader()
 
-	input, quit, err := promptUser(d, input)
-	if err != nil {
-		return err
-	}
-	if quit {
-		return nil
-	}
-	history := []*proto.Content{
-		{
-			Role: "user",
-			Content: &proto.Content_Text{
-				Text: &proto.TextContent{
-					Text: input,
+	var history []*proto.Content
+	if !execResume {
+		input, quit, err := promptUser(d, input)
+		if err != nil {
+			return err
+		}
+		if quit {
+			return nil
+		}
+		history = []*proto.Content{
+			{
+				Role: "user",
+				Content: &proto.Content_Text{
+					Text: &proto.TextContent{
+						Text: input,
+					},
 				},
 			},
-		},
+		}
 	}
 
 	for {

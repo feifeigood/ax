@@ -84,6 +84,11 @@ Instead of running the default planner agent, you can run any registered agent:
 ax exec --agent coding --input "Can you write me a simple HTTP server in Python?"
 ```
 
+You can resume an incomplete execution:
+```bash
+ax exec --resume --agent "coding" --id "edf98ef5-4bb1-4a9e-a091-3a77e03727e6"
+```
+
 ### 2. Run exec with Custom Agents
 
 Most developers want to build their own agents. AX allows running custom agents as remote
