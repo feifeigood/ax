@@ -152,7 +152,6 @@ message ExecRequest {
 // ExecResponse contains the result of an execution.
 message ExecResponse {
   repeated Content outputs = 1; // Output content
-  State state = 2;              // Execution state
 }
 
 message ForkRequest {
