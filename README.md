@@ -306,9 +306,7 @@ Event logs use the `ExecutionEvent` message available in the protobuf.
 
 ### Skills
 
-AX includes built-in support for the agentskills.io discovery and execution protocol.
-
-The planner automatically discovers skills from `~/.agents/skills` by default (or a custom directory specified in `ax.yaml`). These skills are provided to the planner as tools, allowing it to seamlessly read skill instructions and execute their scripts.
+AX includes built-in support for Agent Skills. See [Skills](docs/skills.md) for more.
 
 ### Bash Tool
 
