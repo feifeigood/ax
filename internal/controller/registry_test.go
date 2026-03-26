@@ -211,7 +211,7 @@ func TestRegistry_GracefulShutdown(t *testing.T) {
 	}
 
 	// Register multiple agents to create workload
-	for i := 0; i < 50; i++ {
+	for i := range 50 {
 		_ = r.RegisterRemote(config.RemoteAgentConfig{
 			ID:      "remote-shutdown-test-" + string(rune(i)),
 			Name:    "Shutdown Test Remote",

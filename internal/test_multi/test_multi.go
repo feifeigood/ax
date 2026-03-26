@@ -116,7 +116,7 @@ func main() {
 		},
 	}
 
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		log.Printf("\n--- Executing step %d ---\n", i+1)
 		if err := c.Exec(ctx, req, handler); err != nil {
 			log.Fatalf("Error executing step %d: %v\n", i+1, err)

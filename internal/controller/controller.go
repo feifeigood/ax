@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"maps"
 	"os"
 	"sync"
 
@@ -112,9 +113,7 @@ func (d *Controller) Exec(ctx context.Context, incoming *proto.AgentMessage, han
 	// For testing only! Remove this once the project is stable.
 	// TODO(jbd): Remove this before the release.
 	if os.Getenv("AX_TEST_AGENTS") == "1" {
-		for id, agent := range testagent.Agents() {
-			registry[id] = agent
-		}
+		maps.Copy(registry, testagent.Agents())
 	}
 
 	start := incoming.GetStart()

@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// The sandbox-router is a reverse proxy for routing requests
+// to sandbox agents.
+// It reads routing information from HTTP headers and forwards requests
+// to the corresponding sandbox service within a Kubernetes cluster.
 package main
 
 import (

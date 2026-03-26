@@ -91,11 +91,11 @@ func TestSQLiteEventLog_ConcurrentAppend(t *testing.T) {
 	numRoutines := 10
 	numEvents := 100
 
-	for i := 0; i < numRoutines; i++ {
+	for i := range numRoutines {
 		wg.Add(1)
 		go func(agentIdx int) {
 			defer wg.Done()
-			for j := 0; j < numEvents; j++ {
+			for range numEvents {
 				ev := &proto.ExecutionEvent{
 					ExecId:    "task-concurrent",
 					State:     proto.State(agentIdx % 4), // distribute states 0-3

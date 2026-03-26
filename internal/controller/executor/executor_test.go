@@ -154,7 +154,7 @@ func TestFanout(t *testing.T) {
 	registry := map[string]agent.Agent{
 		"root": AgentFunc(func(inputs []*proto.Message, tm agent.Executor, o agent.OutputHandler) {
 			var g errgroup.Group
-			for i := 0; i < 50; i++ {
+			for i := range 50 {
 				i := i // Capture loop variable.
 				g.Go(func() error {
 					return tm.Exec(ctx, fmt.Sprintf("child-%d", i), &proto.AgentStart{
@@ -177,7 +177,7 @@ func TestFanout(t *testing.T) {
 			time.Sleep(100 * time.Millisecond)
 
 			var g errgroup.Group
-			for i := 0; i < 2; i++ {
+			for i := range 2 {
 				i := i // Capture loop variable.
 				g.Go(func() error {
 					return tm.Exec(ctx, fmt.Sprintf("child2-%d", i), &proto.AgentStart{

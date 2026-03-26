@@ -78,15 +78,15 @@ func NewClient(namespace string) (*Client, error) {
 // CreateClaim provisions an ephemeral sandbox execution environment.
 func (c *Client) CreateClaim(ctx context.Context, claimName, templateRef string) error {
 	claim := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "extensions.agents.x-k8s.io/v1alpha1",
 			"kind":       "SandboxClaim",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name":      claimName,
 				"namespace": c.namespace,
 			},
-			"spec": map[string]interface{}{
-				"sandboxTemplateRef": map[string]interface{}{
+			"spec": map[string]any{
+				"sandboxTemplateRef": map[string]any{
 					"name": templateRef,
 				},
 			},
@@ -104,7 +104,7 @@ func (c *Client) DeleteClaim(ctx context.Context, claimName string) error {
 
 // WaitForSandbox waits for the Sandbox resource to be ready and returns the pod selector.
 func (c *Client) WaitForSandbox(ctx context.Context, claimName string) (selector string, err error) {
-	for i := 0; i < 300; i++ {
+	for range 300 {
 		select {
 		case <-ctx.Done():
 			return "", ctx.Err()
