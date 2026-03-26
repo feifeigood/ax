@@ -50,7 +50,7 @@ func init() {
 }
 
 func runServe(cmd *cobra.Command, args []string) error {
-	ctx := context.Background()
+	ctx := cmd.Context()
 
 	// Load configuration from YAML file
 	cfg, err := config.LoadFromFile(serveConfigFile)

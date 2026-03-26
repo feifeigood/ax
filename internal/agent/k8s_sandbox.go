@@ -83,7 +83,7 @@ func (a *KubernetesSandboxAgent) HealthCheck(ctx context.Context) error {
 }
 
 func (a *KubernetesSandboxAgent) Connect(ctx context.Context, execID string, start *proto.AgentStart, e Executor, o OutputHandler) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	// Use the id deterministically so interactive executions reuse the same sandbox pod,

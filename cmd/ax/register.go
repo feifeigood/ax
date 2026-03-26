@@ -15,7 +15,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/google/ax/proto"
@@ -50,7 +49,7 @@ func init() {
 }
 
 func runRegister(cmd *cobra.Command, args []string) error {
-	ctx := context.Background()
+	ctx := cmd.Context()
 	conn, err := connect(registerServerAddr)
 	if err != nil {
 		return err

@@ -140,7 +140,7 @@ func (c *Client) WaitForSandboxReady(ctx context.Context, claimName string) erro
 // PortForward establishes a local connection to the remote sandbox pod over the given port.
 // It returns a cleanup function the caller MUST execute when finished, closing the port-forward pipeline.
 func (c *Client) PortForward(ctx context.Context, claimName, selector string, localPort, targetPort int) (cancelFunc func(), err error) {
-	pfCtx, pfCancel := context.WithCancel(context.Background())
+	pfCtx, pfCancel := context.WithCancel(ctx)
 
 	// Wait for Sandbox to be ready first
 	waitCmd := exec.CommandContext(pfCtx, "kubectl", "wait", "--for=condition=Ready", "--namespace", c.namespace, "sandbox.agents.x-k8s.io/"+claimName, "--timeout=120s")
@@ -179,7 +179,7 @@ func (c *Client) PortForward(ctx context.Context, claimName, selector string, lo
 // PortForwardRouter establishes a local connection to the Sandbox Router service.
 // It returns a cleanup function the caller MUST execute when finished.
 func (c *Client) PortForwardRouter(ctx context.Context, localPort, targetPort int) (cancelFunc func(), err error) {
-	pfCtx, pfCancel := context.WithCancel(context.Background())
+	pfCtx, pfCancel := context.WithCancel(ctx)
 
 	// Wait for Router service to be ready
 	waitCmd := exec.CommandContext(pfCtx, "kubectl", "wait", "--for=condition=Ready", "--namespace", c.namespace, "pod", "-l", "app=sandbox-router", "--timeout=120s")

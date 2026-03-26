@@ -48,7 +48,7 @@ func init() {
 }
 
 func runFork(cmd *cobra.Command, args []string) error {
-	ctx := context.Background()
+	ctx := cmd.Context()
 
 	// Generate UUID if no destination ID provided
 	if forkDestID == "" {

@@ -66,7 +66,7 @@ var (
 )
 
 func runExec(cmd *cobra.Command, args []string) error {
-	ctx := context.Background()
+	ctx := cmd.Context()
 
 	// Generate UUID if no ID provided
 	if execID == "" {

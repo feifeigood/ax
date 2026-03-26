@@ -89,7 +89,7 @@ func init() {
 
 func runTrace(cmd *cobra.Command, args []string) error {
 	// Load trace data
-	data, err := loadTraceData(traceID)
+	data, err := loadTraceData(cmd.Context(), traceID)
 	if err != nil {
 		return fmt.Errorf("error loading trace data: %w", err)
 	}
@@ -107,11 +107,11 @@ func runTrace(cmd *cobra.Command, args []string) error {
 	return serveTraceUI(listener, data, indexHTML)
 }
 
-func loadTraceData(rootExecID string) (*TraceData, error) {
+func loadTraceData(ctx context.Context, rootExecID string) (*TraceData, error) {
 	// The trace command uses the config provided by --config flag
 	configPath := traceConfigFile
 
-	events, err := fetchEventsFromDB(configPath, rootExecID)
+	events, err := fetchEventsFromDB(ctx, configPath, rootExecID)
 	if err != nil {
 		return nil, err
 	}
@@ -124,7 +124,7 @@ func loadTraceData(rootExecID string) (*TraceData, error) {
 	return data, nil
 }
 
-func fetchEventsFromDB(configPath string, rootExecID string) ([]*proto.ExecutionEvent, error) {
+func fetchEventsFromDB(ctx context.Context, configPath string, rootExecID string) ([]*proto.ExecutionEvent, error) {
 	cfg, err := config.LoadFromFile(configPath)
 	if err != nil {
 		return nil, fmt.Errorf("error loading config: %w", err)
@@ -136,7 +136,6 @@ func fetchEventsFromDB(configPath string, rootExecID string) ([]*proto.Execution
 	}
 	defer evLog.Close()
 
-	ctx := context.Background()
 	events, err := evLog.EventsByPrefix(ctx, rootExecID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query trace events: %w", err)
