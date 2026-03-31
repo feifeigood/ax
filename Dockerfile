@@ -37,7 +37,7 @@ RUN go mod download
 COPY . .
 
 # Build the uppercase agent
-RUN go build -o /app/bin/uppercase ./examples/sandbox_agent
+RUN go build -o /app/bin/uppercase ./examples/k8s_sandbox_agent
 
 # Runtime stage
 # TODO: consider other options instead of Alpine
