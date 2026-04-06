@@ -148,7 +148,7 @@ func (p *geminiPlannerAgent) loop(ctx context.Context, start *proto.AgentStart, 
 			Messages: append(start.Messages, outputs...),
 		}
 		outputs = nil
-		if err := e.Exec(ctx, nextAgentID, start, handler); err != nil {
+		if _, err := e.Exec(ctx, nextAgentID, start, handler); err != nil {
 			return err
 		}
 	}
@@ -350,14 +350,7 @@ func protoToContents(inputs []*proto.Message) []*genai.Content {
 				},
 			})
 		case *proto.Content_Confirmation:
-			if m.Confirmation.Question != "" {
-				contents = append(contents, &genai.Content{
-					Role: "model",
-					Parts: []*genai.Part{
-						{Text: m.Confirmation.Question},
-					},
-				})
-			}
+			// shouldn't be sent to Gemini
 			switch m.Confirmation.Decision.(type) {
 			case *proto.ConfirmationContent_Decline:
 				// shouldn't be sent to Gemini

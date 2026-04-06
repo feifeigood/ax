@@ -33,29 +33,29 @@ import (
 )
 
 var (
-	execID         string
-	execAgentID    string
-	execInput      string
-	execServerAddr string
-	execConfigFile string
-	execResume     bool // allow resuming an execution without inputs
+	execConversationID string
+	execAgentID        string
+	execInput          string
+	execServerAddr     string
+	execConfigFile     string
+	execResume         bool // allow resuming an execution without inputs
 )
 
 var execCmd = &cobra.Command{
 	Use:   "exec",
-	Short: "Execute a task or resume an existing one",
-	Long: `Execute a new agentic task or resume an existing one.
-If no ID is provided, a new UUID will be generated.`,
+	Short: "Execute a conversation or resume an existing one",
+	Long: `Execute a new conversation or resume an existing one.
+If no conversation ID is provided, a new UUID will be generated.`,
 	RunE: runExec,
 }
 
 func init() {
-	execCmd.Flags().StringVar(&execID, "id", "", "ID (optional, generates UUID if not provided)")
+	execCmd.Flags().StringVar(&execConversationID, "conversation", uuid.NewString(), "Conversation ID (optional, generates UUID if not provided)")
 	execCmd.Flags().StringVar(&execAgentID, "agent", "", "Agent ID (optional, planner is used if not specified)")
 	execCmd.Flags().StringVar(&execInput, "input", "", "Input message to send (optional)")
 	execCmd.Flags().StringVar(&execServerAddr, "server", "", "gRPC controller server address (if specified, connects to remote server; otherwise runs with a local built-in AX server)")
 	execCmd.Flags().StringVar(&execConfigFile, "config", "ax.yaml", "Path to YAML configuration file (only used with a local built-in AX server)")
-	execCmd.Flags().BoolVar(&execResume, "resume", false, "Resume an execution without inputs")
+	execCmd.Flags().BoolVar(&execResume, "resume", false, "Resume a conversation without inputs")
 	execCmd.MarkFlagsMutuallyExclusive("input", "resume")
 }
 
@@ -67,11 +67,6 @@ var (
 
 func runExec(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
-
-	// Generate UUID if no ID provided
-	if execID == "" {
-		execID = uuid.New().String()
-	}
 
 	// Setup signal handling for graceful shutdown
 	ctx, cancel := context.WithCancel(ctx)
@@ -89,23 +84,25 @@ func runExec(cmd *cobra.Command, args []string) error {
 		cancel()
 	}()
 
-	return execLoop(ctx, execID, execAgentID, execInput)
+	return execLoop(ctx, execConversationID, execAgentID, execInput)
 }
 
 func execLoop(ctx context.Context, id string, agentID string, input string) error {
 	d := internal.NewDisplay(id)
 	d.DisplayHeader()
 
-	var history []*proto.Message
+	var inputs []*proto.Message
 	if !execResume {
-		input, quit, err := promptUser(d, input)
+		var quit bool
+		var err error
+		input, quit, err = promptUser(d, input)
 		if err != nil {
 			return err
 		}
 		if quit {
 			return nil
 		}
-		history = []*proto.Message{
+		inputs = []*proto.Message{
 			{
 				Role: "user",
 				Content: &proto.Content{
@@ -120,11 +117,10 @@ func execLoop(ctx context.Context, id string, agentID string, input string) erro
 	}
 
 	for {
-		conf, outputs, err := runAutoExec(ctx, d, id, agentID, history)
+		conf, err := runAutoExec(ctx, d, id, agentID, inputs)
 		if err != nil {
 			return err
 		}
-		history = append(history, outputs...)
 
 		if conf != nil {
 			for {
@@ -162,53 +158,43 @@ func execLoop(ctx context.Context, id string, agentID string, input string) erro
 						},
 					}}
 				}
-				// The task is still pending, we need to only send the answer.
-				// not the full history. Because we executor will put the full
-				// history together.
-				conf, outputs, err = runAutoExec(ctx, d, id, agentID, decision)
+
+				conf, err = runAutoExec(ctx, d, id, agentID, decision)
 				if err != nil {
 					return err
 				}
-				history = append(history, decision...)
-				history = append(history, outputs...)
 				if conf == nil {
 					break
 				}
 			}
 		}
 
-		// Once we finished a task, we should start another one
-		// to continue the conversation with history.
-		id = uuid.NewString()
-		d := internal.NewDisplay(id)
-		d.DisplayHeader()
-
-		// Remove all the function calls, confirmations,
-		// and function responses. They are not relevant
-		// for the upcoming executions.
-		history = resetHistory(history)
-
-		input, quit, err := promptUser(d, "")
+		var quit bool
+		input, quit, err = promptUser(d, "")
 		if err != nil {
 			return err
 		}
 		if quit {
 			return nil
 		}
-		history = append(history, &proto.Message{
-			Role: "user",
-			Content: &proto.Content{
-				Content: &proto.Content_Text{
-					Text: &proto.TextContent{
-						Text: input,
+
+		inputs = []*proto.Message{
+			{
+				Role: "user",
+				Content: &proto.Content{
+					Content: &proto.Content_Text{
+						Text: &proto.TextContent{
+							Text: input,
+						},
 					},
 				},
 			},
-		})
+		}
+		agentID = "" // reset agent id for next turn
 	}
 }
 
-func runAutoExec(ctx context.Context, d *internal.Display, id string, agentID string, inputs []*proto.Message) (*proto.ConfirmationContent, []*proto.Message, error) {
+func runAutoExec(ctx context.Context, d *internal.Display, id string, agentID string, inputs []*proto.Message) (*proto.ConfirmationContent, error) {
 	fn := runExecHeadless
 	if execServerAddr != "" {
 		fn = runExecServer
@@ -216,74 +202,62 @@ func runAutoExec(ctx context.Context, d *internal.Display, id string, agentID st
 	return fn(ctx, d, id, agentID, inputs)
 }
 
-func runExecHeadless(ctx context.Context, d *internal.Display, id string, agentID string, inputs []*proto.Message) (*proto.ConfirmationContent, []*proto.Message, error) {
+func runExecHeadless(ctx context.Context, d *internal.Display, id string, agentID string, inputs []*proto.Message) (*proto.ConfirmationContent, error) {
 	if execController == nil {
 		cfg, err := config.LoadFromFile(execConfigFile)
 		if err != nil {
-			return nil, nil, fmt.Errorf("error loading config file '%s': %w", execConfigFile, err)
+			return nil, fmt.Errorf("error loading config file '%s': %w", execConfigFile, err)
 		}
 
 		c, err := newControllerFromConfig(ctx, cfg)
 		if err != nil {
-			return nil, nil, fmt.Errorf("error creating controller: %w", err)
+			return nil, fmt.Errorf("error creating controller: %w", err)
 		}
 		execController = c
 	}
 
-	var checkpoint string
-	var outputs []*proto.Message
 	var confirmation *proto.ConfirmationContent
 	outputHandler := agent.OutputHandler(func(resp *proto.AgentOutputs) error {
-		if resp.CheckpointId != "" {
-			checkpoint = resp.CheckpointId
-		}
-
 		for _, m := range resp.Messages {
 			if conf := m.GetContent().GetConfirmation(); conf != nil {
 				confirmation = conf
 			}
 		}
-		outputs = append(outputs, resp.Messages...)
 		displayContents(d, resp.Messages)
 		return nil
 	})
-	if err := execController.Exec(ctx, &proto.AgentMessage{
-		ExecId: id,
-		Msg: &proto.AgentMessage_Start{
-			Start: &proto.AgentStart{
-				AgentId:  agentID,
-				Messages: inputs,
-			},
-		},
+	if err := execController.Exec(ctx, &proto.ExecRequest{
+		ConversationId: id,
+		AgentId:        agentID,
+		Inputs:         inputs,
 	}, outputHandler); err != nil {
-		return nil, nil, fmt.Errorf("error executing with local server: %w", err)
+		return nil, fmt.Errorf("error executing with local server: %w", err)
 	}
 
 	if confirmation == nil {
-		d.FinishOutput(checkpoint)
+		d.FinishOutput("")
 	}
-	return confirmation, outputs, nil
+	return confirmation, nil
 }
 
-func runExecServer(ctx context.Context, d *internal.Display, id string, agentID string, inputs []*proto.Message) (*proto.ConfirmationContent, []*proto.Message, error) {
+func runExecServer(ctx context.Context, d *internal.Display, id string, agentID string, inputs []*proto.Message) (*proto.ConfirmationContent, error) {
 	conn, err := connect(execServerAddr)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	defer conn.Close()
 
 	client := proto.NewAXServiceClient(conn)
 	stream, err := client.Exec(ctx, &proto.ExecRequest{
-		Id:      id,
-		AgentId: agentID,
-		Inputs:  inputs,
+		ConversationId: id,
+		AgentId:        agentID,
+		Inputs:         inputs,
 	})
 	if err != nil {
-		return nil, nil, fmt.Errorf("error executing: %w", err)
+		return nil, fmt.Errorf("error executing: %w", err)
 	}
 
 	var checkpoint string
-	var outputs []*proto.Message
 	var confirmation *proto.ConfirmationContent
 	for {
 		resp, err := stream.Recv()
@@ -291,7 +265,7 @@ func runExecServer(ctx context.Context, d *internal.Display, id string, agentID 
 			break
 		}
 		if err != nil {
-			return nil, nil, fmt.Errorf("error receiving response: %w", err)
+			return nil, fmt.Errorf("error receiving response: %w", err)
 		}
 		if resp.Outputs != nil {
 			for _, m := range resp.Outputs {
@@ -299,14 +273,13 @@ func runExecServer(ctx context.Context, d *internal.Display, id string, agentID 
 					confirmation = conf
 				}
 			}
-			outputs = append(outputs, resp.Outputs...)
 			displayContents(d, resp.Outputs)
 		}
 	}
 	if confirmation == nil {
 		d.FinishOutput(checkpoint)
 	}
-	return confirmation, outputs, nil
+	return confirmation, nil
 }
 
 func displayContents(d *internal.Display, contents []*proto.Message) {
@@ -334,24 +307,6 @@ func displayContents(d *internal.Display, contents []*proto.Message) {
 	}
 }
 
-func resetHistory(history []*proto.Message) []*proto.Message {
-	var out []*proto.Message
-	for _, m := range history {
-		content := m.GetContent()
-		if content.GetFunctionCall() != nil {
-			continue
-		}
-		if content.GetFunctionResponse() != nil {
-			continue
-		}
-		if content.GetConfirmation() != nil {
-			continue
-		}
-		out = append(out, m)
-	}
-	return out
-}
-
 // promptUser loops until the user provides a non-empty input string.
 // It returns:
 //   - string: the valid user input
@@ -369,6 +324,7 @@ func promptUser(d *internal.Display, input string) (string, bool, error) {
 	d.DisplayInput(input)
 	if strings.ToLower(strings.TrimSpace(input)) == "q" {
 		fmt.Println("Goodbye!")
+		fmt.Printf("To resume this conversation, ax exec --conversation %s\n", execConversationID)
 		return "", true, nil
 	}
 	return input, false, nil

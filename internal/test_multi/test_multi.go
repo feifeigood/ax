@@ -18,11 +18,14 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/google/ax/internal/agent"
 	"github.com/google/ax/internal/config"
 	"github.com/google/ax/internal/controller"
+	"github.com/google/ax/internal/controller/executor"
 	"github.com/google/ax/proto"
 	"github.com/google/uuid"
 )
@@ -42,6 +45,9 @@ func main() {
 	c, err := controller.New(ctx, controller.Config{
 		HealthCheck: config.HealthCheckConfig{
 			Enabled: false, // disable to speed up
+		},
+		EventLogBuilder: func() (executor.EventLog, error) {
+			return executor.OpenSQLiteEventLog(filepath.Join(os.TempDir(), "test_multi.db"))
 		},
 		PlannerBuilder: func(ctx context.Context, r *controller.Registry) (agent.Agent, error) {
 			return &mockPlanner{}, nil
@@ -106,30 +112,14 @@ func main() {
 		return nil
 	})
 
-	req := &proto.AgentMessage{
-		ExecId: execID,
-		Msg: &proto.AgentMessage_Start{
-			Start: &proto.AgentStart{
-				AgentId:  "planner",
-				Messages: inputs,
-			},
-		},
-	}
-
 	for i := range 4 {
 		log.Printf("\n--- Executing step %d ---\n", i+1)
-		if err := c.Exec(ctx, req, handler); err != nil {
+		if err := c.Exec(ctx, &proto.ExecRequest{
+			ConversationId: execID,
+			AgentId:        "planner",
+			Inputs:         inputs,
+		}, handler); err != nil {
 			log.Fatalf("Error executing step %d: %v\n", i+1, err)
-		}
-		// Subsequent execs just ask the planner to continue processing the existing history
-		req = &proto.AgentMessage{
-			ExecId: execID,
-			Msg: &proto.AgentMessage_Start{
-				Start: &proto.AgentStart{
-					AgentId:  "planner",
-					Messages: inputs,
-				},
-			},
 		}
 	}
 }
@@ -195,10 +185,11 @@ func (m *mockPlanner) Connect(ctx context.Context, execID string, start *proto.A
 				},
 			},
 		})
-		return e.Exec(ctx, "local-echo", &proto.AgentStart{
+		_, err := e.Exec(ctx, "local-echo", &proto.AgentStart{
 			AgentId:  "local-echo-agent",
 			Messages: inputs,
 		}, handler)
+		return err
 	}
 
 	// Step 2: Local -> Remote
@@ -211,10 +202,11 @@ func (m *mockPlanner) Connect(ctx context.Context, execID string, start *proto.A
 				},
 			},
 		})
-		return e.Exec(ctx, "remote-text", &proto.AgentStart{
+		_, err := e.Exec(ctx, "remote-text", &proto.AgentStart{
 			AgentId:  "remote-text-processor",
 			Messages: inputs,
 		}, handler)
+		return err
 	}
 
 	// Step 3: Remote -> Sandbox
@@ -227,10 +219,11 @@ func (m *mockPlanner) Connect(ctx context.Context, execID string, start *proto.A
 				},
 			},
 		})
-		return e.Exec(ctx, "uppercase-task", &proto.AgentStart{
+		_, err := e.Exec(ctx, "uppercase-task", &proto.AgentStart{
 			AgentId:  "uppercase",
 			Messages: inputs,
 		}, handler)
+		return err
 	}
 
 	// Final step: Sandbox -> Done

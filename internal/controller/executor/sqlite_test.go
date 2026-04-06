@@ -35,7 +35,41 @@ func TestSQLiteEventLog_AppendAndEvents(t *testing.T) {
 	}
 	defer log.Close()
 
-	ev1 := &proto.ExecutionEvent{
+	// 1. Test Conversation Log
+	cev1 := &proto.ConversationEvent{
+		ConversationId: "conv-1",
+		Seq:            1,
+		ExecId:         "task-1",
+	}
+
+	cev2 := &proto.ConversationEvent{
+		ConversationId: "conv-1",
+		Seq:            2,
+		ExecId:         "task-2",
+	}
+
+	if err := log.Append(ctx, cev1); err != nil {
+		t.Fatalf("failed to append cev1: %v", err)
+	}
+	if err := log.Append(ctx, cev2); err != nil {
+		t.Fatalf("failed to append cev2: %v", err)
+	}
+
+	cEvents, err := log.Events(ctx, "conv-1")
+	if err != nil {
+		t.Fatalf("failed to read conversation events: %v", err)
+	}
+
+	if len(cEvents) != 2 {
+		t.Fatalf("expected 2 conversation events, got %d", len(cEvents))
+	}
+
+	if cEvents[0].ExecId != "task-1" || cEvents[1].ExecId != "task-2" {
+		t.Errorf("conversation events mismatch")
+	}
+
+	// 2. Test Execution Log
+	ee1 := &proto.ExecutionEvent{
 		ExecId:    "task-1",
 		State:     proto.State_STATE_PENDING,
 		Timestamp: timestamppb.Now(),
@@ -44,36 +78,21 @@ func TestSQLiteEventLog_AppendAndEvents(t *testing.T) {
 		},
 	}
 
-	ev2 := &proto.ExecutionEvent{
-		ExecId:    "task-1",
-		State:     proto.State_STATE_COMPLETED,
-		Timestamp: timestamppb.Now(),
-		Outputs: []*proto.Message{
-			{Role: "assistant", Content: &proto.Content{Content: &proto.Content_Text{Text: &proto.TextContent{Text: "world"}}}},
-		},
+	if err := log.AppendExec(ctx, ee1); err != nil {
+		t.Fatalf("failed to append ee1: %v", err)
 	}
 
-	if err := log.Append(ctx, ev1); err != nil {
-		t.Fatalf("failed to append ev1: %v", err)
-	}
-	if err := log.Append(ctx, ev2); err != nil {
-		t.Fatalf("failed to append ev2: %v", err)
-	}
-
-	events, err := log.Events(ctx, "task-1")
+	eEvents, err := log.ExecEvents(ctx, "task-1")
 	if err != nil {
-		t.Fatalf("failed to read events: %v", err)
+		t.Fatalf("failed to read execution events: %v", err)
 	}
 
-	if len(events) != 2 {
-		t.Fatalf("expected 2 events, got %d", len(events))
+	if len(eEvents) != 1 {
+		t.Fatalf("expected 1 execution event, got %d", len(eEvents))
 	}
 
-	if events[0].ExecId != "task-1" || events[0].State != proto.State_STATE_PENDING {
-		t.Errorf("ev1 metadata mismatch")
-	}
-	if events[1].ExecId != "task-1" || events[1].State != proto.State_STATE_COMPLETED {
-		t.Errorf("ev2 metadata mismatch")
+	if eEvents[0].ExecId != "task-1" || eEvents[0].State != proto.State_STATE_PENDING {
+		t.Errorf("execution event mismatch")
 	}
 }
 
@@ -95,11 +114,11 @@ func TestSQLiteEventLog_ConcurrentAppend(t *testing.T) {
 		wg.Add(1)
 		go func(agentIdx int) {
 			defer wg.Done()
-			for range numEvents {
-				ev := &proto.ExecutionEvent{
-					ExecId:    "task-concurrent",
-					State:     proto.State(agentIdx % 4), // distribute states 0-3
-					Timestamp: timestamppb.Now(),
+			for i := range numEvents {
+				ev := &proto.ConversationEvent{
+					ConversationId: "conv-concurrent",
+					Seq:            int32(agentIdx*numEvents + i + 1),
+					ExecId:         "task-concurrent",
 				}
 				if err := log.Append(ctx, ev); err != nil {
 					t.Errorf("concurrent append failed: %v", err)
@@ -110,7 +129,7 @@ func TestSQLiteEventLog_ConcurrentAppend(t *testing.T) {
 
 	wg.Wait()
 
-	events, err := log.Events(ctx, "task-concurrent")
+	events, err := log.Events(ctx, "conv-concurrent")
 	if err != nil {
 		t.Fatalf("failed to read events: %v", err)
 	}
@@ -130,7 +149,7 @@ func TestSQLiteEventLog_Empty(t *testing.T) {
 	}
 	defer log.Close()
 
-	events, err := log.Events(ctx, "task-1")
+	events, err := log.Events(ctx, "conv-1")
 	if err != nil {
 		t.Fatalf("failed to read events: %v", err)
 	}

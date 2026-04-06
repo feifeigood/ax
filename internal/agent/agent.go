@@ -27,7 +27,7 @@ import (
 type OutputHandler func(outgoing *proto.AgentOutputs) error
 
 type Executor interface {
-	Exec(ctx context.Context, execID string, start *proto.AgentStart, o OutputHandler) error
+	Exec(ctx context.Context, execID string, start *proto.AgentStart, o OutputHandler) (proto.State, error)
 }
 
 // Agent defines the common interface for both local and remote agents.

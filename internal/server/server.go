@@ -23,6 +23,8 @@ import (
 	"net"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/google/ax/internal/agent"
 	"github.com/google/ax/internal/config"
@@ -53,26 +55,11 @@ func (s *Server) Exec(req *proto.ExecRequest, stream grpc.ServerStreamingServer[
 			Outputs: outgoing.Messages,
 		})
 	})
-	return s.controller.Exec(stream.Context(), &proto.AgentMessage{
-		ExecId: req.Id,
-		Msg: &proto.AgentMessage_Start{
-			Start: &proto.AgentStart{
-				AgentId:  req.AgentId,
-				Config:   req.AgentConfig,
-				Messages: req.Inputs,
-			},
-		},
-	}, outputHandler)
+	return s.controller.Exec(stream.Context(), req, outputHandler)
 }
 
 func (s *Server) Fork(ctx context.Context, req *proto.ForkRequest) (*proto.ForkResponse, error) {
-	if err := s.controller.Fork(ctx, req.SrcId, req.SrcCheckpointId, req.DestId); err != nil {
-		return nil, err
-	}
-
-	return &proto.ForkResponse{
-		NewId: req.DestId,
-	}, nil
+	return nil, status.Errorf(codes.Unimplemented, "forking not implemented")
 }
 
 // RegisterAgent registers a new remote agent with the controller.
@@ -98,7 +85,7 @@ func (s *Server) RegisterAgent(ctx context.Context, req *proto.RegisterAgentRequ
 		if cfg.Remote.Address == "" {
 			return nil, fmt.Errorf("address is required for remote agents")
 		}
-		
+
 		var err error
 		healthy, err = registry.RegisterRemote(config.RemoteAgentConfig{
 			ID:          req.AgentId,

@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/google/ax/internal/agent"
+	"github.com/google/ax/internal/historyutil"
 	"github.com/google/ax/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -27,7 +28,7 @@ import (
 type EventLogBuilder func() (EventLog, error)
 
 type defaultExecutor struct {
-	id       string
+	execID   string
 	eventLog EventLog
 	registry map[string]agent.Agent
 }
@@ -41,30 +42,41 @@ func newExecID(parent, child string) string {
 
 func DefaultExecutor(eventLog EventLog, registry map[string]agent.Agent) agent.Executor {
 	return &defaultExecutor{
-		id:       "",
+		execID:   "",
 		eventLog: eventLog,
 		registry: registry,
 	}
 }
 
-func (tm *defaultExecutor) Exec(ctx context.Context, execID string, start *proto.AgentStart, o agent.OutputHandler) error {
-	execID = newExecID(tm.id, execID)
+func (tm *defaultExecutor) Exec(ctx context.Context, execID string, start *proto.AgentStart, o agent.OutputHandler) (proto.State, error) {
+	execID = newExecID(tm.execID, execID)
 	a, ok := tm.registry[start.AgentId]
 	if !ok {
-		return errors.New("no agent found")
+		return proto.State_STATE_UNSPECIFIED, errors.New("no agent found")
 	}
 
 	allInputs, state, earlierAgentID, err := history(ctx, tm.eventLog, execID)
 	if err != nil {
-		return err
+		return proto.State_STATE_UNSPECIFIED, err
+	}
+
+	if msg := historyutil.WaitsForConfirmation(allInputs); msg != nil {
+		// Ensure that the inputs contain the answer to the
+		// confirmation to continue.
+		_, conf := historyutil.HasConfirmationAnswer(start.Messages)
+		if conf == nil {
+			return proto.State_STATE_PENDING, o(&proto.AgentOutputs{
+				Messages: []*proto.Message{msg},
+			})
+		}
 	}
 
 	if earlierAgentID != "" && earlierAgentID != start.AgentId {
-		return fmt.Errorf("resumption not allowed: agent ID changed from %s to %s", earlierAgentID, start.AgentId)
+		return proto.State_STATE_UNSPECIFIED, fmt.Errorf("resumption not allowed: agent ID changed from %s to %s", earlierAgentID, start.AgentId)
 	}
 
 	if state == proto.State_STATE_COMPLETED {
-		return nil
+		return proto.State_STATE_COMPLETED, nil
 	}
 	return tm.exec(ctx, execID, start, tm.eventLog, a, allInputs, o)
 }
@@ -76,9 +88,9 @@ func (tm *defaultExecutor) exec(
 	el EventLog,
 	a agent.Agent,
 	history []*proto.Message,
-	o agent.OutputHandler) error {
+	o agent.OutputHandler) (proto.State, error) {
 	child := &defaultExecutor{
-		id:       execID,
+		execID:   execID,
 		eventLog: tm.eventLog,
 		registry: tm.registry,
 	}
@@ -94,79 +106,77 @@ func (tm *defaultExecutor) exec(
 
 	history = append(history, start.Messages...)
 	if len(history) == 0 {
-		return errors.New("no inputs")
+		return proto.State_STATE_UNSPECIFIED, errors.New("no inputs")
 	}
 	if err := logPending(ctx, el, execID, start); err != nil {
-		return err
+		return proto.State_STATE_UNSPECIFIED, err
 	}
 
 	start.Messages = history
 	if err := a.Connect(ctx, execID, start, child, outputBuffer); err != nil {
-		_ = logFailed(ctx, el, execID, start) // Attempt to log failure, but prioritize returning the original error.
-		return err
+		// _ = logFailed(ctx, el, execID, start) // Attempt to log failure, but prioritize returning the original error.
+		return proto.State_STATE_UNSPECIFIED, err
 	}
 
 	if len(allOutputs) > 0 {
 		// Log all the outputs at once.
 		// TODO: Log only at checkpoints.
 		if err := logOutputs(ctx, el, execID, start, allOutputs); err != nil {
-			return err
+			return proto.State_STATE_UNSPECIFIED, err
 		}
 
 		last := allOutputs[len(allOutputs)-1]
 		if last.GetContent().GetConfirmation() == nil || last.GetContent().GetConfirmation().GetQuestion() == "" {
 			// Log completed only if we are not waiting
 			// for an answer to a confirmation.
-			return logCompleted(ctx, el, execID, start)
+			if err := logCompleted(ctx, el, execID, start); err != nil {
+				return proto.State_STATE_UNSPECIFIED, err
+			}
+			return proto.State_STATE_COMPLETED, nil
 		}
 	}
-	return nil
+	return proto.State_STATE_PENDING, nil
 }
 
 func history(ctx context.Context, el EventLog, execID string) ([]*proto.Message, proto.State, string, error) {
-	events, err := el.Events(ctx, execID)
-	if err != nil {
-		return nil, proto.State_STATE_UNSPECIFIED, "", err
-	}
-
 	var history []*proto.Message
+
 	var state proto.State
 	var agentID string
 
-	for _, event := range events {
-		if event.ExecId != execID {
-			continue
+	if execID != "" {
+		execEvents, err := el.ExecEvents(ctx, execID)
+		if err != nil {
+			return nil, proto.State_STATE_UNSPECIFIED, "", err
 		}
-		if event.AgentId != "" {
-			agentID = event.AgentId
+		for _, ev := range execEvents {
+			if ev.State != proto.State_STATE_UNSPECIFIED {
+				state = ev.State
+			}
+			if ev.AgentId != "" {
+				agentID = ev.AgentId
+			}
+			history = append(history, ev.Inputs...)
+			history = append(history, ev.Outputs...)
 		}
-		// Reset after the status change ensure
-		// that we have a clean state even if we are
-		// presented an event log with dirty entries
-		// from previous runs.
-		if event.State == proto.State_STATE_PENDING {
-			history = []*proto.Message{}
-		}
-		history = append(history, event.Inputs...)
-		history = append(history, event.Outputs...)
-		state = event.State
 	}
 
 	return history, state, agentID, nil
 }
 
 func logPending(ctx context.Context, el EventLog, execID string, start *proto.AgentStart) error {
-	return el.Append(ctx, &proto.ExecutionEvent{
-		Timestamp: timestamppb.Now(),
-		ExecId:    execID,
-		AgentId:   start.AgentId,
-		Inputs:    start.Messages,
-		State:     proto.State_STATE_PENDING,
+	return el.AppendExec(ctx, &proto.ExecutionEvent{
+		Timestamp:   timestamppb.Now(),
+		ExecId:      execID,
+		AgentId:     start.AgentId,
+		AgentConfig: start.Config,
+		Inputs:      start.Messages,
+		State:       proto.State_STATE_PENDING,
 	})
 }
 
 func logFailed(ctx context.Context, el EventLog, execID string, start *proto.AgentStart) error {
-	return el.Append(ctx, &proto.ExecutionEvent{
+	return el.AppendExec(ctx, &proto.ExecutionEvent{
 		Timestamp: timestamppb.Now(),
 		ExecId:    execID,
 		AgentId:   start.AgentId,
@@ -175,7 +185,7 @@ func logFailed(ctx context.Context, el EventLog, execID string, start *proto.Age
 }
 
 func logCompleted(ctx context.Context, el EventLog, execID string, start *proto.AgentStart) error {
-	return el.Append(ctx, &proto.ExecutionEvent{
+	return el.AppendExec(ctx, &proto.ExecutionEvent{
 		Timestamp: timestamppb.Now(),
 		ExecId:    execID,
 		AgentId:   start.AgentId,
@@ -184,10 +194,11 @@ func logCompleted(ctx context.Context, el EventLog, execID string, start *proto.
 }
 
 func logOutputs(ctx context.Context, el EventLog, execID string, start *proto.AgentStart, outputs []*proto.Message) error {
-	return el.Append(ctx, &proto.ExecutionEvent{
+	return el.AppendExec(ctx, &proto.ExecutionEvent{
 		Timestamp: timestamppb.Now(),
 		ExecId:    execID,
 		AgentId:   start.AgentId,
 		Outputs:   outputs,
+		State:     proto.State_STATE_PENDING,
 	})
 }

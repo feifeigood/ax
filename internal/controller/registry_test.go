@@ -27,36 +27,11 @@ import (
 
 	"github.com/google/ax/internal/agent"
 	"github.com/google/ax/internal/config"
+	"github.com/google/ax/internal/controller/executor"
 	"github.com/google/ax/proto"
 )
 
-// MockAgent is a mock implementation of the Agent interface for testing.
-type MockAgent struct {
-	ProcessFunc     func(ctx context.Context, execID string, start *proto.AgentStart, e agent.Executor, o agent.OutputHandler) error
-	healthCheckFunc func(ctx context.Context) error
-	closeFunc       func() error
-}
 
-func (m *MockAgent) Connect(ctx context.Context, execID string, start *proto.AgentStart, e agent.Executor, o agent.OutputHandler) error {
-	if m.ProcessFunc != nil {
-		return m.ProcessFunc(ctx, execID, start, e, o)
-	}
-	return nil
-}
-
-func (m *MockAgent) HealthCheck(ctx context.Context) error {
-	if m.healthCheckFunc != nil {
-		return m.healthCheckFunc(ctx)
-	}
-	return nil
-}
-
-func (m *MockAgent) Close() error {
-	if m.closeFunc != nil {
-		return m.closeFunc()
-	}
-	return nil
-}
 
 type mockAgentServer struct {
 	proto.UnimplementedAgentServiceServer
@@ -138,11 +113,11 @@ func TestRegistry_HealthCheckScenarios(t *testing.T) {
 
 			if tt.agentType == "local" {
 				// Mock local agent
-				validMockAgent := &MockAgent{}
+				agent := executor.AgentFunc(func(inputs []*proto.Message, tm agent.Executor, o agent.OutputHandler) {})
 				err = r.RegisterLocal(config.LocalAgentConfig{
 					ID:    id,
 					Name:  id,
-					Agent: validMockAgent,
+					Agent: agent,
 				})
 				if err != nil {
 					t.Fatalf("RegisterLocal failed: %v", err)

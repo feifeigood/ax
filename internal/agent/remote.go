@@ -107,7 +107,7 @@ func (a *RemoteAgent) Connect(ctx context.Context, execID string, start *proto.A
 		switch msg := resp.Msg.(type) {
 		case *proto.AgentMessage_Start:
 			// Start a new agent call
-			if err := e.Exec(stream.Context(), resp.ExecId, msg.Start, o); err != nil {
+			if _, err := e.Exec(stream.Context(), resp.ExecId, msg.Start, o); err != nil {
 				return fmt.Errorf("failed to execute: %w", err)
 			}
 		case *proto.AgentMessage_Outputs:

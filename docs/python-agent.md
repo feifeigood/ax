@@ -29,6 +29,6 @@ ax register \
 
 ax exec \
   --server localhost:8494 \
-  --id exec123 \
+  --conversation d85a4b4e-c53b-4c84-b879-f10d905bce40 \
   --input "Hello, can you echo what I just said?"
 ```

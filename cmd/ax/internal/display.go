@@ -81,7 +81,7 @@ func (d *Display) FinishOutput(checkpointID string) {
 }
 
 func (d *Display) DisplayHeader() {
-	fmt.Println(d.idStyle.Render("ID: " + d.id))
+	fmt.Println(d.idStyle.Render("Conversation: " + d.id))
 	fmt.Println()
 }
 

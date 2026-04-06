@@ -25,12 +25,17 @@ import (
 // exec. Every entry is an atomic step: replaying the log in order brings
 // the executor back to a consistent state from which execution can resume.
 type EventLog interface {
-	// Append adds an event to the end of the log.
-	// Implementations must be safe for concurrent use.
-	Append(ctx context.Context, event *proto.ExecutionEvent) error
+	// Append adds a conversation event to the end of the log.
+	Append(ctx context.Context, event *proto.ConversationEvent) error
 
-	// Events returns all events recorded so far, in append order.
-	Events(ctx context.Context, id string) ([]*proto.ExecutionEvent, error)
+	// AppendExec adds an execution event to the end of the log.
+	AppendExec(ctx context.Context, event *proto.ExecutionEvent) error
+
+	// Events returns all events for the conversation.
+	Events(ctx context.Context, conversationID string) ([]*proto.ConversationEvent, error)
+
+	// ExecEvents returns all events for a specific execution ID.
+	ExecEvents(ctx context.Context, execID string) ([]*proto.ExecutionEvent, error)
 
 	// Close releases the underlying resources and closes the log.
 	Close() error

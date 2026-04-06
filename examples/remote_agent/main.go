@@ -26,7 +26,6 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/google/ax/proto"
-	"github.com/google/uuid"
 )
 
 const port = ":50051"
@@ -86,8 +85,7 @@ func (s *server) Connect(stream grpc.BidiStreamingServer[proto.AgentMessage, pro
 			ExecId: incoming.ExecId,
 			Msg: &proto.AgentMessage_Outputs{
 				Outputs: &proto.AgentOutputs{
-					Messages:     []*proto.Message{responseMsg},
-					CheckpointId: uuid.New().String(),
+					Messages: []*proto.Message{responseMsg},
 				},
 			},
 		}); err != nil {

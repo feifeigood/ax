@@ -28,8 +28,10 @@ import (
 	"github.com/google/ax/internal/controller/executor"
 	"github.com/google/ax/internal/testagent"
 	"github.com/google/ax/proto"
+	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 const plannerAgentID = "__planner"
@@ -37,11 +39,11 @@ const plannerAgentID = "__planner"
 // Controller is the main controller that coordinates all components.
 // It acts as a single-writer system for managing agentic loops.
 type Controller struct {
-	inFlightExecutionsMu sync.Mutex
-	inFlightExecutions   map[string]struct{}
-	registry             *Registry
-	eventLog             executor.EventLog
-	plannerBuilder       PlannerBuilder
+	inFlightMu     sync.Mutex
+	inFlight       map[string]struct{}
+	registry       *Registry
+	eventLog       executor.EventLog
+	plannerBuilder PlannerBuilder
 }
 
 // PlannerBuilder is a function that creates a PlanFunc given a Registry.
@@ -51,8 +53,7 @@ type PlannerBuilder func(ctx context.Context, r *Registry) (agent.Agent, error)
 type Config struct {
 	EventLogBuilder executor.EventLogBuilder
 	PlannerBuilder  PlannerBuilder
-	// TODO(jbd): Add CompacterBuilder.
-	HealthCheck config.HealthCheckConfig
+	HealthCheck     config.HealthCheckConfig
 }
 
 // New creates a new controller instance.
@@ -80,26 +81,79 @@ func New(ctx context.Context, config Config) (*Controller, error) {
 	}
 
 	return &Controller{
-		inFlightExecutions: make(map[string]struct{}),
-		registry:           registry,
-		eventLog:           eventLog,
-		plannerBuilder:     config.PlannerBuilder,
+		inFlight:       make(map[string]struct{}),
+		registry:       registry,
+		eventLog:       eventLog,
+		plannerBuilder: config.PlannerBuilder,
 	}, nil
+}
+
+func (d *Controller) tryResuming(ctx context.Context, req *proto.ExecRequest, el executor.EventLog, registry map[string]agent.Agent, handler agent.OutputHandler) (history []*proto.Message, done bool, err error) {
+	events, err := el.Events(ctx, req.ConversationId)
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to retrieve execution history: %w", err)
+	}
+	var pendingExecID string
+	for _, ev := range events {
+		if ev.ExecId != "" && ev.State == proto.State_STATE_PENDING {
+			pendingExecID = ev.ExecId
+		}
+		if ev.ExecId == pendingExecID && ev.State == proto.State_STATE_COMPLETED {
+			pendingExecID = ""
+		}
+		history = append(history, ev.Messages...)
+	}
+
+	if pendingExecID == "" {
+		return history, false, nil
+	}
+
+	// Find the pending event.
+	execEvents, err := el.ExecEvents(ctx, pendingExecID)
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to retrieve execution events: %w", err)
+	}
+
+	// TODO(jbd): Merge ExecutionEvent and ConversationEvent?
+	var pendingEvent *proto.ExecutionEvent
+	for _, ev := range execEvents {
+		if ev.State == proto.State_STATE_PENDING {
+			pendingEvent = ev
+			break
+		}
+	}
+	if pendingEvent == nil {
+		return nil, false, fmt.Errorf("failed to retrieve pending event: %w", err)
+	}
+	if err := d.execute(
+		ctx,
+		req.ConversationId,
+		pendingExecID,
+		pendingEvent.AgentId,
+		pendingEvent.AgentConfig,
+		history,
+		req.Inputs,
+		registry,
+		handler,
+	); err != nil {
+		return nil, false, err
+	}
+	return history, true, nil
 }
 
 // Exec executes a new agentic loop execution or resumes an existing one.
 // If id is empty, a UUID will be generated.
 // If the execution already exists, it will be resumed with optional new inputs.
-func (d *Controller) Exec(ctx context.Context, incoming *proto.AgentMessage, handler agent.OutputHandler) error {
-	if incoming.ExecId == "" {
-		return fmt.Errorf("id is required")
+func (d *Controller) Exec(ctx context.Context, req *proto.ExecRequest, handler agent.OutputHandler) error {
+	if req.ConversationId == "" {
+		return fmt.Errorf("conversation_id is required")
 	}
 
-	inFlight, cleanup := d.markInFlight(incoming.ExecId)
+	inFlight, cleanup := d.markInFlight(req.ConversationId)
 	defer cleanup()
 
 	if inFlight {
-		return fmt.Errorf("execution %q is already in flight", incoming.ExecId)
+		return fmt.Errorf("execution %q is already in flight", req.ConversationId)
 	}
 
 	planner, err := d.plannerBuilder(ctx, d.registry)
@@ -116,26 +170,67 @@ func (d *Controller) Exec(ctx context.Context, incoming *proto.AgentMessage, han
 		maps.Copy(registry, testagent.Agents())
 	}
 
-	start := incoming.GetStart()
-	if start == nil {
-		return fmt.Errorf("no start message")
+	if req.AgentId == "" {
+		req.AgentId = plannerAgentID
 	}
-	if start.AgentId == "" {
-		start.AgentId = plannerAgentID
+
+	// Replay the execution history if any.
+	history, done, err := d.tryResuming(ctx, req, d.eventLog, registry, handler)
+	if err != nil {
+		return err
 	}
+	if done {
+		// Nothing else to do, new inputs are used in the replay.
+		return nil
+	}
+
+	return d.execute(
+		ctx,
+		req.ConversationId,
+		uuid.NewString(),
+		req.AgentId,
+		req.AgentConfig,
+		history,
+		req.Inputs,
+		registry,
+		handler,
+	)
+}
+
+func (d *Controller) execute(ctx context.Context, conversationID string, execID string, agentID string, agentConfig *anypb.Any, history []*proto.Message, newInputs []*proto.Message, registry map[string]agent.Agent, handler agent.OutputHandler) error {
 	e := executor.DefaultExecutor(d.eventLog, registry)
-	return e.Exec(ctx, incoming.ExecId, start, handler)
+	var outputs []*proto.Message
+	outputCapturer := func(outgoing *proto.AgentOutputs) error {
+		outputs = append(outputs, outgoing.Messages...)
+		return handler(outgoing)
+	}
+	if err := d.eventLog.Append(ctx, &proto.ConversationEvent{
+		ConversationId: conversationID,
+		ExecId:         execID,
+		Messages:       newInputs,
+		State:          proto.State_STATE_PENDING,
+	}); err != nil {
+		return err
+	}
+	state, err := e.Exec(ctx, execID, &proto.AgentStart{
+		AgentId:  agentID,
+		Config:   agentConfig,
+		Messages: append(history, newInputs...),
+	}, outputCapturer)
+	if err != nil {
+		return err
+	}
+	return d.eventLog.Append(ctx, &proto.ConversationEvent{
+		ConversationId: conversationID,
+		ExecId:         execID,
+		Messages:       outputs,
+		State:          state,
+	})
 }
 
 // Fork forks an execution from a source execution.
 // If checkpointId is provided, fork til the checkpoint. Otherwise, fork the whole execution.
 func (d *Controller) Fork(ctx context.Context, sourceID, sourceCheckpoint, destID string) error {
-	if sourceID == "" {
-		return fmt.Errorf("source ID is required")
-	}
-	if destID == "" {
-		return fmt.Errorf("destination ID is required")
-	}
 	return status.Errorf(codes.Unimplemented, "forking is not supported yet")
 }
 
@@ -156,18 +251,18 @@ func (d *Controller) Close() error {
 }
 
 func (d *Controller) markInFlight(id string) (exists bool, cleanup func()) {
-	d.inFlightExecutionsMu.Lock()
-	defer d.inFlightExecutionsMu.Unlock()
+	d.inFlightMu.Lock()
+	defer d.inFlightMu.Unlock()
 
-	_, ok := d.inFlightExecutions[id]
+	_, ok := d.inFlight[id]
 	if ok {
 		return true, func() {}
 	}
-	d.inFlightExecutions[id] = struct{}{}
+	d.inFlight[id] = struct{}{}
 
 	return false, func() {
-		d.inFlightExecutionsMu.Lock()
-		delete(d.inFlightExecutions, id)
-		d.inFlightExecutionsMu.Unlock()
+		d.inFlightMu.Lock()
+		delete(d.inFlight, id)
+		d.inFlightMu.Unlock()
 	}
 }

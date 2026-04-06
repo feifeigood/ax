@@ -99,7 +99,7 @@ func (a *CodingAgent) Connect(ctx context.Context, execID string, start *proto.A
 		history = append(history, outputs...)
 		// User may need to take control back to confirm
 		// or after decline.
-		if historyutil.WaitsForUser(history) {
+		if historyutil.WaitsForUser(history) != nil {
 			return nil
 		}
 	}
@@ -121,7 +121,7 @@ func (a *CodingAgent) Connect(ctx context.Context, execID string, start *proto.A
 		}
 
 		history = append(history, outputs...)
-		if historyutil.WaitsForUser(history) {
+		if historyutil.WaitsForUser(history) != nil {
 			return nil
 		}
 	}
@@ -330,7 +330,7 @@ func (e *Executor) Exec(ctx context.Context, execID string, start *proto.AgentSt
 			return nil, err
 		}
 	}
-	if err := e.exec.Exec(ctx, execID, start, func(resp *proto.AgentOutputs) error {
+	if _, err := e.exec.Exec(ctx, execID, start, func(resp *proto.AgentOutputs) error {
 		outputs = append(outputs, resp.Messages...)
 		return e.handler(resp)
 	}); err != nil {

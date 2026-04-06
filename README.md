@@ -75,7 +75,7 @@ ax exec --input "Can you list me this directory?" --config my-config.yaml
 You can continue an execution any time:
 
 ```bash
-ax exec --id exec123 --input "Show me the contents of README.md"
+ax exec --conversation d85a4b4e-c53b-4c84-b879-f10d905bce40 --input "Show me the contents of README.md"
 ```
 
 Instead of running the default planner agent, you can run any registered agent:
@@ -86,7 +86,7 @@ ax exec --agent coding --input "Can you write me a simple HTTP server in Python?
 
 You can resume an incomplete execution:
 ```bash
-ax exec --resume --agent "coding" --id "edf98ef5-4bb1-4a9e-a091-3a77e03727e6"
+ax exec --resume --agent "coding" --conversation "edf98ef5-4bb1-4a9e-a091-3a77e03727e6"
 ```
 
 ### 2. Run exec with Custom Agents
@@ -121,7 +121,7 @@ The server exposes the `AXService` on port `:8494` by default.
 ```bash
 ax exec \
     --server localhost:8494 \
-    --id task123 \
+    --conversation 550e8400-e29b-41d4-a716-446655440000 \
     --input "HELLO, CAN YOU LOWERCASE WHAT I JUST SAID?"
 ```
 
@@ -134,17 +134,17 @@ The `ax` command provides several subcommands:
 ```bash
 ax exec \
     --input <text> \
-    [--id <id>] \
+    [--conversation <id>] \
     [--agent <id>] \
     [--server <address>] \
     [--config <file>]
 ```
 
-Executes a new agentic execution or automatically resumes an existing one. If the ID already exists, the execution will be resumed from its last state with the new input (if any).
+Executes a new agentic execution or automatically resumes an existing one. If the conversation ID already exists, the execution will be resumed from its last state with the new input (if any).
 
 Options:
 - `--input`: Input message to send to agents (required)
-- `--id`: Unique identifier (optional, generates UUID if not provided, or resumes if exists)
+- `--conversation`: Conversation ID (optional, generates UUID if not provided, or resumes if exists)
 - `--agent`: Agent ID to use (optional, defaults to planner)
 - `--server`: gRPC controller server address (optional. If not provided, runs with a built-in server)
 - `--config`: Path to YAML configuration file (only used with a built-in server, default: "ax.yaml")
@@ -156,7 +156,7 @@ Options:
 ax exec --input "Hello agents!"
 
 # Resume an existing execution with new input
-ax exec --id abc123 --input "Ok, now let's do something else..."
+ax exec --conversation a53d4db3-1165-4925-87da-be6c72bbdeb1 --input "Ok, now let's do something else..."
 
 # Execute using server mode
 ax exec --server localhost:8494 --input "Hello agents!"
@@ -188,13 +188,13 @@ Options:
 
 ```bash
 # Fork from the latest state
-ax fork --src-id abc123
+ax fork --src-id 38460323-9a78-41cb-8991-022b0ff2c19c
 
 # Fork from a specific checkpoint
-ax fork --src-id abc123 --src-checkpoint "550e..."
+ax fork --src-id 38460323-9a78-41cb-8991-022b0ff2c19c --src-checkpoint "550e..."
 
 # Fork from a specific checkpoint to a new event log with a specific new ID
-ax fork --src-id abc123 --src-checkpoint "550e..." --dest-id new-id
+ax fork --src-id 38460323-9a78-41cb-8991-022b0ff2c19c --src-checkpoint "550e..." --dest-id e5e26e38-53a2-4f22-b1cb-ae867357df83
 ```
 
 
@@ -203,7 +203,7 @@ ax fork --src-id abc123 --src-checkpoint "550e..." --dest-id new-id
 Visualize the trace of an agentic execution in a Web UI, directly fetching from the SQLite event log.
 
 ```bash
-ax trace --id <id> [--server <server-address>] [--config <file>]
+ax trace --conversation <id> [--addr <address>] [--config <file>]
 ```
 
 This will parse the execution logs and spin up a local web server (defaulting to e.g. `http://localhost:8080`), automatically opening it in your browser.
@@ -216,10 +216,10 @@ Options:
 
 ```bash
 # Trace on default server localhost:8080
-ax trace --id 1a6e0b29-87c2-4af0-81ac-0c73bf8fa293
+ax trace --conversation 1a6e0b29-87c2-4af0-81ac-0c73bf8fa293
 
 # Trace on a custom server address and port
-ax trace --id 1a6e0b29-87c2-4af0-81ac-0c73bf8fa293 --addr 0.0.0.0:9090
+ax trace --conversation 1a6e0b29-87c2-4af0-81ac-0c73bf8fa293 --addr 0.0.0.0:9090
 ```
 
 ### Register

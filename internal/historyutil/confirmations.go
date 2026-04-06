@@ -18,15 +18,15 @@ import "github.com/google/ax/proto"
 
 // WaitsForConfirmation returns true if the last message in the history
 // is a confirmation question waiting for user input.
-func WaitsForConfirmation(history []*proto.Message) bool {
+func WaitsForConfirmation(history []*proto.Message) *proto.Message {
 	if len(history) == 0 {
-		return false
+		return nil
 	}
 	last := history[len(history)-1]
 	if last.GetContent().GetConfirmation() != nil && last.GetContent().GetConfirmation().Question != "" {
-		return true
+		return last
 	}
-	return false
+	return nil
 }
 
 // HasConfirmationAnswer returns true if the last message in the history
@@ -50,17 +50,17 @@ func HasConfirmationAnswer(history []*proto.Message) (approved bool, conf *proto
 	return approved, conf
 }
 
-func WaitsForUser(history []*proto.Message) bool {
+func WaitsForUser(history []*proto.Message) *proto.Message {
 	if len(history) == 0 {
-		return false
+		return nil
 	}
-	if WaitsForConfirmation(history) {
-		return true
+	if msg := WaitsForConfirmation(history); msg != nil {
+		return msg
 	}
 
 	last := history[len(history)-1]
 	if last.GetContent().GetConfirmation() != nil && last.GetContent().GetConfirmation().GetDecline() != nil {
-		return true
+		return last
 	}
-	return false
+	return nil
 }

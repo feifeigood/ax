@@ -69,7 +69,7 @@ type TraceData struct {
 }
 
 var (
-	traceID         string
+	conversationID string
 	traceServerAddr string
 	traceConfigFile string
 )
@@ -81,21 +81,21 @@ var traceCmd = &cobra.Command{
 }
 
 func init() {
-	traceCmd.Flags().StringVar(&traceID, "id", "", "Execution ID")
+	traceCmd.Flags().StringVar(&conversationID, "conversation", "", "Conversation ID")
 	traceCmd.Flags().StringVar(&traceServerAddr, "addr", "localhost:8080", "Server address to listen on")
 	traceCmd.Flags().StringVar(&traceConfigFile, "config", "ax.yaml", "Path to YAML configuration file")
-	traceCmd.MarkFlagRequired("id")
+	traceCmd.MarkFlagRequired("conversation")
 }
 
 func runTrace(cmd *cobra.Command, args []string) error {
 	// Load trace data
-	data, err := loadTraceData(cmd.Context(), traceID)
+	data, err := loadTraceData(cmd.Context(), conversationID)
 	if err != nil {
 		return fmt.Errorf("error loading trace data: %w", err)
 	}
 
 	if len(data.Execs) == 0 {
-		return fmt.Errorf("no trace data found for execution ID: %s", traceID)
+		return fmt.Errorf("no trace data found")
 	}
 
 	// Start HTTP server on specified address
@@ -107,11 +107,11 @@ func runTrace(cmd *cobra.Command, args []string) error {
 	return serveTraceUI(listener, data, indexHTML)
 }
 
-func loadTraceData(ctx context.Context, rootExecID string) (*TraceData, error) {
+func loadTraceData(ctx context.Context, convID string) (*TraceData, error) {
 	// The trace command uses the config provided by --config flag
 	configPath := traceConfigFile
 
-	events, err := fetchEventsFromDB(ctx, configPath, rootExecID)
+	events, rootExecID, err := fetchEventsByConversation(ctx, configPath, convID)
 	if err != nil {
 		return nil, err
 	}
@@ -124,24 +124,51 @@ func loadTraceData(ctx context.Context, rootExecID string) (*TraceData, error) {
 	return data, nil
 }
 
-func fetchEventsFromDB(ctx context.Context, configPath string, rootExecID string) ([]*proto.ExecutionEvent, error) {
+
+
+func fetchEventsByConversation(ctx context.Context, configPath string, convID string) ([]*proto.ExecutionEvent, string, error) {
 	cfg, err := config.LoadFromFile(configPath)
 	if err != nil {
-		return nil, fmt.Errorf("error loading config: %w", err)
+		return nil, "", fmt.Errorf("error loading config: %w", err)
 	}
 
 	evLog, err := executor.OpenSQLiteEventLog(cfg.EventLog.SQLiteConfig.Filename)
 	if err != nil {
-		return nil, fmt.Errorf("could not open sqlite eventlog: %w", err)
+		return nil, "", fmt.Errorf("could not open sqlite eventlog: %w", err)
 	}
 	defer evLog.Close()
 
-	events, err := evLog.EventsByPrefix(ctx, rootExecID)
+	convEvents, err := evLog.Events(ctx, convID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query trace events: %w", err)
+		return nil, "", fmt.Errorf("failed to query conversation events: %w", err)
 	}
 
-	return events, nil
+	var execIDs []string
+	seen := make(map[string]bool)
+	for _, ev := range convEvents {
+		if ev.ExecId != "" && !seen[ev.ExecId] {
+			execIDs = append(execIDs, ev.ExecId)
+			seen[ev.ExecId] = true
+		}
+	}
+
+	if len(execIDs) == 0 {
+		return nil, "", fmt.Errorf("no executions found for conversation: %s", convID)
+	}
+
+	var allEvents []*proto.ExecutionEvent
+	for _, eID := range execIDs {
+		events, err := evLog.ExecEvents(ctx, eID)
+		if err != nil {
+			return nil, "", fmt.Errorf("failed to query events for exec %s: %w", eID, err)
+		}
+		allEvents = append(allEvents, events...)
+	}
+
+	// Use the first execID as the rootExecID as requested by user
+	rootExecID := execIDs[0]
+
+	return allEvents, rootExecID, nil
 }
 
 func buildExecTraces(rootExecID string, events []*proto.ExecutionEvent) []ExecTrace {

@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/google/ax/internal/agent"
+	"github.com/google/ax/internal/historyutil"
 	"github.com/google/ax/proto"
 	"golang.org/x/sync/errgroup"
 )
@@ -32,11 +33,12 @@ import (
 // MemoryEventLog is an in-memory EventLog useful for testing and short-lived
 // executions. It does not survive process restarts.
 type MemoryEventLog struct {
-	mu     sync.Mutex
-	events []*proto.ExecutionEvent
+	mu         sync.Mutex
+	events     []*proto.ConversationEvent
+	execEvents []*proto.ExecutionEvent
 }
 
-func (m *MemoryEventLog) Append(_ context.Context, event *proto.ExecutionEvent) error {
+func (m *MemoryEventLog) Append(_ context.Context, event *proto.ConversationEvent) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -44,12 +46,33 @@ func (m *MemoryEventLog) Append(_ context.Context, event *proto.ExecutionEvent) 
 	return nil
 }
 
-func (m *MemoryEventLog) Events(_ context.Context, execID string) ([]*proto.ExecutionEvent, error) {
+func (m *MemoryEventLog) AppendExec(_ context.Context, event *proto.ExecutionEvent) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.execEvents = append(m.execEvents, event)
+	return nil
+}
+
+func (m *MemoryEventLog) Events(_ context.Context, conversationID string) ([]*proto.ConversationEvent, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	out := make([]*proto.ConversationEvent, 0)
+	for _, ev := range m.events {
+		if ev.ConversationId == conversationID {
+			out = append(out, ev)
+		}
+	}
+	return out, nil
+}
+
+func (m *MemoryEventLog) ExecEvents(_ context.Context, execID string) ([]*proto.ExecutionEvent, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	out := make([]*proto.ExecutionEvent, 0)
-	for _, ev := range m.events {
+	for _, ev := range m.execEvents {
 		if ev.ExecId == execID {
 			out = append(out, ev)
 		}
@@ -59,7 +82,7 @@ func (m *MemoryEventLog) Events(_ context.Context, execID string) ([]*proto.Exec
 
 // Drop removes every event for which drop returns true.
 // It is provided for testing and crash-simulation purposes.
-func (m *MemoryEventLog) Drop(drop func(*proto.ExecutionEvent) bool) {
+func (m *MemoryEventLog) Drop(drop func(*proto.ConversationEvent) bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -86,14 +109,14 @@ func Example() {
 
 	registry := map[string]agent.Agent{
 		"planner": AgentFunc(func(inputs []*proto.Message, tm agent.Executor, o agent.OutputHandler) {
-			if err := tm.Exec(ctx, "deep-research-task", &proto.AgentStart{
+			if _, err := tm.Exec(ctx, "deep-research-task", &proto.AgentStart{
 				AgentId:  "deep-research",
 				Messages: inputs,
 			}, o); err != nil {
 				return
 			}
 
-			if err := tm.Exec(ctx, "pub-med-lookup-task", &proto.AgentStart{
+			if _, err := tm.Exec(ctx, "pub-med-lookup-task", &proto.AgentStart{
 				AgentId:  "pub-med-index",
 				Messages: inputs,
 			}, o); err != nil {
@@ -103,7 +126,7 @@ func Example() {
 	}
 
 	tm := DefaultExecutor(memoryEventLog(), registry)
-	if err := tm.Exec(ctx, "test", &proto.AgentStart{
+	if _, err := tm.Exec(ctx, "test", &proto.AgentStart{
 		AgentId:  "planner",
 		Messages: []*proto.Message{text("user", "Hello, I'd like to research cancer treatment options.")},
 	}, nil); err != nil {
@@ -116,7 +139,7 @@ func TestTaskManager(t *testing.T) {
 
 	registry := map[string]agent.Agent{
 		"root": AgentFunc(func(inputs []*proto.Message, tm agent.Executor, o agent.OutputHandler) {
-			if err := tm.Exec(ctx, "child-task", &proto.AgentStart{
+			if _, err := tm.Exec(ctx, "child-task", &proto.AgentStart{
 				AgentId:  "child",
 				Messages: inputs,
 			}, o); err != nil {
@@ -139,7 +162,7 @@ func TestTaskManager(t *testing.T) {
 	}
 
 	tm := DefaultExecutor(memoryEventLog(), registry)
-	if err := tm.Exec(ctx, "root-task", &proto.AgentStart{
+	if _, err := tm.Exec(ctx, "root-task", &proto.AgentStart{
 		AgentId:  "root",
 		Messages: []*proto.Message{text("user", "hello!")},
 	}, nil); err != nil {
@@ -157,10 +180,11 @@ func TestFanout(t *testing.T) {
 			for i := range 50 {
 				i := i // Capture loop variable.
 				g.Go(func() error {
-					return tm.Exec(ctx, fmt.Sprintf("child-%d", i), &proto.AgentStart{
+					_, err := tm.Exec(ctx, fmt.Sprintf("child-%d", i), &proto.AgentStart{
 						AgentId:  "child",
 						Messages: inputs,
 					}, nil)
+					return err
 				})
 			}
 			if err := g.Wait(); err != nil {
@@ -180,10 +204,11 @@ func TestFanout(t *testing.T) {
 			for i := range 2 {
 				i := i // Capture loop variable.
 				g.Go(func() error {
-					return tm.Exec(ctx, fmt.Sprintf("child2-%d", i), &proto.AgentStart{
+					_, err := tm.Exec(ctx, fmt.Sprintf("child2-%d", i), &proto.AgentStart{
 						AgentId:  "child2",
 						Messages: inputs,
 					}, nil)
+					return err
 				})
 			}
 			if err := g.Wait(); err != nil {
@@ -207,7 +232,7 @@ func TestFanout(t *testing.T) {
 	}
 
 	tm := DefaultExecutor(memoryEventLog(), registry)
-	if err := tm.Exec(ctx, "root-task", &proto.AgentStart{
+	if _, err := tm.Exec(ctx, "root-task", &proto.AgentStart{
 		AgentId:  "root",
 		Messages: []*proto.Message{text("user", "hello!")},
 	}, nil); err != nil {
@@ -229,7 +254,7 @@ func TestConfirmation(t *testing.T) {
 	var childDone atomic.Bool
 	registry := map[string]agent.Agent{
 		"root": AgentFunc(func(inputs []*proto.Message, tm agent.Executor, o agent.OutputHandler) {
-			if err := tm.Exec(ctx, "child-task", &proto.AgentStart{
+			if _, err := tm.Exec(ctx, "child-task", &proto.AgentStart{
 				AgentId:  "child",
 				Messages: inputs,
 			}, o); err != nil {
@@ -272,7 +297,7 @@ func TestConfirmation(t *testing.T) {
 	tm := DefaultExecutor(eventLog, registry)
 
 	// First run: child returns a confirmation request.
-	if err := tm.Exec(ctx, "root-task", &proto.AgentStart{
+	if _, err := tm.Exec(ctx, "root-task", &proto.AgentStart{
 		AgentId:  "root",
 		Messages: []*proto.Message{text("user", "hello!")},
 	}, nil); err != nil {
@@ -293,7 +318,7 @@ func TestConfirmation(t *testing.T) {
 			},
 		},
 	}
-	if err := tm.Exec(ctx, "root-task", &proto.AgentStart{
+	if _, err := tm.Exec(ctx, "root-task", &proto.AgentStart{
 		AgentId:  "root",
 		Messages: []*proto.Message{approval},
 	}, nil); err != nil {
@@ -311,7 +336,7 @@ func TestResume(t *testing.T) {
 
 	registry := map[string]agent.Agent{
 		"root": AgentFunc(func(inputs []*proto.Message, tm agent.Executor, o agent.OutputHandler) {
-			if err := tm.Exec(ctx, "child-task", &proto.AgentStart{
+			if _, err := tm.Exec(ctx, "child-task", &proto.AgentStart{
 				AgentId:  "child",
 				Messages: inputs,
 			}, nil); err != nil {
@@ -334,7 +359,7 @@ func TestResume(t *testing.T) {
 	}
 
 	tm := DefaultExecutor(eventLog, registry)
-	if err := tm.Exec(ctx, "root-task", &proto.AgentStart{
+	if _, err := tm.Exec(ctx, "root-task", &proto.AgentStart{
 		AgentId:  "root",
 		Messages: []*proto.Message{text("user", "hello!")},
 	}, nil); err != nil {
@@ -357,7 +382,7 @@ func TestResumeAgentIDMismatch(t *testing.T) {
 	tm := DefaultExecutor(eventLog, registry)
 
 	// First run: starts as "root"
-	if err := tm.Exec(ctx, "task1", &proto.AgentStart{
+	if _, err := tm.Exec(ctx, "task1", &proto.AgentStart{
 		AgentId:  "root",
 		Messages: []*proto.Message{text("user", "hello!")},
 	}, nil); err != nil {
@@ -365,7 +390,7 @@ func TestResumeAgentIDMismatch(t *testing.T) {
 	}
 
 	// Second run: attempts to resume as "other" for same execID "task1"
-	err := tm.Exec(ctx, "task1", &proto.AgentStart{
+	_, err := tm.Exec(ctx, "task1", &proto.AgentStart{
 		AgentId:  "other",
 		Messages: []*proto.Message{text("user", "hello again!")},
 	}, nil)
@@ -376,5 +401,123 @@ func TestResumeAgentIDMismatch(t *testing.T) {
 
 	if !strings.Contains(err.Error(), "resumption not allowed") {
 		t.Fatalf("expected 'resumption not allowed' error, got: %v", err)
+	}
+}
+
+func TestResumeConfirmation(t *testing.T) {
+	ctx := context.Background()
+	eventLog := memoryEventLog()
+
+	msg := &proto.Message{
+		Content: &proto.Content{
+			Content: &proto.Content_Confirmation{
+				Confirmation: &proto.ConfirmationContent{
+					Id:       "test-conf-id",
+					Question: "proceed?",
+				},
+			},
+		},
+	}
+
+	var runCount int
+	registry := map[string]agent.Agent{
+		"root": AgentFunc(func(inputs []*proto.Message, tm agent.Executor, o agent.OutputHandler) {
+			if conf := historyutil.WaitsForConfirmation(inputs); conf != nil {
+				o(&proto.AgentOutputs{
+					Messages: []*proto.Message{msg},
+				})
+				return
+			}
+
+			approved, _ := historyutil.HasConfirmationAnswer(inputs)
+			if approved {
+				if err := o(&proto.AgentOutputs{
+					// "Hello!" is responded with a confirmation request.
+					Messages: []*proto.Message{{
+						Content: &proto.Content{
+							Content: &proto.Content_Text{
+								Text: &proto.TextContent{
+									Text: "awesome!",
+								},
+							},
+						},
+					}},
+				}); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			if runCount == 0 {
+				runCount++
+				if err := o(&proto.AgentOutputs{
+					// "Hello!" is responded with a confirmation request.
+					Messages: []*proto.Message{msg},
+				}); err != nil {
+					t.Fatal(err)
+				}
+			}
+		}),
+	}
+
+	tm := DefaultExecutor(eventLog, registry)
+
+	// First run: starts as "root"
+	if _, err := tm.Exec(ctx, "task1", &proto.AgentStart{
+		AgentId:  "root",
+		Messages: []*proto.Message{text("user", "hello!")},
+	}, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	var confirmation *proto.ConfirmationContent
+	handler := func(outputs *proto.AgentOutputs) error {
+		confirmation = outputs.Messages[0].GetContent().GetConfirmation()
+		return nil
+	}
+	// Second run: attempts to resume as "other" for same execID "task1"
+	if _, err := tm.Exec(ctx, "task1", &proto.AgentStart{
+		AgentId: "root",
+	}, handler); err != nil {
+		t.Fatal(err)
+	}
+	if confirmation == nil {
+		t.Fatal("confirmation is nil")
+	}
+	if confirmation.Id != "test-conf-id" {
+		t.Fatalf("confirmation id mismatch: got %v, want %v", confirmation.Id, "test-conf-id")
+	}
+
+	// Third run: user provides an approval decision.
+	var msgs []*proto.Message
+	handler = func(outputs *proto.AgentOutputs) error {
+		msgs = outputs.Messages
+		return nil
+	}
+	if _, err := tm.Exec(ctx, "task1", &proto.AgentStart{
+		AgentId: "root",
+		Messages: []*proto.Message{
+			{
+				Content: &proto.Content{
+					Content: &proto.Content_Confirmation{
+						Confirmation: &proto.ConfirmationContent{
+							Id: "test-conf-id",
+							Decision: &proto.ConfirmationContent_Approval{
+								Approval: &proto.ApprovalDecision{
+									Approved: true,
+								},
+							},
+						},
+					},
+				},
+			},
+		}}, handler); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(msgs) != 1 {
+		t.Fatalf("expected 1 message, got %v", len(msgs))
+	}
+	if msgs[0].GetContent().GetText().GetText() != "awesome!" {
+		t.Fatalf("expected 'awesome!', got %v", msgs[0].GetContent().GetText().GetText())
 	}
 }

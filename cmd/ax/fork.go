@@ -15,11 +15,6 @@
 package main
 
 import (
-	"context"
-	"fmt"
-
-	"github.com/google/ax/proto"
-	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 )
 
@@ -48,35 +43,5 @@ func init() {
 }
 
 func runFork(cmd *cobra.Command, args []string) error {
-	ctx := cmd.Context()
-
-	// Generate UUID if no destination ID provided
-	if forkDestID == "" {
-		forkDestID = uuid.New().String()
-		fmt.Printf("Generated destination ID: %s\n", forkDestID)
-	}
-
-	conn, err := connect(forkServerAddr)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-
-	client := proto.NewAXServiceClient(conn)
-
-	_, err = Fork(ctx, client, forkSourceID, forkCheckpointID, forkDestID)
-	return err
-}
-
-// Fork forks a execution from a checkpoint and returns the new execution ID.
-func Fork(ctx context.Context, client proto.AXServiceClient, sourceID, checkpointID, destID string) (string, error) {
-	resp, err := client.Fork(ctx, &proto.ForkRequest{
-		SrcId:           sourceID,
-		SrcCheckpointId: checkpointID,
-		DestId:          destID,
-	})
-	if err != nil {
-		return "", fmt.Errorf("error forking: %w", err)
-	}
-	return resp.NewId, nil
+	panic("forking not implemented")
 }
