@@ -308,7 +308,8 @@ ax serve --config my-config.yaml
 
 ## Event Log Format
 
-Event logs use the `ExecutionEvent` message available in the protobuf.
+Event logs use `ConversationEvent` and `ExecutionEvent` messages available in the proto file
+to keep a log of conversations and executions.
 
 ## Built-in Capabilities
 
