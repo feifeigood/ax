@@ -72,10 +72,17 @@ ax exec --input "Can you list me this directory?"
 ax exec --input "Can you list me this directory?" --config my-config.yaml
 ```
 
-You can continue an execution any time:
+You can continue a conversation any time:
 
 ```bash
 ax exec --conversation d85a4b4e-c53b-4c84-b879-f10d905bce40 --input "Show me the contents of README.md"
+```
+
+You can continue from a previous sequence if client got disconnected
+during an conversation. In this example, we skip seeing the events after 
+sequence number 12:
+```bash
+ax exec --conversation d85a4b4e-c53b-4c84-b879-f10d905bce40 --resume --last-seen-seq 12
 ```
 
 Instead of running the default planner agent, you can run any registered agent:
@@ -84,7 +91,8 @@ Instead of running the default planner agent, you can run any registered agent:
 ax exec --agent coding --input "Can you write me a simple HTTP server in Python?"
 ```
 
-You can resume an incomplete execution:
+If anything goes wrong during the execution of an agent,
+you can resume an incomplete execution in a conversation:
 ```bash
 ax exec --resume --agent "coding" --conversation "edf98ef5-4bb1-4a9e-a091-3a77e03727e6"
 ```

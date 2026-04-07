@@ -79,19 +79,19 @@ func OpenSQLiteEventLog(path string) (*SQLiteEventLog, error) {
 }
 
 // Append serializes the event to JSON and inserts it into the database.
-func (l *SQLiteEventLog) Append(ctx context.Context, event *proto.ConversationEvent) error {
+func (l *SQLiteEventLog) Append(ctx context.Context, event *proto.ConversationEvent) (int32, error) {
 	seq := event.Seq
 	if seq == 0 {
 		err := l.db.QueryRowContext(ctx, "SELECT COALESCE(MAX(seq), 0) + 1 FROM conversation_log WHERE conversation_id = ?", event.ConversationId).Scan(&seq)
 		if err != nil {
-			return fmt.Errorf("sqlite_eventlog: compute seq: %w", err)
+			return 0, fmt.Errorf("sqlite_eventlog: compute seq: %w", err)
 		}
 		event.Seq = seq
 	}
 
 	payload, err := marshalOpts.Marshal(event)
 	if err != nil {
-		return fmt.Errorf("sqlite_eventlog: marshal event: %w", err)
+		return 0, fmt.Errorf("sqlite_eventlog: marshal event: %w", err)
 	}
 
 	_, err = l.db.ExecContext(ctx,
@@ -99,10 +99,10 @@ func (l *SQLiteEventLog) Append(ctx context.Context, event *proto.ConversationEv
 		event.ConversationId, event.Seq, string(payload))
 
 	if err != nil {
-		return fmt.Errorf("sqlite_eventlog: insert conversation: %w", err)
+		return 0, fmt.Errorf("sqlite_eventlog: insert conversation: %w", err)
 	}
 
-	return nil
+	return seq, nil
 }
 
 // AppendExec inserts an execution event into the database.

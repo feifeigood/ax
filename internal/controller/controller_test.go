@@ -30,9 +30,13 @@ type mockEventLog struct {
 	execEvents []*proto.ExecutionEvent
 }
 
-func (m *mockEventLog) Append(ctx context.Context, event *proto.ConversationEvent) error {
+func (m *mockEventLog) Append(ctx context.Context, event *proto.ConversationEvent) (int32, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	seq := int32(len(m.events) + 1)
+	event.Seq = seq
 	m.events = append(m.events, event)
-	return nil
+	return seq, nil
 }
 
 func (m *mockEventLog) AppendExec(ctx context.Context, event *proto.ExecutionEvent) error {
@@ -157,5 +161,122 @@ func TestController_Exec_ResumptionAndIDGeneration(t *testing.T) {
 	newExecID := log.events[len(log.events)-1].ExecId
 	if newExecID == execID {
 		t.Fatal("expected a NEW execution ID, but it was reused")
+	}
+}
+
+
+func TestController_Exec_LastSeenSeq_Empty(t *testing.T) {
+	ctx := context.Background()
+	cid := "test-conv-seq"
+
+	log := &mockEventLog{}
+	// Pre-populate history
+	log.events = []*proto.ConversationEvent{
+		{
+			ConversationId: cid,
+			Seq:            1,
+			Messages: []*proto.Message{
+				{Role: "user", Content: &proto.Content{Content: &proto.Content_Text{Text: &proto.TextContent{Text: "msg 1"}}}},
+			},
+			State: proto.State_STATE_COMPLETED,
+		},
+		{
+			ConversationId: cid,
+			Seq:            2,
+			Messages: []*proto.Message{
+				{Role: "assistant", Content: &proto.Content{Content: &proto.Content_Text{Text: &proto.TextContent{Text: "msg 2"}}}},
+			},
+			State: proto.State_STATE_COMPLETED,
+		},
+	}
+
+	c, err := New(ctx, Config{
+		EventLogBuilder: func() (executor.EventLog, error) {
+			return log, nil
+		},
+		PlannerBuilder: func(ctx context.Context, r *Registry) (agent.Agent, error) {
+			return &dummyAgent{}, nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+
+	var msgs []*proto.Message
+	handler := ExecHandler(func(resp *proto.ExecResponse) error {
+		msgs = append(msgs, resp.Outputs...)
+		return nil
+	})
+
+	err = c.Exec(ctx, &proto.ExecRequest{
+		ConversationId: cid,
+	}, handler)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(msgs) != 0 {
+		t.Fatalf("expected 0 messages, got %d", len(msgs))
+	}
+}
+
+func TestController_Exec_LastSeenSeq(t *testing.T) {
+	ctx := context.Background()
+	cid := "test-conv-seq"
+
+	log := &mockEventLog{}
+	// Pre-populate history
+	log.events = []*proto.ConversationEvent{
+		{
+			ConversationId: cid,
+			Seq:            1,
+			Messages: []*proto.Message{
+				{Role: "user", Content: &proto.Content{Content: &proto.Content_Text{Text: &proto.TextContent{Text: "msg 1"}}}},
+			},
+			State: proto.State_STATE_COMPLETED,
+		},
+		{
+			ConversationId: cid,
+			Seq:            2,
+			Messages: []*proto.Message{
+				{Role: "assistant", Content: &proto.Content{Content: &proto.Content_Text{Text: &proto.TextContent{Text: "msg 2"}}}},
+			},
+			State: proto.State_STATE_COMPLETED,
+		},
+	}
+
+	c, err := New(ctx, Config{
+		EventLogBuilder: func() (executor.EventLog, error) {
+			return log, nil
+		},
+		PlannerBuilder: func(ctx context.Context, r *Registry) (agent.Agent, error) {
+			return &dummyAgent{}, nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+
+	var msgs []*proto.Message
+	handler := ExecHandler(func(resp *proto.ExecResponse) error {
+		msgs = append(msgs, resp.Outputs...)
+		return nil
+	})
+
+	err = c.Exec(ctx, &proto.ExecRequest{
+		ConversationId: cid,
+		LastSeenSeq:    1,
+	}, handler)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// We expect to receive messages from Seq 2 (since LastSeenSeq is 1).
+	if len(msgs) != 1 {
+		t.Fatalf("expected 1 message, got %d", len(msgs))
+	}
+	if msgs[0].GetContent().GetText().GetText() != "msg 2" {
+		t.Fatalf("expected 'msg 2', got %v", msgs[0].GetContent().GetText().GetText())
 	}
 }

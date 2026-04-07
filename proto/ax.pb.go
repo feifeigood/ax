@@ -1158,6 +1158,7 @@ func (x *ExecRequest) GetAgentConfig() *anypb.Any {
 type ExecResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Outputs       []*Message             `protobuf:"bytes,1,rep,name=outputs,proto3" json:"outputs,omitempty"` // Output content
+	Seq           int32                  `protobuf:"varint,2,opt,name=seq,proto3" json:"seq,omitempty"`        // Seq of the outputs
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1197,6 +1198,13 @@ func (x *ExecResponse) GetOutputs() []*Message {
 		return x.Outputs
 	}
 	return nil
+}
+
+func (x *ExecResponse) GetSeq() int32 {
+	if x != nil {
+		return x.Seq
+	}
+	return 0
 }
 
 type ForkRequest struct {
@@ -1601,9 +1609,10 @@ const file_proto_ax_proto_rawDesc = "" +
 	"\x06inputs\x18\x02 \x03(\v2\x0e.proto.MessageR\x06inputs\x12\"\n" +
 	"\rlast_seen_seq\x18\x03 \x01(\x05R\vlastSeenSeq\x12\x19\n" +
 	"\bagent_id\x18\x04 \x01(\tR\aagentId\x127\n" +
-	"\fagent_config\x18\x05 \x01(\v2\x14.google.protobuf.AnyR\vagentConfig\"8\n" +
+	"\fagent_config\x18\x05 \x01(\v2\x14.google.protobuf.AnyR\vagentConfig\"J\n" +
 	"\fExecResponse\x12(\n" +
-	"\aoutputs\x18\x01 \x03(\v2\x0e.proto.MessageR\aoutputs\"\r\n" +
+	"\aoutputs\x18\x01 \x03(\v2\x0e.proto.MessageR\aoutputs\x12\x10\n" +
+	"\x03seq\x18\x02 \x01(\x05R\x03seq\"\r\n" +
 	"\vForkRequest\"\x0e\n" +
 	"\fForkResponse\"-\n" +
 	"\x11RemoteAgentConfig\x12\x18\n" +

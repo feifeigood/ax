@@ -48,10 +48,10 @@ func TestSQLiteEventLog_AppendAndEvents(t *testing.T) {
 		ExecId:         "task-2",
 	}
 
-	if err := log.Append(ctx, cev1); err != nil {
+	if _, err := log.Append(ctx, cev1); err != nil {
 		t.Fatalf("failed to append cev1: %v", err)
 	}
-	if err := log.Append(ctx, cev2); err != nil {
+	if _, err := log.Append(ctx, cev2); err != nil {
 		t.Fatalf("failed to append cev2: %v", err)
 	}
 
@@ -120,7 +120,7 @@ func TestSQLiteEventLog_ConcurrentAppend(t *testing.T) {
 					Seq:            int32(agentIdx*numEvents + i + 1),
 					ExecId:         "task-concurrent",
 				}
-				if err := log.Append(ctx, ev); err != nil {
+				if _, err := log.Append(ctx, ev); err != nil {
 					t.Errorf("concurrent append failed: %v", err)
 				}
 			}

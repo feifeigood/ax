@@ -66,16 +66,14 @@ func (d *Display) DisplayInput(text string) {
 
 // DisplayOutput displays an output fragment.
 func (d *Display) DisplayOutput(text string) {
-	fmt.Print(text)
+	fmt.Println(text)
+	fmt.Println()
 }
 
-// Finish completes the streaming output and shows checkpoint if provided
-func (d *Display) FinishOutput(checkpointID string) {
-	fmt.Print("\n")
-
-	// Show checkpoint box if checkpoint ID exists
-	if checkpointID != "" {
-		fmt.Println(d.checkpointStyle.Render("Checkpoint: " + checkpointID))
+// FinishOutput completes the streaming output and shows info if provided
+func (d *Display) FinishOutput(info string) {
+	if info != "" {
+		fmt.Println(d.checkpointStyle.Render(info))
 	}
 	fmt.Println()
 }

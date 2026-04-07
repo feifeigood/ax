@@ -26,7 +26,7 @@ import (
 // the executor back to a consistent state from which execution can resume.
 type EventLog interface {
 	// Append adds a conversation event to the end of the log.
-	Append(ctx context.Context, event *proto.ConversationEvent) error
+	Append(ctx context.Context, event *proto.ConversationEvent) (int32, error)
 
 	// AppendExec adds an execution event to the end of the log.
 	AppendExec(ctx context.Context, event *proto.ExecutionEvent) error

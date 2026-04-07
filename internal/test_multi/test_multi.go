@@ -103,8 +103,8 @@ func main() {
 
 	log.Printf("ID: %s\n", execID)
 
-	handler := agent.OutputHandler(func(outgoing *proto.AgentOutputs) error {
-		for _, m := range outgoing.Messages {
+	handler := controller.ExecHandler(func(resp *proto.ExecResponse) error {
+		for _, m := range resp.Outputs {
 			if textContent := m.GetContent().GetText(); textContent != nil {
 				fmt.Printf("Output received: %s\n", textContent.Text)
 			}

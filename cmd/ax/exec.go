@@ -24,7 +24,6 @@ import (
 	"syscall"
 
 	"github.com/google/ax/cmd/ax/internal"
-	"github.com/google/ax/internal/agent"
 	"github.com/google/ax/internal/config"
 	"github.com/google/ax/internal/controller"
 	"github.com/google/ax/proto"
@@ -39,6 +38,7 @@ var (
 	execServerAddr     string
 	execConfigFile     string
 	execResume         bool // allow resuming an execution without inputs
+	execLastSeenSeq    int32
 )
 
 var execCmd = &cobra.Command{
@@ -56,6 +56,7 @@ func init() {
 	execCmd.Flags().StringVar(&execServerAddr, "server", "", "gRPC controller server address (if specified, connects to remote server; otherwise runs with a local built-in AX server)")
 	execCmd.Flags().StringVar(&execConfigFile, "config", "ax.yaml", "Path to YAML configuration file (only used with a local built-in AX server)")
 	execCmd.Flags().BoolVar(&execResume, "resume", false, "Resume a conversation without inputs")
+	execCmd.Flags().Int32Var(&execLastSeenSeq, "last-seen-seq", 0, "Last sequence number seen by the client")
 	execCmd.MarkFlagsMutuallyExclusive("input", "resume")
 }
 
@@ -84,10 +85,10 @@ func runExec(cmd *cobra.Command, args []string) error {
 		cancel()
 	}()
 
-	return execLoop(ctx, execConversationID, execAgentID, execInput)
+	return execLoop(ctx, execConversationID, execAgentID, execInput, execLastSeenSeq)
 }
 
-func execLoop(ctx context.Context, id string, agentID string, input string) error {
+func execLoop(ctx context.Context, id string, agentID string, input string, lastSeq int32) error {
 	d := internal.NewDisplay(id)
 	d.DisplayHeader()
 
@@ -117,7 +118,13 @@ func execLoop(ctx context.Context, id string, agentID string, input string) erro
 	}
 
 	for {
-		conf, err := runAutoExec(ctx, d, id, agentID, inputs)
+		conf, err := runAutoExec(ctx, d, &proto.ExecRequest{
+			ConversationId: id,
+			AgentId:        agentID,
+			Inputs:         inputs,
+			LastSeenSeq:    lastSeq,
+		})
+		lastSeq = 0 // disable resuming from sequence, user sees the seq on the screen
 		if err != nil {
 			return err
 		}
@@ -159,7 +166,11 @@ func execLoop(ctx context.Context, id string, agentID string, input string) erro
 					}}
 				}
 
-				conf, err = runAutoExec(ctx, d, id, agentID, decision)
+				conf, err = runAutoExec(ctx, d, &proto.ExecRequest{
+					ConversationId: id,
+					AgentId:        agentID,
+					Inputs:         decision,
+				})
 				if err != nil {
 					return err
 				}
@@ -194,15 +205,15 @@ func execLoop(ctx context.Context, id string, agentID string, input string) erro
 	}
 }
 
-func runAutoExec(ctx context.Context, d *internal.Display, id string, agentID string, inputs []*proto.Message) (*proto.ConfirmationContent, error) {
+func runAutoExec(ctx context.Context, d *internal.Display, req *proto.ExecRequest) (*proto.ConfirmationContent, error) {
 	fn := runExecHeadless
 	if execServerAddr != "" {
 		fn = runExecServer
 	}
-	return fn(ctx, d, id, agentID, inputs)
+	return fn(ctx, d, req)
 }
 
-func runExecHeadless(ctx context.Context, d *internal.Display, id string, agentID string, inputs []*proto.Message) (*proto.ConfirmationContent, error) {
+func runExecHeadless(ctx context.Context, d *internal.Display, req *proto.ExecRequest) (*proto.ConfirmationContent, error) {
 	if execController == nil {
 		cfg, err := config.LoadFromFile(execConfigFile)
 		if err != nil {
@@ -217,30 +228,28 @@ func runExecHeadless(ctx context.Context, d *internal.Display, id string, agentI
 	}
 
 	var confirmation *proto.ConfirmationContent
-	outputHandler := agent.OutputHandler(func(resp *proto.AgentOutputs) error {
-		for _, m := range resp.Messages {
+	var lastSeq int32
+	outputHandler := controller.ExecHandler(func(resp *proto.ExecResponse) error {
+		for _, m := range resp.Outputs {
 			if conf := m.GetContent().GetConfirmation(); conf != nil {
 				confirmation = conf
 			}
 		}
-		displayContents(d, resp.Messages)
+		lastSeq = resp.Seq
+		displayContents(d, resp.Outputs)
 		return nil
 	})
-	if err := execController.Exec(ctx, &proto.ExecRequest{
-		ConversationId: id,
-		AgentId:        agentID,
-		Inputs:         inputs,
-	}, outputHandler); err != nil {
+	if err := execController.Exec(ctx, req, outputHandler); err != nil {
 		return nil, fmt.Errorf("error executing with local server: %w", err)
 	}
 
 	if confirmation == nil {
-		d.FinishOutput("")
+		d.FinishOutput(fmt.Sprintf("seq=%d", lastSeq))
 	}
 	return confirmation, nil
 }
 
-func runExecServer(ctx context.Context, d *internal.Display, id string, agentID string, inputs []*proto.Message) (*proto.ConfirmationContent, error) {
+func runExecServer(ctx context.Context, d *internal.Display, req *proto.ExecRequest) (*proto.ConfirmationContent, error) {
 	conn, err := connect(execServerAddr)
 	if err != nil {
 		return nil, err
@@ -248,17 +257,13 @@ func runExecServer(ctx context.Context, d *internal.Display, id string, agentID 
 	defer conn.Close()
 
 	client := proto.NewAXServiceClient(conn)
-	stream, err := client.Exec(ctx, &proto.ExecRequest{
-		ConversationId: id,
-		AgentId:        agentID,
-		Inputs:         inputs,
-	})
+	stream, err := client.Exec(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("error executing: %w", err)
 	}
 
-	var checkpoint string
 	var confirmation *proto.ConfirmationContent
+	var lastSeq int32
 	for {
 		resp, err := stream.Recv()
 		if err == io.EOF {
@@ -267,6 +272,7 @@ func runExecServer(ctx context.Context, d *internal.Display, id string, agentID 
 		if err != nil {
 			return nil, fmt.Errorf("error receiving response: %w", err)
 		}
+		lastSeq = resp.Seq
 		if resp.Outputs != nil {
 			for _, m := range resp.Outputs {
 				if conf := m.GetContent().GetConfirmation(); conf != nil {
@@ -277,7 +283,7 @@ func runExecServer(ctx context.Context, d *internal.Display, id string, agentID 
 		}
 	}
 	if confirmation == nil {
-		d.FinishOutput(checkpoint)
+		d.FinishOutput(fmt.Sprintf("seq=%d", lastSeq))
 	}
 	return confirmation, nil
 }

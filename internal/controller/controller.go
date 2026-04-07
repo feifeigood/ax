@@ -36,6 +36,8 @@ import (
 
 const plannerAgentID = "__planner"
 
+type ExecHandler func(resp *proto.ExecResponse) error
+
 // Controller is the main controller that coordinates all components.
 // It acts as a single-writer system for managing agentic loops.
 type Controller struct {
@@ -88,7 +90,7 @@ func New(ctx context.Context, config Config) (*Controller, error) {
 	}, nil
 }
 
-func (d *Controller) tryResuming(ctx context.Context, req *proto.ExecRequest, el executor.EventLog, registry map[string]agent.Agent, handler agent.OutputHandler) (history []*proto.Message, done bool, err error) {
+func (d *Controller) tryResuming(ctx context.Context, req *proto.ExecRequest, el executor.EventLog, registry map[string]agent.Agent, handler ExecHandler) (history []*proto.Message, done bool, err error) {
 	events, err := el.Events(ctx, req.ConversationId)
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to retrieve execution history: %w", err)
@@ -102,6 +104,19 @@ func (d *Controller) tryResuming(ctx context.Context, req *proto.ExecRequest, el
 			pendingExecID = ""
 		}
 		history = append(history, ev.Messages...)
+	}
+
+	if req.LastSeenSeq != 0 {
+		for _, ev := range events {
+			if ev.Seq > req.LastSeenSeq {
+				if err := handler(&proto.ExecResponse{
+					Outputs: ev.Messages,
+					Seq:     ev.Seq,
+				}); err != nil {
+					return nil, false, err
+				}
+			}
+		}
 	}
 
 	if pendingExecID == "" {
@@ -144,7 +159,7 @@ func (d *Controller) tryResuming(ctx context.Context, req *proto.ExecRequest, el
 // Exec executes a new agentic loop execution or resumes an existing one.
 // If id is empty, a UUID will be generated.
 // If the execution already exists, it will be resumed with optional new inputs.
-func (d *Controller) Exec(ctx context.Context, req *proto.ExecRequest, handler agent.OutputHandler) error {
+func (d *Controller) Exec(ctx context.Context, req *proto.ExecRequest, handler ExecHandler) error {
 	if req.ConversationId == "" {
 		return fmt.Errorf("conversation_id is required")
 	}
@@ -197,14 +212,25 @@ func (d *Controller) Exec(ctx context.Context, req *proto.ExecRequest, handler a
 	)
 }
 
-func (d *Controller) execute(ctx context.Context, conversationID string, execID string, agentID string, agentConfig *anypb.Any, history []*proto.Message, newInputs []*proto.Message, registry map[string]agent.Agent, handler agent.OutputHandler) error {
+func (d *Controller) execute(ctx context.Context, conversationID string, execID string, agentID string, agentConfig *anypb.Any, history []*proto.Message, newInputs []*proto.Message, registry map[string]agent.Agent, handler ExecHandler) error {
 	e := executor.DefaultExecutor(d.eventLog, registry)
-	var outputs []*proto.Message
 	outputCapturer := func(outgoing *proto.AgentOutputs) error {
-		outputs = append(outputs, outgoing.Messages...)
-		return handler(outgoing)
+		msg := &proto.ConversationEvent{
+			ConversationId: conversationID,
+			ExecId:         execID,
+			Messages:       outgoing.Messages,
+			State:          proto.State_STATE_PENDING,
+		}
+		seq, err := d.eventLog.Append(ctx, msg)
+		if err != nil {
+			return err
+		}
+		return handler(&proto.ExecResponse{
+			Outputs: msg.Messages,
+			Seq:     seq,
+		})
 	}
-	if err := d.eventLog.Append(ctx, &proto.ConversationEvent{
+	if _, err := d.eventLog.Append(ctx, &proto.ConversationEvent{
 		ConversationId: conversationID,
 		ExecId:         execID,
 		Messages:       newInputs,
@@ -220,12 +246,12 @@ func (d *Controller) execute(ctx context.Context, conversationID string, execID 
 	if err != nil {
 		return err
 	}
-	return d.eventLog.Append(ctx, &proto.ConversationEvent{
+	_, err = d.eventLog.Append(ctx, &proto.ConversationEvent{
 		ConversationId: conversationID,
 		ExecId:         execID,
-		Messages:       outputs,
 		State:          state,
 	})
+	return err
 }
 
 // Fork forks an execution from a source execution.

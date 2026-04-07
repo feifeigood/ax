@@ -38,12 +38,14 @@ type MemoryEventLog struct {
 	execEvents []*proto.ExecutionEvent
 }
 
-func (m *MemoryEventLog) Append(_ context.Context, event *proto.ConversationEvent) error {
+func (m *MemoryEventLog) Append(_ context.Context, event *proto.ConversationEvent) (int32, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	seq := int32(len(m.events) + 1)
+	event.Seq = seq
 	m.events = append(m.events, event)
-	return nil
+	return seq, nil
 }
 
 func (m *MemoryEventLog) AppendExec(_ context.Context, event *proto.ExecutionEvent) error {

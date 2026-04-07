@@ -168,8 +168,7 @@ message ExecRequest {
 // ExecResponse contains the result of an execution.
 message ExecResponse {
   repeated Message outputs = 1; // Output content
-  // TODO: int32 seq = 2;
-  // TODO: State state = 3;
+  int32 seq = 2;                // Seq of the outputs
 }
 
 message ForkRequest {

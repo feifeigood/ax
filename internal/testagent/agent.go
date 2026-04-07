@@ -30,6 +30,10 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
+// Please note that this is not production code. testagent is only for testing ax.
+// and it will be deleted once we have comprehensive agents and integration tests.
+// testagent is not meant to be used in production.
+
 func Agents() map[string]agent.Agent {
 	return map[string]agent.Agent{
 		"coding":            &CodingAgent{},
@@ -132,7 +136,7 @@ func (a *CodingAgent) Connect(ctx context.Context, execID string, start *proto.A
 			Content: &proto.Content{
 				Content: &proto.Content_Text{
 					Text: &proto.TextContent{
-						Text: "One last step, a summary...\n\n",
+						Text: "One last step, a summary...",
 					},
 				},
 			},
@@ -193,7 +197,7 @@ func (a *KubernetesDeployAgent) Connect(ctx context.Context, execID string, star
 				Content: &proto.Content{
 					Content: &proto.Content_Text{
 						Text: &proto.TextContent{
-							Text: fmt.Sprintf("\nPicked %v region(s) for deployment.\n", strings.Join(regions, ",")),
+							Text: fmt.Sprintf("Picked %v region(s) for deployment.", strings.Join(regions, ",")),
 						},
 					},
 				},
@@ -229,7 +233,7 @@ func (a *KubernetesDeployAgent) Connect(ctx context.Context, execID string, star
 					Content: &proto.Content{
 						Content: &proto.Content_Text{
 							Text: &proto.TextContent{
-								Text: "* Deploying to " + region + ", this may take a while...\n",
+								Text: "* Deploying to " + region + ", this may take a while...",
 							},
 						},
 					},
@@ -243,7 +247,7 @@ func (a *KubernetesDeployAgent) Connect(ctx context.Context, execID string, star
 					Content: &proto.Content{
 						Content: &proto.Content_Text{
 							Text: &proto.TextContent{
-								Text: "* kubectl apply -f deployment.yaml\n",
+								Text: "* kubectl apply -f deployment.yaml",
 							},
 						},
 					},
@@ -259,7 +263,7 @@ func (a *KubernetesDeployAgent) Connect(ctx context.Context, execID string, star
 					Content: &proto.Content{
 						Content: &proto.Content_Text{
 							Text: &proto.TextContent{
-								Text: fmt.Sprintf("* Deployment complete. You can access the service at https://%v.test.services.acme.com\n\n", region),
+								Text: fmt.Sprintf("* Deployment complete. You can access the service at https://%v.test.services.acme.com", region),
 							},
 						},
 					},

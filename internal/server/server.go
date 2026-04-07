@@ -26,7 +26,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/google/ax/internal/agent"
 	"github.com/google/ax/internal/config"
 	"github.com/google/ax/internal/controller"
 	"github.com/google/ax/proto"
@@ -50,10 +49,8 @@ func New(c *controller.Controller) *Server {
 // Exec executes a new agentic task with streaming responses.
 func (s *Server) Exec(req *proto.ExecRequest, stream grpc.ServerStreamingServer[proto.ExecResponse]) error {
 	// Create output handler to stream outputs back to client
-	outputHandler := agent.OutputHandler(func(outgoing *proto.AgentOutputs) error {
-		return stream.Send(&proto.ExecResponse{
-			Outputs: outgoing.Messages,
-		})
+	outputHandler := controller.ExecHandler(func(resp *proto.ExecResponse) error {
+		return stream.Send(resp)
 	})
 	return s.controller.Exec(stream.Context(), req, outputHandler)
 }
