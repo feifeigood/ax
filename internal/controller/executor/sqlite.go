@@ -17,11 +17,9 @@ package executor
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/google/ax/proto"
@@ -54,9 +52,7 @@ func OpenSQLiteEventLog(path string) (*SQLiteEventLog, error) {
 		CREATE TABLE IF NOT EXISTS conversation_log (
 			conversation_id TEXT NOT NULL,
 			seq INTEGER NOT NULL,
-			exec_id TEXT NOT NULL,
-			messages TEXT,
-			state INTEGER,
+			payload TEXT NOT NULL,
 			PRIMARY KEY (conversation_id, seq)
 		)`); err != nil {
 		db.Close()
@@ -93,27 +89,14 @@ func (l *SQLiteEventLog) Append(ctx context.Context, event *proto.ConversationEv
 		event.Seq = seq
 	}
 
-	var messagesJSON string
-	if len(event.Messages) > 0 {
-		var sb strings.Builder
-		sb.WriteString("[")
-		for i, m := range event.Messages {
-			if i > 0 {
-				sb.WriteString(",")
-			}
-			payload, err := marshalOpts.Marshal(m)
-			if err != nil {
-				return fmt.Errorf("sqlite_eventlog: marshal message: %w", err)
-			}
-			sb.Write(payload)
-		}
-		sb.WriteString("]")
-		messagesJSON = sb.String()
+	payload, err := marshalOpts.Marshal(event)
+	if err != nil {
+		return fmt.Errorf("sqlite_eventlog: marshal event: %w", err)
 	}
 
-	_, err := l.db.ExecContext(ctx,
-		"INSERT INTO conversation_log (conversation_id, seq, exec_id, messages, state) VALUES (?, ?, ?, ?, ?)",
-		event.ConversationId, event.Seq, event.ExecId, messagesJSON, int32(event.State))
+	_, err = l.db.ExecContext(ctx,
+		"INSERT INTO conversation_log (conversation_id, seq, payload) VALUES (?, ?, ?)",
+		event.ConversationId, event.Seq, string(payload))
 
 	if err != nil {
 		return fmt.Errorf("sqlite_eventlog: insert conversation: %w", err)
@@ -149,7 +132,7 @@ func (l *SQLiteEventLog) AppendExec(ctx context.Context, event *proto.ExecutionE
 
 // Events retrieves all events from the database for a conversation, ordered by seq and execution order.
 func (l *SQLiteEventLog) Events(ctx context.Context, conversationID string) ([]*proto.ConversationEvent, error) {
-	rows, err := l.db.QueryContext(ctx, "SELECT seq, exec_id, messages, state FROM conversation_log WHERE conversation_id = ? ORDER BY seq", conversationID)
+	rows, err := l.db.QueryContext(ctx, "SELECT payload FROM conversation_log WHERE conversation_id = ? ORDER BY seq", conversationID)
 	if err != nil {
 		return nil, fmt.Errorf("sqlite_eventlog: query conversation: %w", err)
 	}
@@ -157,36 +140,16 @@ func (l *SQLiteEventLog) Events(ctx context.Context, conversationID string) ([]*
 
 	var events []*proto.ConversationEvent
 	for rows.Next() {
-		var seq int32
-		var execID string
-		var messagesJSON sql.NullString
-		var state int32
-		if err := rows.Scan(&seq, &execID, &messagesJSON, &state); err != nil {
+		var payload string
+		if err := rows.Scan(&payload); err != nil {
 			return nil, fmt.Errorf("sqlite_eventlog: scan conversation: %w", err)
 		}
 
-		var messages []*proto.Message
-		if messagesJSON.Valid && messagesJSON.String != "" {
-			var rawMessages []json.RawMessage
-			if err := json.Unmarshal([]byte(messagesJSON.String), &rawMessages); err != nil {
-				return nil, fmt.Errorf("sqlite_eventlog: unmarshal raw messages: %w", err)
-			}
-			for _, raw := range rawMessages {
-				m := &proto.Message{}
-				if err := unmarshalOpts.Unmarshal(raw, m); err != nil {
-					return nil, fmt.Errorf("sqlite_eventlog: unmarshal proto message: %w", err)
-				}
-				messages = append(messages, m)
-			}
+		ev := &proto.ConversationEvent{}
+		if err := unmarshalOpts.Unmarshal([]byte(payload), ev); err != nil {
+			return nil, fmt.Errorf("sqlite_eventlog: unmarshal event: %w", err)
 		}
-
-		events = append(events, &proto.ConversationEvent{
-			ConversationId: conversationID,
-			Seq:            seq,
-			ExecId:         execID,
-			Messages:       messages,
-			State:          proto.State(state),
-		})
+		events = append(events, ev)
 	}
 
 	if err := rows.Err(); err != nil {
