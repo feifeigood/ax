@@ -279,3 +279,80 @@ func TestController_Exec_LastSeenSeq(t *testing.T) {
 		t.Fatalf("expected 'msg 2', got %v", msgs[0].GetContent().GetText().GetText())
 	}
 }
+
+func TestController_Exec_WaitsForConfirmation(t *testing.T) {
+	ctx := context.Background()
+	cid := "test-conv-conf"
+	execID := "test-exec-conf"
+
+	log := &mockEventLog{}
+
+	// 1. History has a pending execution.
+	log.events = []*proto.ConversationEvent{
+		{
+			ConversationId: cid,
+			ExecId:         execID,
+			State:          proto.State_STATE_PENDING,
+			Seq:            1,
+		},
+	}
+
+	// 2. The execution history ends with a confirmation question.
+	questionMsg := &proto.Message{
+		Role: "assistant",
+		Content: &proto.Content{
+			Content: &proto.Content_Confirmation{
+				Confirmation: &proto.ConfirmationContent{
+					Question: "Are you sure?",
+				},
+			},
+		},
+	}
+
+	log.execEvents = []*proto.ExecutionEvent{
+		{
+			ExecId:  execID,
+			AgentId: "__planner",
+			State:   proto.State_STATE_PENDING,
+			Outputs: []*proto.Message{
+				questionMsg,
+			},
+		},
+	}
+
+	c, err := New(ctx, Config{
+		EventLogBuilder: func() (executor.EventLog, error) {
+			return log, nil
+		},
+		PlannerBuilder: func(ctx context.Context, r *Registry) (agent.Agent, error) {
+			return &dummyAgent{}, nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+
+	var msgs []*proto.Message
+	handler := ExecHandler(func(resp *proto.ExecResponse) error {
+		msgs = append(msgs, resp.Outputs...)
+		return nil
+	})
+
+	// Call Exec without providing an answer.
+	err = c.Exec(ctx, &proto.ExecRequest{
+		ConversationId: cid,
+	}, handler)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// We expect to receive the confirmation question again.
+	if len(msgs) != 1 {
+		t.Fatalf("expected 1 message, got %d", len(msgs))
+	}
+	if msgs[0].GetContent().GetConfirmation().GetQuestion() != "Are you sure?" {
+		t.Fatalf("expected 'Are you sure?', got %v", msgs[0].GetContent().GetConfirmation().GetQuestion())
+	}
+}
+
