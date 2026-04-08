@@ -12,15 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package internal_test
 
 import (
 	"context"
-	"fmt"
-	"log"
-	"os"
 	"path/filepath"
 	"strings"
+	"testing"
 
 	"github.com/google/ax/internal/agent"
 	"github.com/google/ax/internal/config"
@@ -30,59 +28,68 @@ import (
 	"github.com/google/uuid"
 )
 
-func main() {
+func TestMulti(t *testing.T) {
 	ctx := context.Background()
 	input := "Send the word 'oRanGe' to the local-echo-agent. Take its exact output and send it to the remote-text-processor. Take its exact output and send it to the uppercase agent. Return the final output."
 	execID := uuid.New().String()
 
-	// 1. Create a local agent
-	echoAgent, err := createLocalAgent()
+	// 1. Create local agents with specific behaviors to make the test self-contained.
+	echoAgent, err := createLocalAgent(func(s string) string { return strings.ToLower(s) })
 	if err != nil {
-		log.Fatalf("Error creating local agent: %v\n", err)
+		t.Fatalf("Error creating local agent: %v", err)
+	}
+
+	remoteAgent, err := createLocalAgent(func(s string) string { return "Remote Prefix: " + s })
+	if err != nil {
+		t.Fatalf("Error creating remote agent: %v", err)
+	}
+
+	uppercaseAgent, err := createLocalAgent(func(s string) string { return "UPPERCASE: " + strings.ToUpper(s) })
+	if err != nil {
+		t.Fatalf("Error creating uppercase agent: %v", err)
 	}
 
 	// 2. Initialize controller
+	dbPath := filepath.Join(t.TempDir(), "test_multi.db")
 	c, err := controller.New(ctx, controller.Config{
 		EventLogBuilder: func() (executor.EventLog, error) {
-			return executor.OpenSQLiteEventLog(filepath.Join(os.TempDir(), "test_multi.db"))
+			return executor.OpenSQLiteEventLog(dbPath)
 		},
 		PlannerBuilder: func(ctx context.Context, r *controller.Registry) (agent.Agent, error) {
 			return &mockPlanner{}, nil
 		},
 	})
 	if err != nil {
-		log.Fatalf("Error creating controller: %v\n", err)
+		t.Fatalf("Error creating controller: %v", err)
 	}
 	defer c.Close()
 
-	// 3. Register Local Agent
+	// 3. Register Agents
 	if err := c.Registry().RegisterLocal(config.LocalAgentConfig{
 		ID:          "local-echo-agent",
 		Name:        "Local Echo Agent",
 		Description: "Converts text to lowercase",
 		Agent:       echoAgent,
 	}); err != nil {
-		log.Fatalf("Error registering local agent: %v\n", err)
+		t.Fatalf("Error registering local agent: %v", err)
 	}
 
-	// 4. Register Remote Agent
-	if err := c.Registry().RegisterRemote(config.RemoteAgentConfig{
+	if err := c.Registry().RegisterLocal(config.LocalAgentConfig{
 		ID:          "remote-text-processor",
 		Name:        "Remote Text Processor",
 		Description: "Adds the prefix 'Remote Prefix: ' to the text",
-		Address:     "localhost:50051",
+		Agent:       remoteAgent,
 	}); err != nil {
-		log.Fatalf("Error registering remote agent: %v\n", err)
+		t.Fatalf("Error registering remote agent: %v", err)
 	}
 
-	// 5. Register Sandbox Agent
-	if err := c.Registry().RegisterKubernetesSandbox(ctx, config.SandboxAgentConfig{
-		ID:                 "uppercase",
-		SandboxTemplateRef: "uppercase-agent-template",
-		ContainerPort:      8494,
-		UseRouter:          true,
+	if err := c.Registry().RegisterLocal(config.LocalAgentConfig{
+		ID:          "uppercase",
+		Name:        "Uppercase Agent",
+		Description: "Converts text to uppercase",
+		Agent:       uppercaseAgent,
 	}); err != nil {
-		log.Fatalf("Error registering sandbox agent: %v\n", err)
+		t.Fatalf("Error registering sandbox agent: %v", err)
 	}
 
 	inputs := []*proto.Message{
@@ -98,30 +105,46 @@ func main() {
 		},
 	}
 
-	log.Printf("ID: %s\n", execID)
+	t.Logf("ID: %s", execID)
 
+	var finalResult string
 	handler := controller.ExecHandler(func(resp *proto.ExecResponse) error {
 		for _, m := range resp.Outputs {
 			if textContent := m.GetContent().GetText(); textContent != nil {
-				fmt.Printf("Output received: %s\n", textContent.Text)
+				t.Logf("Output received: %s", textContent.Text)
+				if strings.HasPrefix(textContent.Text, "Final Result:") {
+					finalResult = textContent.Text
+				}
 			}
 		}
 		return nil
 	})
 
 	for i := range 4 {
-		log.Printf("\n--- Executing step %d ---\n", i+1)
+		t.Logf("\n--- Executing step %d ---", i+1)
+		var reqInputs []*proto.Message
+		if i == 0 {
+			reqInputs = inputs
+		}
 		if err := c.Exec(ctx, &proto.ExecRequest{
 			ConversationId: execID,
-			AgentId:        "planner",
-			Inputs:         inputs,
+			AgentId:        "__planner",
+			Inputs:         reqInputs,
 		}, handler); err != nil {
-			log.Fatalf("Error executing step %d: %v\n", i+1, err)
+			t.Fatalf("Error executing step %d: %v", i+1, err)
 		}
+	}
+
+	if finalResult == "" {
+		t.Fatal("Expected a final result, but got none")
+	}
+	expected := "Final Result: UPPERCASE: REMOTE PREFIX: ORANGE"
+	if finalResult != expected {
+		t.Fatalf("Expected final result %q, got %q", expected, finalResult)
 	}
 }
 
-func createLocalAgent() (*agent.LocalAgent, error) {
+func createLocalAgent(transform func(string) string) (*agent.LocalAgent, error) {
 	processFunc := func(ctx context.Context, execID string, start *proto.AgentStart, e agent.Executor, handler agent.OutputHandler) error {
 		for _, msg := range start.Messages {
 			content := msg.GetContent()
@@ -139,7 +162,7 @@ func createLocalAgent() (*agent.LocalAgent, error) {
 						Content: &proto.Content{
 							Content: &proto.Content_Text{
 								Text: &proto.TextContent{
-									Text: strings.ToLower(textContent.Text),
+									Text: transform(textContent.Text),
 								},
 							},
 						},
