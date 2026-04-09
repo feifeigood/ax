@@ -30,6 +30,7 @@ const (
 	AgentTypeLocal             AgentType = "local"
 	AgentTypeRemote            AgentType = "remote"
 	AgentTypeKubernetesSandbox AgentType = "k8s_sandbox"
+	AgentTypeColab             AgentType = "colab"
 )
 
 // AgentInfo contains metadata about a registered agent.
@@ -153,6 +154,47 @@ func (r *Registry) RegisterKubernetesSandbox(ctx context.Context, cfg config.San
 		Name:        cfg.Name,
 		Description: cfg.Description,
 		Type:        AgentTypeKubernetesSandbox,
+		Metadata:    cfg.Metadata,
+	}
+
+	return nil
+}
+
+// RegisterColab registers a Colab agent that executes a local Python file
+// on a remote Colab session via the colab CLI.
+func (r *Registry) RegisterColab(cfg config.ColabAgentConfig) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if err := validateID(cfg.ID); err != nil {
+		return err
+	}
+
+	if _, ok := r.agents[cfg.ID]; ok {
+		return fmt.Errorf("agent %s already registered", cfg.ID)
+	}
+
+	colabAgent, err := agent.NewColabAgent(agent.ColabAgentConfig{
+		ID:              cfg.ID,
+		LocalFile:       cfg.LocalFile,
+		DriveFile:       cfg.DriveFile,
+		Accelerator:     cfg.Accelerator,
+		DriveMountPath:  cfg.DriveMountPath,
+		Requirements:    cfg.Requirements,
+		InputFlag:       cfg.InputFlag,
+		OutputImage:     cfg.OutputImage,
+		OutputDrivePath: cfg.OutputDrivePath,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create colab agent: %w", err)
+	}
+
+	r.agents[cfg.ID] = colabAgent
+	r.agentInfo[cfg.ID] = &AgentInfo{
+		ID:          cfg.ID,
+		Name:        cfg.Name,
+		Description: cfg.Description,
+		Type:        AgentTypeColab,
 		Metadata:    cfg.Metadata,
 	}
 

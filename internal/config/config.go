@@ -35,6 +35,7 @@ type Config struct {
 type RegistryConfig struct {
 	RemoteAgents            []RemoteAgentConfig  `yaml:"remote_agents,omitempty"`
 	KubernetesSandboxAgents []SandboxAgentConfig `yaml:"k8s_sandbox_agents,omitempty"`
+	ColabAgents             []ColabAgentConfig   `yaml:"colab_agents,omitempty"`
 }
 
 // ServerConfig configures the gRPC server.
@@ -87,6 +88,22 @@ type SandboxAgentConfig struct {
 	ContainerPort int               `yaml:"container_port,omitempty"` // Optional container port, defaults to 8494
 	UseRouter     bool              `yaml:"use_router,omitempty"`     // Override port-forwarding to use Sandbox Router
 	Metadata      map[string]string `yaml:"metadata,omitempty"`       // Optional metadata
+}
+
+// ColabAgentConfig configures a Colab agent to register on startup.
+type ColabAgentConfig struct {
+	ID              string            `yaml:"id"`                          // Unique agent identifier
+	Name            string            `yaml:"name"`                        // Human-readable name
+	Description     string            `yaml:"description"`                 // Description of agent capabilities
+	LocalFile       string            `yaml:"local_file,omitempty"`        // Path to local .py or .ipynb file (uploaded to VM)
+	DriveFile       string            `yaml:"drive_file,omitempty"`        // Path to .ipynb file in Google Drive (e.g. MyDrive/notebooks/nb.ipynb)
+	Accelerator     string            `yaml:"accelerator,omitempty"`       // Accelerator type (optional), e.g. "tpu-v5e1", "gpu-A100"
+	DriveMountPath  string            `yaml:"drive_mount_path,omitempty"`  // Path to mount Google Drive (optional), default: "/content/drive"
+	Requirements    string            `yaml:"requirements,omitempty"`      // Path to requirements.txt (optional)
+	InputFlag       string            `yaml:"input_flag,omitempty"`        // Input parameter name (optional). For .py, passed as --<name>. For .ipynb, set as a variable before %run
+	OutputImage     string            `yaml:"output_image,omitempty"`      // Local path to download the output image to
+	OutputDrivePath string            `yaml:"output_drive_path,omitempty"` // Google Drive path to save converted .ipynb (e.g. MyDrive/notebooks/out.ipynb)
+	Metadata        map[string]string `yaml:"metadata,omitempty"`          // Optional metadata
 }
 
 type LocalAgentConfig struct {

@@ -48,3 +48,21 @@ registry:
   #     sandbox_template_ref: "uppercase-agent-template"
   #     container_port: 8494
   #     use_router: true
+
+  # colab_agents:
+  #   - id: "plotter"
+  #     name: "Function Plotter"
+  #     description: "Plots mathematical functions on a Colab session."
+  #     local_file: "./examples/colab_agent/plot.py"
+  #     requirements: "./examples/colab_agent/requirements.txt"
+  #     input_flag: "input"
+  #     output_image: "./examples/colab_agent/plot.png"
+  #     output_drive_path: "MyDrive/notebooks/plot.ipynb"
+  #
+  #   - id: "data-analysis"
+  #     name: "Data Analysis"
+  #     description: "Analyzes data using a Colab notebook on Google Drive."
+  #     drive_file: "MyDrive/notebooks/data_analysis.ipynb"
+  #     input_flag: "query"
+  #     output_image: "./examples/colab_agent/chart.png"
+
