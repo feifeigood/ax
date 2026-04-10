@@ -356,3 +356,147 @@ func TestController_Exec_WaitsForConfirmation(t *testing.T) {
 	}
 }
 
+func TestController_Exec_InternalOnly(t *testing.T) {
+	ctx := context.Background()
+	cid := "test-conv-internal"
+
+	log := &mockEventLog{}
+
+	// Create an agent that emits one internal-only message and one regular message.
+	a := &mockAgentFunc{
+		connectFunc: func(ctx context.Context, execID string, start *proto.AgentStart, e agent.Executor, o agent.OutputHandler) error {
+			// If we already have the public message in history, don't emit anything.
+			for _, m := range start.Messages {
+				if m.GetContent().GetText().GetText() == "public message" {
+					return nil
+				}
+			}
+			// Emit internal-only message
+			if err := o(&proto.AgentOutputs{
+				Messages: []*proto.Message{
+					{Role: "assistant", Content: &proto.Content{Content: &proto.Content_Text{Text: &proto.TextContent{Text: "internal message"}}}},
+				},
+				InternalOnly: true,
+			}); err != nil {
+				return err
+			}
+			// Emit regular message
+			return o(&proto.AgentOutputs{
+				Messages: []*proto.Message{
+					{Role: "assistant", Content: &proto.Content{Content: &proto.Content_Text{Text: &proto.TextContent{Text: "public message"}}}},
+				},
+			})
+		},
+	}
+
+	c, err := New(ctx, Config{
+		EventLogBuilder: func() (executor.EventLog, error) {
+			return log, nil
+		},
+		PlannerBuilder: func(ctx context.Context, r *Registry) (agent.Agent, error) {
+			return a, nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+
+	var msgs []*proto.Message
+	handler := ExecHandler(func(resp *proto.ExecResponse) error {
+		msgs = append(msgs, resp.Outputs...)
+		return nil
+	})
+
+	err = c.Exec(ctx, &proto.ExecRequest{
+		ConversationId: cid,
+		Inputs: []*proto.Message{
+			{Role: "user", Content: &proto.Content{Content: &proto.Content_Text{Text: &proto.TextContent{Text: "hello"}}}},
+		},
+	}, handler)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify that ONLY the public message was emitted.
+	if len(msgs) != 1 {
+		t.Fatalf("expected 1 message emitted, got %d", len(msgs))
+	}
+	if msgs[0].GetContent().GetText().GetText() != "public message" {
+		t.Fatalf("expected 'public message', got %v", msgs[0].GetContent().GetText().GetText())
+	}
+
+	// Verify that internal messages are NOT stored in ConversationEvent.
+	if len(log.events) != 3 {
+		t.Fatalf("expected 3 events in log.events, got %d", len(log.events))
+	}
+	
+	// Event 0: Inputs
+	// Event 1: Public message
+	if log.events[1].Messages[0].GetContent().GetText().GetText() != "public message" {
+		t.Fatalf("expected 'public message' in log.events, got %v", log.events[1].Messages[0].GetContent().GetText().GetText())
+	}
+
+	// Verify that BOTH messages ARE stored in ExecutionEvent.
+	if len(log.execEvents) != 3 {
+		t.Fatalf("expected 3 events in log.execEvents, got %d", len(log.execEvents))
+	}
+	
+	// Event 1 in execEvents should contain both outputs.
+	outputs := log.execEvents[1].Outputs
+	if len(outputs) != 2 {
+		t.Fatalf("expected 2 outputs in execEvent, got %d", len(outputs))
+	}
+	if outputs[0].GetContent().GetText().GetText() != "internal message" {
+		t.Fatalf("expected 'internal message' in execEvent, got %v", outputs[0].GetContent().GetText().GetText())
+	}
+	if outputs[1].GetContent().GetText().GetText() != "public message" {
+		t.Fatalf("expected 'public message' in execEvent, got %v", outputs[1].GetContent().GetText().GetText())
+	}
+
+	// Test resumption with LastSeenSeq
+	var resumedMsgs []*proto.Message
+	resumedHandler := ExecHandler(func(resp *proto.ExecResponse) error {
+		resumedMsgs = append(resumedMsgs, resp.Outputs...)
+		return nil
+	})
+
+	c2, err := New(ctx, Config{
+		EventLogBuilder: func() (executor.EventLog, error) {
+			return log, nil
+		},
+		PlannerBuilder: func(ctx context.Context, r *Registry) (agent.Agent, error) {
+			return a, nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c2.Close()
+
+	err = c2.Exec(ctx, &proto.ExecRequest{
+		ConversationId: cid,
+		LastSeenSeq:    1,
+	}, resumedHandler)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(resumedMsgs) != 1 {
+		t.Fatalf("expected 1 message resumed, got %d", len(resumedMsgs))
+	}
+	if resumedMsgs[0].GetContent().GetText().GetText() != "public message" {
+		t.Fatalf("expected 'public message' resumed, got %v", resumedMsgs[0].GetContent().GetText().GetText())
+	}
+}
+
+type mockAgentFunc struct {
+	connectFunc func(ctx context.Context, execID string, start *proto.AgentStart, e agent.Executor, o agent.OutputHandler) error
+}
+
+func (m *mockAgentFunc) Connect(ctx context.Context, execID string, start *proto.AgentStart, e agent.Executor, o agent.OutputHandler) error {
+	return m.connectFunc(ctx, execID, start, e, o)
+}
+func (m *mockAgentFunc) HealthCheck(ctx context.Context) error { return nil }
+func (m *mockAgentFunc) Close() error                          { return nil }
+

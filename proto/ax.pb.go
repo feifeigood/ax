@@ -153,8 +153,12 @@ func (x *AgentStart) GetMessages() []*Message {
 }
 
 type AgentOutputs struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Messages      []*Message             `protobuf:"bytes,1,rep,name=messages,proto3" json:"messages,omitempty"` // TODO: Add awaiting_more field.
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Messages []*Message             `protobuf:"bytes,1,rep,name=messages,proto3" json:"messages,omitempty"`
+	// If true, these outputs are stored only in the execution log
+	// (for resumption) and are not emitted to the client or stored
+	// in the conversation history.
+	InternalOnly  bool `protobuf:"varint,2,opt,name=internal_only,json=internalOnly,proto3" json:"internal_only,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -194,6 +198,13 @@ func (x *AgentOutputs) GetMessages() []*Message {
 		return x.Messages
 	}
 	return nil
+}
+
+func (x *AgentOutputs) GetInternalOnly() bool {
+	if x != nil {
+		return x.InternalOnly
+	}
+	return false
 }
 
 type AgentMessage struct {
@@ -1545,9 +1556,10 @@ const file_proto_ax_proto_rawDesc = "" +
 	"AgentStart\x12\x19\n" +
 	"\bagent_id\x18\x01 \x01(\tR\aagentId\x12,\n" +
 	"\x06config\x18\x02 \x01(\v2\x14.google.protobuf.AnyR\x06config\x12*\n" +
-	"\bmessages\x18\x03 \x03(\v2\x0e.proto.MessageR\bmessages\":\n" +
+	"\bmessages\x18\x03 \x03(\v2\x0e.proto.MessageR\bmessages\"_\n" +
 	"\fAgentOutputs\x12*\n" +
-	"\bmessages\x18\x01 \x03(\v2\x0e.proto.MessageR\bmessages\"\x8a\x01\n" +
+	"\bmessages\x18\x01 \x03(\v2\x0e.proto.MessageR\bmessages\x12#\n" +
+	"\rinternal_only\x18\x02 \x01(\bR\finternalOnly\"\x8a\x01\n" +
 	"\fAgentMessage\x12\x17\n" +
 	"\aexec_id\x18\x01 \x01(\tR\x06execId\x12)\n" +
 	"\x05start\x18\x02 \x01(\v2\x11.proto.AgentStartH\x00R\x05start\x12/\n" +

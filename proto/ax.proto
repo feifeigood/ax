@@ -31,6 +31,12 @@ message AgentStart {
 
 message AgentOutputs {
   repeated Message messages = 1;
+
+  // If true, these outputs are stored only in the execution log
+  // (for resumption) and are not emitted to the client or stored
+  // in the conversation history.
+  bool internal_only = 2; 
+
   // TODO: Add awaiting_more field.
 }
 

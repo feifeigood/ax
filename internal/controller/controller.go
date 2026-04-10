@@ -210,6 +210,9 @@ func (d *Controller) Exec(ctx context.Context, req *proto.ExecRequest, handler E
 func (d *Controller) execute(ctx context.Context, conversationID string, execID string, agentID string, agentConfig *anypb.Any, history []*proto.Message, newInputs []*proto.Message, registry map[string]agent.Agent, handler ExecHandler) error {
 	e := executor.DefaultExecutor(d.eventLog, registry)
 	outputCapturer := func(outgoing *proto.AgentOutputs) error {
+		if outgoing.InternalOnly {
+			return nil
+		}
 		msg := &proto.ConversationEvent{
 			ConversationId: conversationID,
 			ExecId:         execID,
