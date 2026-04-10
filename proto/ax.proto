@@ -222,4 +222,5 @@ message GeminiConfig {
   string system_prompt = 2;               // System prompt for the agent
   int32 max_tokens = 3;                   // Maximum number of tokens to generate
   google.protobuf.Duration timeout = 4;   // e.g. "10s"
+  repeated string tools = 5;              // List of enabled tools (e.g. "google_search")
 }

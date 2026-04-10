@@ -1485,6 +1485,7 @@ type GeminiConfig struct {
 	SystemPrompt  string                 `protobuf:"bytes,2,opt,name=system_prompt,json=systemPrompt,proto3" json:"system_prompt,omitempty"` // System prompt for the agent
 	MaxTokens     int32                  `protobuf:"varint,3,opt,name=max_tokens,json=maxTokens,proto3" json:"max_tokens,omitempty"`         // Maximum number of tokens to generate
 	Timeout       *durationpb.Duration   `protobuf:"bytes,4,opt,name=timeout,proto3" json:"timeout,omitempty"`                               // e.g. "10s"
+	Tools         []string               `protobuf:"bytes,5,rep,name=tools,proto3" json:"tools,omitempty"`                                   // List of enabled tools (e.g. "google_search")
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1543,6 +1544,13 @@ func (x *GeminiConfig) GetMaxTokens() int32 {
 func (x *GeminiConfig) GetTimeout() *durationpb.Duration {
 	if x != nil {
 		return x.Timeout
+	}
+	return nil
+}
+
+func (x *GeminiConfig) GetTools() []string {
+	if x != nil {
+		return x.Tools
 	}
 	return nil
 }
@@ -1640,13 +1648,14 @@ const file_proto_ax_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\b\n" +
 	"\x06config\"1\n" +
 	"\x15RegisterAgentResponse\x12\x18\n" +
-	"\ahealthy\x18\x01 \x01(\bR\ahealthy\"\x9d\x01\n" +
+	"\ahealthy\x18\x01 \x01(\bR\ahealthy\"\xb3\x01\n" +
 	"\fGeminiConfig\x12\x14\n" +
 	"\x05model\x18\x01 \x01(\tR\x05model\x12#\n" +
 	"\rsystem_prompt\x18\x02 \x01(\tR\fsystemPrompt\x12\x1d\n" +
 	"\n" +
 	"max_tokens\x18\x03 \x01(\x05R\tmaxTokens\x123\n" +
-	"\atimeout\x18\x04 \x01(\v2\x19.google.protobuf.DurationR\atimeout*X\n" +
+	"\atimeout\x18\x04 \x01(\v2\x19.google.protobuf.DurationR\atimeout\x12\x14\n" +
+	"\x05tools\x18\x05 \x03(\tR\x05tools*X\n" +
 	"\x05State\x12\x15\n" +
 	"\x11STATE_UNSPECIFIED\x10\x00\x12\x11\n" +
 	"\rSTATE_PENDING\x10\x01\x12\x10\n" +

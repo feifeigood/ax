@@ -78,10 +78,27 @@ func (a *GeminiAgent) Connect(ctx context.Context, execID string, start *proto.A
 	if cfg.SystemPrompt != "" {
 		systemPrompt = genai.Text(cfg.SystemPrompt)[0]
 	}
+	var tools []*genai.Tool
+	for _, t := range cfg.Tools {
+		switch t {
+		case "google_search":
+			tools = append(tools, &genai.Tool{GoogleSearch: &genai.GoogleSearch{}})
+		case "url_context":
+			tools = append(tools, &genai.Tool{URLContext: &genai.URLContext{}})
+		case "code_execution":
+			tools = append(tools, &genai.Tool{CodeExecution: &genai.ToolCodeExecution{}})
+		case "google_maps":
+			tools = append(tools, &genai.Tool{GoogleMaps: &genai.GoogleMaps{}})
+		default:
+			return fmt.Errorf("unsupported tool: %q", t)
+		}
+	}
+
 	resp, err := client.Models.GenerateContent(ctx, cfg.Model, contents, &genai.GenerateContentConfig{
 		SystemInstruction: systemPrompt,
 		MaxOutputTokens:   cfg.MaxTokens,
 		CandidateCount:    1,
+		Tools:             tools,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to generate: %w", err)
