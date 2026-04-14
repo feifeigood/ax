@@ -177,12 +177,6 @@ message ExecResponse {
   int32 seq = 2;                // Seq of the outputs
 }
 
-message ForkRequest {
-}
-
-message ForkResponse {
-}
-
 message RemoteAgentConfig {
   string address = 1;     // gRPC address for remote agents
 }
@@ -209,11 +203,39 @@ service AXService {
   // If the conversation_id already exists, it will be resumed.
   rpc Exec(ExecRequest) returns (stream ExecResponse);
 
-  // Fork forks an event log from a specific conversation.
-  rpc Fork(ForkRequest) returns (ForkResponse);
-
   // RegisterAgent registers a new agent with the controller
   rpc RegisterAgent(RegisterAgentRequest) returns (RegisterAgentResponse);
+}
+
+message ListRequest {
+  string conversation_id = 1;
+}
+
+message ListResponse {
+  repeated ConversationEvent events = 1;
+  // TODO: Do we need pagination?
+}
+
+message DeleteRequest {
+  string conversation_id = 1;
+}
+
+message DeleteResponse {}
+
+message ForkRequest {}
+
+message ForkResponse {}
+
+service AXEventLogService {
+  // List conversational events.
+  rpc List(ListRequest) returns (ListResponse);
+
+  // Deletes conversational events and all event log resources
+  // for its children executions.
+  rpc Delete(DeleteRequest) returns (DeleteResponse);
+
+  // Fork forks an event log from a specific conversation.
+  rpc Fork(ForkRequest) returns (ForkResponse);
 }
 
 // GeminiConfig is the configuration for a Gemini agent.

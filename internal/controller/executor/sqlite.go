@@ -188,6 +188,62 @@ func (l *SQLiteEventLog) ExecEvents(ctx context.Context, execID string) ([]*prot
 	return events, nil
 }
 
+// DeleteEvents deletes all events for a specific conversation ID and its child executions.
+func (l *SQLiteEventLog) DeleteEvents(ctx context.Context, conversationID string) error {
+	tx, err := l.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("sqlite_eventlog: begin tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	// TODO(jbd): Update the schema to include conversation_id at every execution event.
+
+	// Get all exec_ids for this conversation
+	rows, err := tx.QueryContext(ctx, "SELECT payload FROM conversation_log WHERE conversation_id = ?", conversationID)
+	if err != nil {
+		return fmt.Errorf("sqlite_eventlog: query conversation: %w", err)
+	}
+	defer rows.Close()
+
+	var execIDs []string
+	for rows.Next() {
+		var payload string
+		if err := rows.Scan(&payload); err != nil {
+			return fmt.Errorf("sqlite_eventlog: scan conversation: %w", err)
+		}
+
+		ev := &proto.ConversationEvent{}
+		if err := unmarshalOpts.Unmarshal([]byte(payload), ev); err != nil {
+			return fmt.Errorf("sqlite_eventlog: unmarshal event: %w", err)
+		}
+		if ev.ExecId != "" {
+			execIDs = append(execIDs, ev.ExecId)
+		}
+	}
+
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("sqlite_eventlog: iterate conversation: %w", err)
+	}
+
+	// Delete from execution_log
+	for _, execID := range execIDs {
+		if _, err := tx.ExecContext(ctx, "DELETE FROM execution_log WHERE exec_id = ?", execID); err != nil {
+			return fmt.Errorf("sqlite_eventlog: delete exec %s: %w", execID, err)
+		}
+	}
+
+	// Delete from conversation_log
+	if _, err := tx.ExecContext(ctx, "DELETE FROM conversation_log WHERE conversation_id = ?", conversationID); err != nil {
+		return fmt.Errorf("sqlite_eventlog: delete conversation: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("sqlite_eventlog: commit tx: %w", err)
+	}
+
+	return nil
+}
+
 // Close releases the database connection.
 func (l *SQLiteEventLog) Close() error {
 	return l.db.Close()

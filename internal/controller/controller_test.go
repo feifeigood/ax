@@ -16,57 +16,13 @@ package controller
 
 import (
 	"context"
-	"sync"
 	"testing"
 
 	"github.com/google/ax/internal/agent"
 	"github.com/google/ax/internal/controller/executor"
+	"github.com/google/ax/internal/controller/executor/executortest"
 	"github.com/google/ax/proto"
 )
-
-type mockEventLog struct {
-	mu         sync.Mutex
-	events     []*proto.ConversationEvent
-	execEvents []*proto.ExecutionEvent
-}
-
-func (m *mockEventLog) Append(ctx context.Context, event *proto.ConversationEvent) (int32, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	seq := int32(len(m.events) + 1)
-	event.Seq = seq
-	m.events = append(m.events, event)
-	return seq, nil
-}
-
-func (m *mockEventLog) AppendExec(ctx context.Context, event *proto.ExecutionEvent) error {
-	m.execEvents = append(m.execEvents, event)
-	return nil
-}
-
-func (m *mockEventLog) Events(ctx context.Context, conversationID string) ([]*proto.ConversationEvent, error) {
-	var out []*proto.ConversationEvent
-	for _, ev := range m.events {
-		if ev.ConversationId == conversationID {
-			out = append(out, ev)
-		}
-	}
-	return out, nil
-}
-
-func (m *mockEventLog) ExecEvents(ctx context.Context, execID string) ([]*proto.ExecutionEvent, error) {
-	var out []*proto.ExecutionEvent
-	for _, ev := range m.execEvents {
-		if ev.ExecId == execID {
-			out = append(out, ev)
-		}
-	}
-	return out, nil
-}
-
-func (m *mockEventLog) Close() error {
-	return nil
-}
 
 type dummyAgent struct{}
 
@@ -92,7 +48,7 @@ func TestController_Exec_ResumptionAndIDGeneration(t *testing.T) {
 	}
 
 	// Case 1: No history, new inputs. Should create a new execution with a UUID.
-	log := &mockEventLog{}
+	log := &executortest.MemoryEventLog{}
 	c, err := New(ctx, Config{
 		EventLogBuilder: func() (executor.EventLog, error) {
 			return log, nil
@@ -113,17 +69,17 @@ func TestController_Exec_ResumptionAndIDGeneration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(log.events) == 0 {
+	if len(log.AllEvents) == 0 {
 		t.Fatal("expected events to be logged")
 	}
-	execID := log.events[0].ExecId
+	execID := log.AllEvents[0].ExecId
 	if execID == "" || execID == cid {
 		t.Fatalf("expected a new random execID, got %v", execID)
 	}
 
 	// Case 2: History exists, PENDING state, inputs empty. Should replay/resume.
 	// Modify the event logged by logPending in Case 1 to use dummy-agent.
-	log.events[len(log.events)-1].State = proto.State_STATE_PENDING
+	log.AllEvents[len(log.AllEvents)-1].State = proto.State_STATE_PENDING
 
 	err = c.Exec(ctx, &proto.ExecRequest{
 		ConversationId: cid,
@@ -133,22 +89,22 @@ func TestController_Exec_ResumptionAndIDGeneration(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Replay should have called `e.Exec` for that `execID`.
-	lastEventID := log.events[len(log.events)-1].ExecId
+	lastEventID := log.AllEvents[len(log.AllEvents)-1].ExecId
 	if lastEventID != execID {
 		t.Fatalf("expected resumed execution ID %v, got %v", execID, lastEventID)
 	}
 
 	// Case 3: History exists, COMPLETED state, new inputs. Should create a NEW execution.
-	for _, ev := range log.execEvents {
+	for _, ev := range log.AllExecEvents {
 		if ev.ExecId == execID {
 			ev.State = proto.State_STATE_COMPLETED
 		}
 	}
 	// Also populate messages in conversation log to simulate completion.
-	log.events[len(log.events)-1].Messages = []*proto.Message{
+	log.AllEvents[len(log.AllEvents)-1].Messages = []*proto.Message{
 		{Role: "user", Content: &proto.Content{Content: &proto.Content_Text{Text: &proto.TextContent{Text: "hello"}}}},
 	}
-	log.events[len(log.events)-1].State = proto.State_STATE_COMPLETED
+	log.AllEvents[len(log.AllEvents)-1].State = proto.State_STATE_COMPLETED
 
 	err = c.Exec(ctx, &proto.ExecRequest{
 		ConversationId: cid,
@@ -158,7 +114,7 @@ func TestController_Exec_ResumptionAndIDGeneration(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	newExecID := log.events[len(log.events)-1].ExecId
+	newExecID := log.AllEvents[len(log.AllEvents)-1].ExecId
 	if newExecID == execID {
 		t.Fatal("expected a NEW execution ID, but it was reused")
 	}
@@ -168,9 +124,9 @@ func TestController_Exec_LastSeenSeq_Empty(t *testing.T) {
 	ctx := context.Background()
 	cid := "test-conv-seq"
 
-	log := &mockEventLog{}
+	log := &executortest.MemoryEventLog{}
 	// Pre-populate history
-	log.events = []*proto.ConversationEvent{
+	log.AllEvents = []*proto.ConversationEvent{
 		{
 			ConversationId: cid,
 			Seq:            1,
@@ -223,9 +179,9 @@ func TestController_Exec_LastSeenSeq(t *testing.T) {
 	ctx := context.Background()
 	cid := "test-conv-seq"
 
-	log := &mockEventLog{}
+	log := &executortest.MemoryEventLog{}
 	// Pre-populate history
-	log.events = []*proto.ConversationEvent{
+	log.AllEvents = []*proto.ConversationEvent{
 		{
 			ConversationId: cid,
 			Seq:            1,
@@ -285,10 +241,10 @@ func TestController_Exec_WaitsForConfirmation(t *testing.T) {
 	cid := "test-conv-conf"
 	execID := "test-exec-conf"
 
-	log := &mockEventLog{}
+	log := &executortest.MemoryEventLog{}
 
 	// 1. History has a pending execution.
-	log.events = []*proto.ConversationEvent{
+	log.AllEvents = []*proto.ConversationEvent{
 		{
 			ConversationId: cid,
 			ExecId:         execID,
@@ -309,7 +265,7 @@ func TestController_Exec_WaitsForConfirmation(t *testing.T) {
 		},
 	}
 
-	log.execEvents = []*proto.ExecutionEvent{
+	log.AllExecEvents = []*proto.ExecutionEvent{
 		{
 			ExecId:  execID,
 			AgentId: "__planner",
@@ -360,7 +316,7 @@ func TestController_Exec_InternalOnly(t *testing.T) {
 	ctx := context.Background()
 	cid := "test-conv-internal"
 
-	log := &mockEventLog{}
+	log := &executortest.MemoryEventLog{}
 
 	// Create an agent that emits one internal-only message and one regular message.
 	a := &mockAgentFunc{
@@ -427,23 +383,23 @@ func TestController_Exec_InternalOnly(t *testing.T) {
 	}
 
 	// Verify that internal messages are NOT stored in ConversationEvent.
-	if len(log.events) != 3 {
-		t.Fatalf("expected 3 events in log.events, got %d", len(log.events))
+	if len(log.AllEvents) != 3 {
+		t.Fatalf("expected 3 events in log.AllEvents, got %d", len(log.AllEvents))
 	}
 	
 	// Event 0: Inputs
 	// Event 1: Public message
-	if log.events[1].Messages[0].GetContent().GetText().GetText() != "public message" {
-		t.Fatalf("expected 'public message' in log.events, got %v", log.events[1].Messages[0].GetContent().GetText().GetText())
+	if log.AllEvents[1].Messages[0].GetContent().GetText().GetText() != "public message" {
+		t.Fatalf("expected 'public message' in log.AllEvents, got %v", log.AllEvents[1].Messages[0].GetContent().GetText().GetText())
 	}
 
 	// Verify that BOTH messages ARE stored in ExecutionEvent.
-	if len(log.execEvents) != 3 {
-		t.Fatalf("expected 3 events in log.execEvents, got %d", len(log.execEvents))
+	if len(log.AllExecEvents) != 3 {
+		t.Fatalf("expected 3 events in log.AllExecEvents, got %d", len(log.AllExecEvents))
 	}
 	
 	// Event 1 in execEvents should contain both outputs.
-	outputs := log.execEvents[1].Outputs
+	outputs := log.AllExecEvents[1].Outputs
 	if len(outputs) != 2 {
 		t.Fatalf("expected 2 outputs in execEvent, got %d", len(outputs))
 	}

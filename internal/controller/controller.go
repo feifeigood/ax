@@ -28,8 +28,6 @@ import (
 	"github.com/google/ax/internal/testagent"
 	"github.com/google/ax/proto"
 	"github.com/google/uuid"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
@@ -252,10 +250,16 @@ func (d *Controller) execute(ctx context.Context, conversationID string, execID 
 	return err
 }
 
-// Fork forks an execution from a source execution.
-// If checkpointId is provided, fork til the checkpoint. Otherwise, fork the whole execution.
-func (d *Controller) Fork(ctx context.Context, sourceID, sourceCheckpoint, destID string) error {
-	return status.Errorf(codes.Unimplemented, "forking is not supported yet")
+// Delete deletes all events for a specific conversation ID.
+func (d *Controller) Delete(ctx context.Context, conversationID string) error {
+	d.inFlightMu.Lock()
+	_, ok := d.inFlight[conversationID]
+	d.inFlightMu.Unlock()
+	if ok {
+		return fmt.Errorf("conversation %q is in flight, cannot delete", conversationID)
+	}
+
+	return d.eventLog.DeleteEvents(ctx, conversationID)
 }
 
 // Registry returns the agent registry.

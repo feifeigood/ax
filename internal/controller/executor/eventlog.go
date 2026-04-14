@@ -37,6 +37,9 @@ type EventLog interface {
 	// ExecEvents returns all events for a specific execution ID.
 	ExecEvents(ctx context.Context, execID string) ([]*proto.ExecutionEvent, error)
 
+	// DeleteEvents deletes all events for a specific conversation ID.
+	DeleteEvents(ctx context.Context, conversationID string) error
+
 	// Close releases the underlying resources and closes the log.
 	Close() error
 }

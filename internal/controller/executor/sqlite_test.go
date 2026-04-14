@@ -159,6 +159,81 @@ func TestSQLiteEventLog_Empty(t *testing.T) {
 	}
 }
 
+func TestSQLiteEventLog_DeleteEvents(t *testing.T) {
+	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "test.db")
+
+	log, err := OpenSQLiteEventLog(dbPath)
+	if err != nil {
+		t.Fatalf("failed to open sqlite event log: %v", err)
+	}
+	defer log.Close()
+
+	// Setup data
+	cev1 := &proto.ConversationEvent{ConversationId: "conv-1", Seq: 1, ExecId: "task-1"}
+	cev2 := &proto.ConversationEvent{ConversationId: "conv-1", Seq: 2, ExecId: "task-2"}
+	cev3 := &proto.ConversationEvent{ConversationId: "conv-2", Seq: 1, ExecId: "task-3"}
+
+	log.Append(ctx, cev1)
+	log.Append(ctx, cev2)
+	log.Append(ctx, cev3)
+
+	ee1 := &proto.ExecutionEvent{ExecId: "task-1", State: proto.State_STATE_PENDING}
+	ee2 := &proto.ExecutionEvent{ExecId: "task-2", State: proto.State_STATE_COMPLETED}
+	ee3 := &proto.ExecutionEvent{ExecId: "task-3", State: proto.State_STATE_PENDING}
+
+	log.AppendExec(ctx, ee1)
+	log.AppendExec(ctx, ee2)
+	log.AppendExec(ctx, ee3)
+
+	// Delete conv-1
+	if err := log.DeleteEvents(ctx, "conv-1"); err != nil {
+		t.Fatalf("failed to delete events: %v", err)
+	}
+
+	// Verify conversation events
+	events, err := log.Events(ctx, "conv-1")
+	if err != nil {
+		t.Fatalf("failed to read events: %v", err)
+	}
+	if len(events) != 0 {
+		t.Errorf("expected 0 events for conv-1, got %d", len(events))
+	}
+
+	events, err = log.Events(ctx, "conv-2")
+	if err != nil {
+		t.Fatalf("failed to read events: %v", err)
+	}
+	if len(events) != 1 {
+		t.Errorf("expected 1 event for conv-2, got %d", len(events))
+	}
+
+	// Verify execution events
+	eEvents, err := log.ExecEvents(ctx, "task-1")
+	if err != nil {
+		t.Fatalf("failed to read exec events: %v", err)
+	}
+	if len(eEvents) != 0 {
+		t.Errorf("expected 0 exec events for task-1, got %d", len(eEvents))
+	}
+
+	eEvents, err = log.ExecEvents(ctx, "task-2")
+	if err != nil {
+		t.Fatalf("failed to read exec events: %v", err)
+	}
+	if len(eEvents) != 0 {
+		t.Errorf("expected 0 exec events for task-2, got %d", len(eEvents))
+	}
+
+	eEvents, err = log.ExecEvents(ctx, "task-3")
+	if err != nil {
+		t.Fatalf("failed to read exec events: %v", err)
+	}
+	if len(eEvents) != 1 {
+		t.Errorf("expected 1 exec event for task-3, got %d", len(eEvents))
+	}
+}
+
 func TestSQLiteEventLog_CreatesParentDirectory(t *testing.T) {
 	// Create a path with a non-existent parent directory
 	dbPath := filepath.Join(t.TempDir(), "newdir", "test.db")

@@ -34,6 +34,7 @@ import (
 // Server implements the AXService gRPC service.
 type Server struct {
 	proto.UnimplementedAXServiceServer
+	proto.UnimplementedAXEventLogServiceServer
 
 	controller *controller.Controller
 	grpcServer *grpc.Server
@@ -56,7 +57,21 @@ func (s *Server) Exec(req *proto.ExecRequest, stream grpc.ServerStreamingServer[
 }
 
 func (s *Server) Fork(ctx context.Context, req *proto.ForkRequest) (*proto.ForkResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "forking not implemented")
+	return nil, status.Errorf(codes.Unimplemented, "not implemented")
+}
+
+func (s *Server) List(ctx context.Context, req *proto.ListRequest) (*proto.ListResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "not implemented")
+}
+
+func (s *Server) Delete(ctx context.Context, req *proto.DeleteRequest) (*proto.DeleteResponse, error) {
+	if req.ConversationId == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "conversation_id is required")
+	}
+	if err := s.controller.Delete(ctx, req.ConversationId); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to delete conversation: %v", err)
+	}
+	return &proto.DeleteResponse{}, nil
 }
 
 // RegisterAgent registers a new remote agent with the controller.
@@ -110,6 +125,7 @@ func (s *Server) Serve(address string, opts ...grpc.ServerOption) error {
 
 	s.grpcServer = grpc.NewServer(opts...)
 	proto.RegisterAXServiceServer(s.grpcServer, s)
+	proto.RegisterAXEventLogServiceServer(s.grpcServer, s)
 
 	if err := s.grpcServer.Serve(lis); err != nil {
 		return fmt.Errorf("failed to serve: %w", err)

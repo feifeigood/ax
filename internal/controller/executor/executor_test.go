@@ -19,91 +19,20 @@ import (
 	"fmt"
 	"log"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/google/ax/internal/agent"
+	"github.com/google/ax/internal/controller/executor/executortest"
 	"github.com/google/ax/internal/historyutil"
 	"github.com/google/ax/proto"
 	"golang.org/x/sync/errgroup"
 )
 
-// MemoryEventLog is an in-memory EventLog useful for testing and short-lived
-// executions. It does not survive process restarts.
-type MemoryEventLog struct {
-	mu         sync.Mutex
-	events     []*proto.ConversationEvent
-	execEvents []*proto.ExecutionEvent
-}
-
-func (m *MemoryEventLog) Append(_ context.Context, event *proto.ConversationEvent) (int32, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	seq := int32(len(m.events) + 1)
-	event.Seq = seq
-	m.events = append(m.events, event)
-	return seq, nil
-}
-
-func (m *MemoryEventLog) AppendExec(_ context.Context, event *proto.ExecutionEvent) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	m.execEvents = append(m.execEvents, event)
-	return nil
-}
-
-func (m *MemoryEventLog) Events(_ context.Context, conversationID string) ([]*proto.ConversationEvent, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	out := make([]*proto.ConversationEvent, 0)
-	for _, ev := range m.events {
-		if ev.ConversationId == conversationID {
-			out = append(out, ev)
-		}
-	}
-	return out, nil
-}
-
-func (m *MemoryEventLog) ExecEvents(_ context.Context, execID string) ([]*proto.ExecutionEvent, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	out := make([]*proto.ExecutionEvent, 0)
-	for _, ev := range m.execEvents {
-		if ev.ExecId == execID {
-			out = append(out, ev)
-		}
-	}
-	return out, nil
-}
-
-// Drop removes every event for which drop returns true.
-// It is provided for testing and crash-simulation purposes.
-func (m *MemoryEventLog) Drop(drop func(*proto.ConversationEvent) bool) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	kept := m.events[:0]
-	for _, ev := range m.events {
-		if !drop(ev) {
-			kept = append(kept, ev)
-		}
-	}
-	m.events = kept
-}
-
-func (m *MemoryEventLog) Close() error {
-	return nil
-}
-
-// memoryBuilder returns a new EventLogBuilder that creates a fresh MemoryEventLog per task.
+// memoryEventLog returns a new EventLogBuilder that creates a fresh MemoryEventLog per task.
 func memoryEventLog() EventLog {
-	return &MemoryEventLog{}
+	return &executortest.MemoryEventLog{}
 }
 
 func Example() {
