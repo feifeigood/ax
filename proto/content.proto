@@ -1,0 +1,74 @@
+// Copyright 2026 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package proto;
+
+import "google/protobuf/struct.proto";
+
+option go_package = "github.com/google/ax/proto";
+
+// TextContent represents a text content.
+message TextContent {
+  reserved 1, 2;
+  reserved "type";
+  string text = 3;
+}
+
+message ApprovalDecision {
+  bool approved = 1;
+}
+
+message DeclineDecision {
+  reserved 2;
+  reserved "reason";
+  bool declined = 1;
+}
+
+message ConfirmationContent {
+  reserved 1, 2;
+  reserved "type";
+  string id = 3;
+  string question = 4;
+  oneof decision {
+    ApprovalDecision approval = 5;
+    DeclineDecision decline = 6;
+  }
+}
+
+message FunctionCallContent {
+  string name = 1;
+  google.protobuf.Struct args = 2;
+  string id = 3;
+  bytes thought_signature = 4;
+}
+
+message FunctionResponseContent {
+  string name = 1;
+  google.protobuf.Struct response = 2;
+  string id = 3;
+}
+
+// Content represents a content input or output.
+message Content {
+  reserved 1 to 4, 6 to 9, 11 to 25;
+
+  oneof content {
+    TextContent text = 10;
+    ConfirmationContent confirmation = 26;
+    FunctionCallContent function_call = 27;
+    FunctionResponseContent function_response = 28;
+  }
+}
