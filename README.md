@@ -350,7 +350,7 @@ There are several ways to register custom agents in AX by implementing
 the `AXAgentService` interface defined in `proto/ax.proto`:
 - [Remote Agent](docs/remote-agent.md)
 - [Kubernetes Sandbox Agents](docs/k8s-sandbox-agent.md)
-- [Remote Python Agent](docs/python-agent.md)
+
 
 ## License
 
