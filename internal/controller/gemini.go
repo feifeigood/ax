@@ -18,7 +18,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"os/exec"
 	"runtime"
 	"strings"
@@ -61,10 +60,7 @@ func (a *GeminiAgent) Connect(ctx context.Context, execID string, start *proto.A
 		return err
 	}
 
-	client, err := genai.NewClient(ctx, &genai.ClientConfig{
-		APIKey: os.Getenv("GEMINI_API_KEY"),
-		// TODO(jbd): Support Vertex credentials.
-	})
+	client, err := genai.NewClient(ctx, &genai.ClientConfig{})
 	if err != nil {
 		return fmt.Errorf("failed to create Gemini client: %w", err)
 	}
