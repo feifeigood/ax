@@ -68,7 +68,7 @@ func TestLastUserText(t *testing.T) {
 	msg := func(role, s string) *proto.Message {
 		return &proto.Message{
 			Role:    role,
-			Content: &proto.Content{Content: &proto.Content_Text{Text: &proto.TextContent{Text: s}}},
+			Content: &proto.Content{Type: &proto.Content_Text{Text: &proto.TextContent{Text: s}}},
 		}
 	}
 
@@ -542,6 +542,6 @@ func writeTempFile(t *testing.T, name, content string) string {
 func userText(s string) *proto.Message {
 	return &proto.Message{
 		Role:    "user",
-		Content: &proto.Content{Content: &proto.Content_Text{Text: &proto.TextContent{Text: s}}},
+		Content: &proto.Content{Type: &proto.Content_Text{Text: &proto.TextContent{Text: s}}},
 	}
 }

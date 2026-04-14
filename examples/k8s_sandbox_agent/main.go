@@ -72,7 +72,7 @@ func (s *server) Connect(stream grpc.BidiStreamingServer[proto.AgentMessage, pro
 				outputs = append(outputs, &proto.Message{
 					Role: "agent",
 					Content: &proto.Content{
-						Content: &proto.Content_Text{
+						Type: &proto.Content_Text{
 							Text: &proto.TextContent{
 								Text: "Hey, I'm your sandbox agent.\n",
 							},
@@ -82,7 +82,7 @@ func (s *server) Connect(stream grpc.BidiStreamingServer[proto.AgentMessage, pro
 				outputs = append(outputs, &proto.Message{
 					Role: "agent",
 					Content: &proto.Content{
-						Content: &proto.Content_Text{
+						Type: &proto.Content_Text{
 							Text: &proto.TextContent{
 								Text: fmt.Sprintf("here is your upper case text: %s", upper),
 							},

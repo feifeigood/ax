@@ -74,7 +74,7 @@ func TestSQLiteEventLog_AppendAndEvents(t *testing.T) {
 		State:     proto.State_STATE_PENDING,
 		Timestamp: timestamppb.Now(),
 		Inputs: []*proto.Message{
-			{Role: "user", Content: &proto.Content{Content: &proto.Content_Text{Text: &proto.TextContent{Text: "hello"}}}},
+			{Role: "user", Content: &proto.Content{Type: &proto.Content_Text{Text: &proto.TextContent{Text: "hello"}}}},
 		},
 	}
 

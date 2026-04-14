@@ -96,7 +96,7 @@ func TestMulti(t *testing.T) {
 		{
 			Role: "user",
 			Content: &proto.Content{
-				Content: &proto.Content_Text{
+				Type: &proto.Content_Text{
 					Text: &proto.TextContent{
 						Text: input,
 					},
@@ -160,7 +160,7 @@ func createLocalAgent(transform func(string) string) (*agent.LocalAgent, error) 
 					{
 						Role: "assistant",
 						Content: &proto.Content{
-							Content: &proto.Content_Text{
+							Type: &proto.Content_Text{
 								Text: &proto.TextContent{
 									Text: transform(textContent.Text),
 								},
@@ -200,7 +200,7 @@ func (m *mockPlanner) Connect(ctx context.Context, execID string, start *proto.A
 		inputs := append(start.Messages, &proto.Message{
 			Role: "assistant",
 			Content: &proto.Content{
-				Content: &proto.Content_Text{
+				Type: &proto.Content_Text{
 					Text: &proto.TextContent{Text: "oRanGe"},
 				},
 			},
@@ -217,7 +217,7 @@ func (m *mockPlanner) Connect(ctx context.Context, execID string, start *proto.A
 		inputs := append(start.Messages, &proto.Message{
 			Role: "assistant",
 			Content: &proto.Content{
-				Content: &proto.Content_Text{
+				Type: &proto.Content_Text{
 					Text: &proto.TextContent{Text: lastText},
 				},
 			},
@@ -234,7 +234,7 @@ func (m *mockPlanner) Connect(ctx context.Context, execID string, start *proto.A
 		inputs := append(start.Messages, &proto.Message{
 			Role: "assistant",
 			Content: &proto.Content{
-				Content: &proto.Content_Text{
+				Type: &proto.Content_Text{
 					Text: &proto.TextContent{Text: lastText},
 				},
 			},
@@ -252,7 +252,7 @@ func (m *mockPlanner) Connect(ctx context.Context, execID string, start *proto.A
 			Messages: []*proto.Message{{
 				Role: "assistant",
 				Content: &proto.Content{
-					Content: &proto.Content_Text{
+					Type: &proto.Content_Text{
 						Text: &proto.TextContent{
 							Text: "Final Result: " + lastText,
 						},

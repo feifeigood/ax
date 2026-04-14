@@ -201,7 +201,7 @@ func TestConfirmation(t *testing.T) {
 						Messages: []*proto.Message{{
 							Role: "model",
 							Content: &proto.Content{
-								Content: &proto.Content_Confirmation{
+								Type: &proto.Content_Confirmation{
 									Confirmation: &proto.ConfirmationContent{Id: confID, Question: "proceed?"},
 								},
 							},
@@ -239,7 +239,7 @@ func TestConfirmation(t *testing.T) {
 	approval := &proto.Message{
 		Role: "user",
 		Content: &proto.Content{
-			Content: &proto.Content_Confirmation{
+			Type: &proto.Content_Confirmation{
 				Confirmation: &proto.ConfirmationContent{
 					Id: confID,
 					Decision: &proto.ConfirmationContent_Approval{
@@ -341,7 +341,7 @@ func TestResumeConfirmation(t *testing.T) {
 
 	msg := &proto.Message{
 		Content: &proto.Content{
-			Content: &proto.Content_Confirmation{
+			Type: &proto.Content_Confirmation{
 				Confirmation: &proto.ConfirmationContent{
 					Id:       "test-conf-id",
 					Question: "proceed?",
@@ -366,7 +366,7 @@ func TestResumeConfirmation(t *testing.T) {
 					// "Hello!" is responded with a confirmation request.
 					Messages: []*proto.Message{{
 						Content: &proto.Content{
-							Content: &proto.Content_Text{
+							Type: &proto.Content_Text{
 								Text: &proto.TextContent{
 									Text: "awesome!",
 								},
@@ -429,7 +429,7 @@ func TestResumeConfirmation(t *testing.T) {
 		Messages: []*proto.Message{
 			{
 				Content: &proto.Content{
-					Content: &proto.Content_Confirmation{
+					Type: &proto.Content_Confirmation{
 						Confirmation: &proto.ConfirmationContent{
 							Id: "test-conf-id",
 							Decision: &proto.ConfirmationContent_Approval{

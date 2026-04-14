@@ -107,7 +107,7 @@ func execLoop(ctx context.Context, id string, agentID string, input string, last
 			{
 				Role: "user",
 				Content: &proto.Content{
-					Content: &proto.Content_Text{
+					Type: &proto.Content_Text{
 						Text: &proto.TextContent{
 							Text: input,
 						},
@@ -140,7 +140,7 @@ func execLoop(ctx context.Context, id string, agentID string, input string, last
 					decision = []*proto.Message{{
 						Role: "user",
 						Content: &proto.Content{
-							Content: &proto.Content_Confirmation{
+							Type: &proto.Content_Confirmation{
 								Confirmation: &proto.ConfirmationContent{
 									Id: conf.Id,
 									Decision: &proto.ConfirmationContent_Approval{
@@ -154,7 +154,7 @@ func execLoop(ctx context.Context, id string, agentID string, input string, last
 					decision = []*proto.Message{{
 						Role: "user",
 						Content: &proto.Content{
-							Content: &proto.Content_Confirmation{
+							Type: &proto.Content_Confirmation{
 								Confirmation: &proto.ConfirmationContent{
 									Id: conf.Id,
 									Decision: &proto.ConfirmationContent_Decline{
@@ -193,7 +193,7 @@ func execLoop(ctx context.Context, id string, agentID string, input string, last
 			{
 				Role: "user",
 				Content: &proto.Content{
-					Content: &proto.Content_Text{
+					Type: &proto.Content_Text{
 						Text: &proto.TextContent{
 							Text: input,
 						},
@@ -294,18 +294,23 @@ func displayContents(d *internal.Display, contents []*proto.Message) {
 		if content == nil {
 			continue
 		}
-		switch o := content.Content.(type) {
+		switch o := content.Type.(type) {
 		case *proto.Content_Text:
 			d.DisplayOutput(o.Text.Text)
 		case *proto.Content_Confirmation:
 			// Let the confirmation prompt handle displaying the question.
-		case *proto.Content_FunctionCall:
+		case *proto.Content_ToolCall:
 			// No-op for cleaner CLI logs
-		case *proto.Content_FunctionResponse:
+		case *proto.Content_ToolResult:
 			// Only print if the tool returned an error, otherwise skip
-			respMap := o.FunctionResponse.Response.AsMap()
-			if errStr, ok := respMap["error"]; ok {
-				d.DisplayOutput(fmt.Sprintf("\n[TOOL ERROR for %s]\n%v\n", o.FunctionResponse.Name, errStr))
+			tr := o.ToolResult
+			if fr := tr.GetFunctionResult(); fr != nil {
+				if fr.GetResponse() != nil {
+					respMap := fr.GetResponse().AsMap()
+					if errStr, ok := respMap["error"]; ok {
+						d.DisplayOutput(fmt.Sprintf("\n[TOOL ERROR for %s]\n%v\n", fr.Name, errStr))
+					}
+				}
 			}
 		default:
 			d.DisplayOutput(fmt.Sprintf("unknown output type: %v", o))

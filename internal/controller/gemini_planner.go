@@ -209,7 +209,7 @@ func (p *geminiPlannerAgent) process(ctx context.Context, start *proto.AgentStar
 				Messages: []*proto.Message{{
 					Role: "model",
 					Content: &proto.Content{
-						Content: &proto.Content_Text{
+						Type: &proto.Content_Text{
 							Text: &proto.TextContent{Text: part.Text},
 						},
 					},
@@ -257,14 +257,16 @@ func (p *geminiPlannerAgent) handleConfirmationAnswer(inputs []*proto.Message) (
 	var fc *genai.FunctionCall
 	for _, input := range inputs {
 		content := input.GetContent()
-		if content.GetFunctionCall() == nil {
+		tc := content.GetToolCall()
+		if tc == nil || tc.GetFunctionCall() == nil {
 			continue
 		}
-		if fn := content.GetFunctionCall(); fn != nil && fn.Id == conf.Id {
+		if tc.Id == conf.Id {
+			fn := tc.GetFunctionCall()
 			fc = &genai.FunctionCall{
 				ID:   conf.Id,
 				Name: fn.Name,
-				Args: fn.Args.AsMap(),
+				Args: fn.Arguments.AsMap(),
 			}
 			break
 		}
@@ -278,10 +280,11 @@ func (p *geminiPlannerAgent) handleConfirmationAnswer(inputs []*proto.Message) (
 	// Otherwise, we will execute the function call forever.
 	for _, input := range inputs {
 		content := input.GetContent()
-		if content.GetFunctionResponse() == nil {
+		tr := content.GetToolResult()
+		if tr == nil || tr.GetFunctionResult() == nil {
 			continue
 		}
-		if fr := content.GetFunctionResponse(); fr != nil && fr.Id == fc.ID {
+		if tr.CallId == fc.ID {
 			// We executed this previously.
 			// There is nothing more to execute.
 			return nil, false
@@ -337,7 +340,7 @@ func protoToContents(inputs []*proto.Message) []*genai.Content {
 			continue
 		}
 
-		switch m := content.Content.(type) {
+		switch m := content.Type.(type) {
 		case *proto.Content_Text:
 			contents = append(contents, &genai.Content{
 				Role: role,
@@ -355,33 +358,43 @@ func protoToContents(inputs []*proto.Message) []*genai.Content {
 			case *proto.ConfirmationContent_Approval:
 				// shouldn't be sent to Gemini
 			}
-		case *proto.Content_FunctionCall:
-			contents = append(contents, &genai.Content{
-				Role: "model",
-				Parts: []*genai.Part{
-					{
-						ThoughtSignature: m.FunctionCall.ThoughtSignature,
-						FunctionCall: &genai.FunctionCall{
-							ID:   m.FunctionCall.Id,
-							Name: m.FunctionCall.Name,
-							Args: m.FunctionCall.Args.AsMap(),
+		case *proto.Content_ToolCall:
+			tc := m.ToolCall
+			if fc := tc.GetFunctionCall(); fc != nil {
+				contents = append(contents, &genai.Content{
+					Role: "model",
+					Parts: []*genai.Part{
+						{
+							ThoughtSignature: tc.Signature,
+							FunctionCall: &genai.FunctionCall{
+								ID:   tc.Id,
+								Name: fc.Name,
+								Args: fc.Arguments.AsMap(),
+							},
 						},
 					},
-				},
-			})
-		case *proto.Content_FunctionResponse:
-			contents = append(contents, &genai.Content{
-				Role: "user",
-				Parts: []*genai.Part{
-					{
-						FunctionResponse: &genai.FunctionResponse{
-							ID:       m.FunctionResponse.Id,
-							Name:     m.FunctionResponse.Name,
-							Response: m.FunctionResponse.Response.AsMap(),
+				})
+			}
+		case *proto.Content_ToolResult:
+			tr := m.ToolResult
+			if fr := tr.GetFunctionResult(); fr != nil {
+				var respMap map[string]any
+				if fr.GetResponse() != nil {
+					respMap = fr.GetResponse().AsMap()
+				}
+				contents = append(contents, &genai.Content{
+					Role: "user",
+					Parts: []*genai.Part{
+						{
+							FunctionResponse: &genai.FunctionResponse{
+								ID:       tr.CallId,
+								Name:     fr.Name,
+								Response: respMap,
+							},
 						},
 					},
-				},
-			})
+				})
+			}
 		}
 		// TODO(jbd): Handle other content types (e.g., images, files)
 	}

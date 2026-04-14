@@ -119,7 +119,7 @@ func (a *GeminiAgent) Connect(ctx context.Context, execID string, start *proto.A
 				Messages: []*proto.Message{{
 					Role: "model",
 					Content: &proto.Content{
-						Content: &proto.Content_Text{
+						Type: &proto.Content_Text{
 							Text: &proto.TextContent{Text: part.Text},
 						},
 					},
@@ -196,11 +196,15 @@ func (t *BashTool) HandleCall(ctx context.Context, fc *genai.FunctionCall, o age
 			{
 				Role: "model",
 				Content: &proto.Content{
-					Content: &proto.Content_FunctionCall{
-						FunctionCall: &proto.FunctionCallContent{
-							Id:   fc.ID,
-							Name: fc.Name,
-							Args: argsStruct,
+					Type: &proto.Content_ToolCall{
+						ToolCall: &proto.ToolCallContent{
+							Id: fc.ID,
+							Type: &proto.ToolCallContent_FunctionCall{
+								FunctionCall: &proto.FunctionCallContent{
+									Name:      fc.Name,
+									Arguments: argsStruct,
+								},
+							},
 						},
 					},
 				},
@@ -208,7 +212,7 @@ func (t *BashTool) HandleCall(ctx context.Context, fc *genai.FunctionCall, o age
 			{
 				Role: "model",
 				Content: &proto.Content{
-					Content: &proto.Content_Confirmation{
+					Type: &proto.Content_Confirmation{
 						Confirmation: &proto.ConfirmationContent{
 							Id:       fc.ID,
 							Question: fmt.Sprintf("Can I run %q?", command),
@@ -229,10 +233,14 @@ func (t *BashTool) HandleExecute(ctx context.Context, fc *genai.FunctionCall, ap
 				{
 					Role: "model",
 					Content: &proto.Content{
-						Content: &proto.Content_FunctionResponse{
-							FunctionResponse: &proto.FunctionResponseContent{
-								Name: fc.Name,
-								Id:   fc.ID,
+						Type: &proto.Content_ToolResult{
+							ToolResult: &proto.ToolResultContent{
+								CallId: fc.ID,
+								Type: &proto.ToolResultContent_FunctionResult{
+									FunctionResult: &proto.FunctionResultContent{
+										Name: fc.Name,
+									},
+								},
 							},
 						},
 					},
@@ -240,7 +248,7 @@ func (t *BashTool) HandleExecute(ctx context.Context, fc *genai.FunctionCall, ap
 				{
 					Role: "model",
 					Content: &proto.Content{
-						Content: &proto.Content_Text{
+						Type: &proto.Content_Text{
 							Text: &proto.TextContent{
 								Text: "Okay.",
 							},
@@ -264,11 +272,17 @@ func (t *BashTool) HandleExecute(ctx context.Context, fc *genai.FunctionCall, ap
 			{
 				Role: "model",
 				Content: &proto.Content{
-					Content: &proto.Content_FunctionResponse{
-						FunctionResponse: &proto.FunctionResponseContent{
-							Name:     fc.Name,
-							Response: respStruct,
-							Id:       fc.ID,
+					Type: &proto.Content_ToolResult{
+						ToolResult: &proto.ToolResultContent{
+							CallId: fc.ID,
+							Type: &proto.ToolResultContent_FunctionResult{
+								FunctionResult: &proto.FunctionResultContent{
+									Name: fc.Name,
+									Result: &proto.FunctionResultContent_Response{
+										Response: respStruct,
+									},
+								},
+							},
 						},
 					},
 				},
@@ -276,7 +290,7 @@ func (t *BashTool) HandleExecute(ctx context.Context, fc *genai.FunctionCall, ap
 			{
 				Role: "model",
 				Content: &proto.Content{
-					Content: &proto.Content_Text{
+					Type: &proto.Content_Text{
 						Text: &proto.TextContent{
 							Text: output,
 						},
@@ -338,11 +352,15 @@ func (t *SkillsTool) HandleCall(ctx context.Context, fc *genai.FunctionCall, o a
 				{
 					Role: "model",
 					Content: &proto.Content{
-						Content: &proto.Content_FunctionCall{
-							FunctionCall: &proto.FunctionCallContent{
-								Id:   fc.ID,
-								Name: fc.Name,
-								Args: argsStruct,
+						Type: &proto.Content_ToolCall{
+							ToolCall: &proto.ToolCallContent{
+								Id: fc.ID,
+								Type: &proto.ToolCallContent_FunctionCall{
+									FunctionCall: &proto.FunctionCallContent{
+										Name:      fc.Name,
+										Arguments: argsStruct,
+									},
+								},
 							},
 						},
 					},
@@ -350,7 +368,7 @@ func (t *SkillsTool) HandleCall(ctx context.Context, fc *genai.FunctionCall, o a
 				{
 					Role: "model",
 					Content: &proto.Content{
-						Content: &proto.Content_Confirmation{
+						Type: &proto.Content_Confirmation{
 							Confirmation: &proto.ConfirmationContent{
 								Id:       fc.ID,
 								Question: question,
@@ -390,11 +408,17 @@ func (t *SkillsTool) HandleExecute(ctx context.Context, fc *genai.FunctionCall, 
 				{
 					Role: "model",
 					Content: &proto.Content{
-						Content: &proto.Content_FunctionResponse{
-							FunctionResponse: &proto.FunctionResponseContent{
-								Name:     fc.Name,
-								Response: respStruct,
-								Id:       fc.ID,
+						Type: &proto.Content_ToolResult{
+							ToolResult: &proto.ToolResultContent{
+								CallId: fc.ID,
+								Type: &proto.ToolResultContent_FunctionResult{
+									FunctionResult: &proto.FunctionResultContent{
+										Name: fc.Name,
+										Result: &proto.FunctionResultContent_Response{
+											Response: respStruct,
+										},
+									},
+								},
 							},
 						},
 					},
@@ -412,10 +436,14 @@ func (t *SkillsTool) HandleExecute(ctx context.Context, fc *genai.FunctionCall, 
 				{
 					Role: "model",
 					Content: &proto.Content{
-						Content: &proto.Content_FunctionResponse{
-							FunctionResponse: &proto.FunctionResponseContent{
-								Name: fc.Name,
-								Id:   fc.ID,
+						Type: &proto.Content_ToolResult{
+							ToolResult: &proto.ToolResultContent{
+								CallId: fc.ID,
+								Type: &proto.ToolResultContent_FunctionResult{
+									FunctionResult: &proto.FunctionResultContent{
+										Name: fc.Name,
+									},
+								},
 							},
 						},
 					},
@@ -423,7 +451,7 @@ func (t *SkillsTool) HandleExecute(ctx context.Context, fc *genai.FunctionCall, 
 				{
 					Role: "model",
 					Content: &proto.Content{
-						Content: &proto.Content_Text{
+						Type: &proto.Content_Text{
 							Text: &proto.TextContent{
 								Text: "Okay.",
 							},
@@ -460,11 +488,17 @@ func (t *SkillsTool) HandleExecute(ctx context.Context, fc *genai.FunctionCall, 
 			{
 				Role: "model",
 				Content: &proto.Content{
-					Content: &proto.Content_FunctionResponse{
-						FunctionResponse: &proto.FunctionResponseContent{
-							Name:     fc.Name,
-							Response: respStruct,
-							Id:       fc.ID,
+					Type: &proto.Content_ToolResult{
+						ToolResult: &proto.ToolResultContent{
+							CallId: fc.ID,
+							Type: &proto.ToolResultContent_FunctionResult{
+								FunctionResult: &proto.FunctionResultContent{
+									Name: fc.Name,
+									Result: &proto.FunctionResultContent_Response{
+										Response: respStruct,
+									},
+								},
+							},
 						},
 					},
 				},
@@ -472,7 +506,7 @@ func (t *SkillsTool) HandleExecute(ctx context.Context, fc *genai.FunctionCall, 
 			{
 				Role: "model",
 				Content: &proto.Content{
-					Content: &proto.Content_Text{
+					Type: &proto.Content_Text{
 						Text: &proto.TextContent{
 							Text: output,
 						},

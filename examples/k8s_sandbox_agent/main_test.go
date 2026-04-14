@@ -28,7 +28,7 @@ func TestExtractLatestPayload(t *testing.T) {
 		{
 			Role: "user",
 			Content: &proto.Content{
-				Content: &proto.Content_Text{
+				Type: &proto.Content_Text{
 					Text: &proto.TextContent{Text: "old user prompt"},
 				},
 			},
@@ -36,7 +36,7 @@ func TestExtractLatestPayload(t *testing.T) {
 		{
 			Role: "agent",
 			Content: &proto.Content{
-				Content: &proto.Content_Text{
+				Type: &proto.Content_Text{
 					Text: &proto.TextContent{Text: "old agent response"},
 				},
 			},
@@ -44,7 +44,7 @@ func TestExtractLatestPayload(t *testing.T) {
 		{
 			Role: "user",
 			Content: &proto.Content{
-				Content: &proto.Content_Text{
+				Type: &proto.Content_Text{
 					Text: &proto.TextContent{Text: "find this text plz plz plz"},
 				},
 			},
@@ -52,9 +52,13 @@ func TestExtractLatestPayload(t *testing.T) {
 		{
 			Role: "agent",
 			Content: &proto.Content{
-				Content: &proto.Content_FunctionCall{
-					FunctionCall: &proto.FunctionCallContent{
-						Name: "uppercase-agent",
+				Type: &proto.Content_ToolCall{
+					ToolCall: &proto.ToolCallContent{
+						Type: &proto.ToolCallContent_FunctionCall{
+							FunctionCall: &proto.FunctionCallContent{
+								Name: "uppercase-agent",
+							},
+						},
 					},
 				},
 			},
@@ -82,7 +86,7 @@ func TestExtractLatestPayload(t *testing.T) {
 	outputs = append(outputs, &proto.Message{
 		Role: "agent",
 		Content: &proto.Content{
-			Content: &proto.Content_Text{
+			Type: &proto.Content_Text{
 				Text: &proto.TextContent{
 					Text: "Hey, I'm your sandbox agent.\n",
 				},
@@ -92,7 +96,7 @@ func TestExtractLatestPayload(t *testing.T) {
 	outputs = append(outputs, &proto.Message{
 		Role: "agent",
 		Content: &proto.Content{
-			Content: &proto.Content_Text{
+			Type: &proto.Content_Text{
 				Text: &proto.TextContent{
 					Text: fmt.Sprintf("here is your upper case text: %s", upper),
 				},

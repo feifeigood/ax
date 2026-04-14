@@ -40,7 +40,7 @@ func TestController_Exec_ResumptionAndIDGeneration(t *testing.T) {
 		{
 			Role: "user",
 			Content: &proto.Content{
-				Content: &proto.Content_Text{
+				Type: &proto.Content_Text{
 					Text: &proto.TextContent{Text: "hello"},
 				},
 			},
@@ -102,7 +102,7 @@ func TestController_Exec_ResumptionAndIDGeneration(t *testing.T) {
 	}
 	// Also populate messages in conversation log to simulate completion.
 	log.AllEvents[len(log.AllEvents)-1].Messages = []*proto.Message{
-		{Role: "user", Content: &proto.Content{Content: &proto.Content_Text{Text: &proto.TextContent{Text: "hello"}}}},
+		{Role: "user", Content: &proto.Content{Type: &proto.Content_Text{Text: &proto.TextContent{Text: "hello"}}}},
 	}
 	log.AllEvents[len(log.AllEvents)-1].State = proto.State_STATE_COMPLETED
 
@@ -131,7 +131,7 @@ func TestController_Exec_LastSeq_Empty(t *testing.T) {
 			ConversationId: cid,
 			Seq:            1,
 			Messages: []*proto.Message{
-				{Role: "user", Content: &proto.Content{Content: &proto.Content_Text{Text: &proto.TextContent{Text: "msg 1"}}}},
+				{Role: "user", Content: &proto.Content{Type: &proto.Content_Text{Text: &proto.TextContent{Text: "msg 1"}}}},
 			},
 			State: proto.State_STATE_COMPLETED,
 		},
@@ -139,7 +139,7 @@ func TestController_Exec_LastSeq_Empty(t *testing.T) {
 			ConversationId: cid,
 			Seq:            2,
 			Messages: []*proto.Message{
-				{Role: "assistant", Content: &proto.Content{Content: &proto.Content_Text{Text: &proto.TextContent{Text: "msg 2"}}}},
+				{Role: "assistant", Content: &proto.Content{Type: &proto.Content_Text{Text: &proto.TextContent{Text: "msg 2"}}}},
 			},
 			State: proto.State_STATE_COMPLETED,
 		},
@@ -186,7 +186,7 @@ func TestController_Exec_LastSeq(t *testing.T) {
 			ConversationId: cid,
 			Seq:            1,
 			Messages: []*proto.Message{
-				{Role: "user", Content: &proto.Content{Content: &proto.Content_Text{Text: &proto.TextContent{Text: "msg 1"}}}},
+				{Role: "user", Content: &proto.Content{Type: &proto.Content_Text{Text: &proto.TextContent{Text: "msg 1"}}}},
 			},
 			State: proto.State_STATE_COMPLETED,
 		},
@@ -194,7 +194,7 @@ func TestController_Exec_LastSeq(t *testing.T) {
 			ConversationId: cid,
 			Seq:            2,
 			Messages: []*proto.Message{
-				{Role: "assistant", Content: &proto.Content{Content: &proto.Content_Text{Text: &proto.TextContent{Text: "msg 2"}}}},
+				{Role: "assistant", Content: &proto.Content{Type: &proto.Content_Text{Text: &proto.TextContent{Text: "msg 2"}}}},
 			},
 			State: proto.State_STATE_COMPLETED,
 		},
@@ -257,7 +257,7 @@ func TestController_Exec_WaitsForConfirmation(t *testing.T) {
 	questionMsg := &proto.Message{
 		Role: "assistant",
 		Content: &proto.Content{
-			Content: &proto.Content_Confirmation{
+			Type: &proto.Content_Confirmation{
 				Confirmation: &proto.ConfirmationContent{
 					Question: "Are you sure?",
 				},
@@ -330,7 +330,7 @@ func TestController_Exec_InternalOnly(t *testing.T) {
 			// Emit internal-only message
 			if err := o(&proto.AgentOutputs{
 				Messages: []*proto.Message{
-					{Role: "assistant", Content: &proto.Content{Content: &proto.Content_Text{Text: &proto.TextContent{Text: "internal message"}}}},
+					{Role: "assistant", Content: &proto.Content{Type: &proto.Content_Text{Text: &proto.TextContent{Text: "internal message"}}}},
 				},
 				InternalOnly: true,
 			}); err != nil {
@@ -339,7 +339,7 @@ func TestController_Exec_InternalOnly(t *testing.T) {
 			// Emit regular message
 			return o(&proto.AgentOutputs{
 				Messages: []*proto.Message{
-					{Role: "assistant", Content: &proto.Content{Content: &proto.Content_Text{Text: &proto.TextContent{Text: "public message"}}}},
+					{Role: "assistant", Content: &proto.Content{Type: &proto.Content_Text{Text: &proto.TextContent{Text: "public message"}}}},
 				},
 			})
 		},
@@ -367,7 +367,7 @@ func TestController_Exec_InternalOnly(t *testing.T) {
 	err = c.Exec(ctx, &proto.ExecRequest{
 		ConversationId: cid,
 		Inputs: []*proto.Message{
-			{Role: "user", Content: &proto.Content{Content: &proto.Content_Text{Text: &proto.TextContent{Text: "hello"}}}},
+			{Role: "user", Content: &proto.Content{Type: &proto.Content_Text{Text: &proto.TextContent{Text: "hello"}}}},
 		},
 	}, handler)
 	if err != nil {

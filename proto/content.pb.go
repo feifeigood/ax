@@ -267,19 +267,181 @@ func (*ConfirmationContent_Approval) isConfirmationContent_Decision() {}
 
 func (*ConfirmationContent_Decline) isConfirmationContent_Decision() {}
 
+type ToolCallContent struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	Id        string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`               // A unique ID for this specific tool call.
+	Signature []byte                 `protobuf:"bytes,9,opt,name=signature,proto3" json:"signature,omitempty"` // A signature hash for backend validation.
+	// Types that are valid to be assigned to Type:
+	//
+	//	*ToolCallContent_FunctionCall
+	Type          isToolCallContent_Type `protobuf_oneof:"type"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ToolCallContent) Reset() {
+	*x = ToolCallContent{}
+	mi := &file_proto_content_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ToolCallContent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ToolCallContent) ProtoMessage() {}
+
+func (x *ToolCallContent) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_content_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ToolCallContent.ProtoReflect.Descriptor instead.
+func (*ToolCallContent) Descriptor() ([]byte, []int) {
+	return file_proto_content_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *ToolCallContent) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *ToolCallContent) GetSignature() []byte {
+	if x != nil {
+		return x.Signature
+	}
+	return nil
+}
+
+func (x *ToolCallContent) GetType() isToolCallContent_Type {
+	if x != nil {
+		return x.Type
+	}
+	return nil
+}
+
+func (x *ToolCallContent) GetFunctionCall() *FunctionCallContent {
+	if x != nil {
+		if x, ok := x.Type.(*ToolCallContent_FunctionCall); ok {
+			return x.FunctionCall
+		}
+	}
+	return nil
+}
+
+type isToolCallContent_Type interface {
+	isToolCallContent_Type()
+}
+
+type ToolCallContent_FunctionCall struct {
+	FunctionCall *FunctionCallContent `protobuf:"bytes,2,opt,name=function_call,json=functionCall,proto3,oneof"`
+}
+
+func (*ToolCallContent_FunctionCall) isToolCallContent_Type() {}
+
+type ToolResultContent struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	CallId    string                 `protobuf:"bytes,8,opt,name=call_id,json=callId,proto3" json:"call_id,omitempty"` // ID to match the ID from the function call block.
+	Signature []byte                 `protobuf:"bytes,9,opt,name=signature,proto3" json:"signature,omitempty"`         // A signature hash for backend validation.
+	// Types that are valid to be assigned to Type:
+	//
+	//	*ToolResultContent_FunctionResult
+	Type          isToolResultContent_Type `protobuf_oneof:"type"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ToolResultContent) Reset() {
+	*x = ToolResultContent{}
+	mi := &file_proto_content_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ToolResultContent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ToolResultContent) ProtoMessage() {}
+
+func (x *ToolResultContent) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_content_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ToolResultContent.ProtoReflect.Descriptor instead.
+func (*ToolResultContent) Descriptor() ([]byte, []int) {
+	return file_proto_content_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *ToolResultContent) GetCallId() string {
+	if x != nil {
+		return x.CallId
+	}
+	return ""
+}
+
+func (x *ToolResultContent) GetSignature() []byte {
+	if x != nil {
+		return x.Signature
+	}
+	return nil
+}
+
+func (x *ToolResultContent) GetType() isToolResultContent_Type {
+	if x != nil {
+		return x.Type
+	}
+	return nil
+}
+
+func (x *ToolResultContent) GetFunctionResult() *FunctionResultContent {
+	if x != nil {
+		if x, ok := x.Type.(*ToolResultContent_FunctionResult); ok {
+			return x.FunctionResult
+		}
+	}
+	return nil
+}
+
+type isToolResultContent_Type interface {
+	isToolResultContent_Type()
+}
+
+type ToolResultContent_FunctionResult struct {
+	FunctionResult *FunctionResultContent `protobuf:"bytes,2,opt,name=function_result,json=functionResult,proto3,oneof"`
+}
+
+func (*ToolResultContent_FunctionResult) isToolResultContent_Type() {}
+
 type FunctionCallContent struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	Name             string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Args             *structpb.Struct       `protobuf:"bytes,2,opt,name=args,proto3" json:"args,omitempty"`
-	Id               string                 `protobuf:"bytes,3,opt,name=id,proto3" json:"id,omitempty"`
-	ThoughtSignature []byte                 `protobuf:"bytes,4,opt,name=thought_signature,json=thoughtSignature,proto3" json:"thought_signature,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	Arguments     *structpb.Struct       `protobuf:"bytes,4,opt,name=arguments,proto3" json:"arguments,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *FunctionCallContent) Reset() {
 	*x = FunctionCallContent{}
-	mi := &file_proto_content_proto_msgTypes[4]
+	mi := &file_proto_content_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -291,7 +453,7 @@ func (x *FunctionCallContent) String() string {
 func (*FunctionCallContent) ProtoMessage() {}
 
 func (x *FunctionCallContent) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_content_proto_msgTypes[4]
+	mi := &file_proto_content_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -304,7 +466,7 @@ func (x *FunctionCallContent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FunctionCallContent.ProtoReflect.Descriptor instead.
 func (*FunctionCallContent) Descriptor() ([]byte, []int) {
-	return file_proto_content_proto_rawDescGZIP(), []int{4}
+	return file_proto_content_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *FunctionCallContent) GetName() string {
@@ -314,51 +476,39 @@ func (x *FunctionCallContent) GetName() string {
 	return ""
 }
 
-func (x *FunctionCallContent) GetArgs() *structpb.Struct {
+func (x *FunctionCallContent) GetArguments() *structpb.Struct {
 	if x != nil {
-		return x.Args
+		return x.Arguments
 	}
 	return nil
 }
 
-func (x *FunctionCallContent) GetId() string {
-	if x != nil {
-		return x.Id
-	}
-	return ""
-}
-
-func (x *FunctionCallContent) GetThoughtSignature() []byte {
-	if x != nil {
-		return x.ThoughtSignature
-	}
-	return nil
-}
-
-type FunctionResponseContent struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Response      *structpb.Struct       `protobuf:"bytes,2,opt,name=response,proto3" json:"response,omitempty"`
-	Id            string                 `protobuf:"bytes,3,opt,name=id,proto3" json:"id,omitempty"`
+type FunctionResultContent struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Name  string                 `protobuf:"bytes,8,opt,name=name,proto3" json:"name,omitempty"`
+	// Types that are valid to be assigned to Result:
+	//
+	//	*FunctionResultContent_Response
+	Result        isFunctionResultContent_Result `protobuf_oneof:"result"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *FunctionResponseContent) Reset() {
-	*x = FunctionResponseContent{}
-	mi := &file_proto_content_proto_msgTypes[5]
+func (x *FunctionResultContent) Reset() {
+	*x = FunctionResultContent{}
+	mi := &file_proto_content_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *FunctionResponseContent) String() string {
+func (x *FunctionResultContent) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*FunctionResponseContent) ProtoMessage() {}
+func (*FunctionResultContent) ProtoMessage() {}
 
-func (x *FunctionResponseContent) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_content_proto_msgTypes[5]
+func (x *FunctionResultContent) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_content_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -369,49 +519,61 @@ func (x *FunctionResponseContent) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use FunctionResponseContent.ProtoReflect.Descriptor instead.
-func (*FunctionResponseContent) Descriptor() ([]byte, []int) {
-	return file_proto_content_proto_rawDescGZIP(), []int{5}
+// Deprecated: Use FunctionResultContent.ProtoReflect.Descriptor instead.
+func (*FunctionResultContent) Descriptor() ([]byte, []int) {
+	return file_proto_content_proto_rawDescGZIP(), []int{7}
 }
 
-func (x *FunctionResponseContent) GetName() string {
+func (x *FunctionResultContent) GetName() string {
 	if x != nil {
 		return x.Name
 	}
 	return ""
 }
 
-func (x *FunctionResponseContent) GetResponse() *structpb.Struct {
+func (x *FunctionResultContent) GetResult() isFunctionResultContent_Result {
 	if x != nil {
-		return x.Response
+		return x.Result
 	}
 	return nil
 }
 
-func (x *FunctionResponseContent) GetId() string {
+func (x *FunctionResultContent) GetResponse() *structpb.Struct {
 	if x != nil {
-		return x.Id
+		if x, ok := x.Result.(*FunctionResultContent_Response); ok {
+			return x.Response
+		}
 	}
-	return ""
+	return nil
 }
+
+type isFunctionResultContent_Result interface {
+	isFunctionResultContent_Result()
+}
+
+type FunctionResultContent_Response struct {
+	Response *structpb.Struct `protobuf:"bytes,3,opt,name=response,proto3,oneof"`
+}
+
+func (*FunctionResultContent_Response) isFunctionResultContent_Result() {}
 
 // Content represents a content input or output.
 type Content struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Types that are valid to be assigned to Content:
+	// Types that are valid to be assigned to Type:
 	//
 	//	*Content_Text
 	//	*Content_Confirmation
-	//	*Content_FunctionCall
-	//	*Content_FunctionResponse
-	Content       isContent_Content `protobuf_oneof:"content"`
+	//	*Content_ToolCall
+	//	*Content_ToolResult
+	Type          isContent_Type `protobuf_oneof:"type"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Content) Reset() {
 	*x = Content{}
-	mi := &file_proto_content_proto_msgTypes[6]
+	mi := &file_proto_content_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -423,7 +585,7 @@ func (x *Content) String() string {
 func (*Content) ProtoMessage() {}
 
 func (x *Content) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_content_proto_msgTypes[6]
+	mi := &file_proto_content_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -436,19 +598,19 @@ func (x *Content) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Content.ProtoReflect.Descriptor instead.
 func (*Content) Descriptor() ([]byte, []int) {
-	return file_proto_content_proto_rawDescGZIP(), []int{6}
+	return file_proto_content_proto_rawDescGZIP(), []int{8}
 }
 
-func (x *Content) GetContent() isContent_Content {
+func (x *Content) GetType() isContent_Type {
 	if x != nil {
-		return x.Content
+		return x.Type
 	}
 	return nil
 }
 
 func (x *Content) GetText() *TextContent {
 	if x != nil {
-		if x, ok := x.Content.(*Content_Text); ok {
+		if x, ok := x.Type.(*Content_Text); ok {
 			return x.Text
 		}
 	}
@@ -457,33 +619,33 @@ func (x *Content) GetText() *TextContent {
 
 func (x *Content) GetConfirmation() *ConfirmationContent {
 	if x != nil {
-		if x, ok := x.Content.(*Content_Confirmation); ok {
+		if x, ok := x.Type.(*Content_Confirmation); ok {
 			return x.Confirmation
 		}
 	}
 	return nil
 }
 
-func (x *Content) GetFunctionCall() *FunctionCallContent {
+func (x *Content) GetToolCall() *ToolCallContent {
 	if x != nil {
-		if x, ok := x.Content.(*Content_FunctionCall); ok {
-			return x.FunctionCall
+		if x, ok := x.Type.(*Content_ToolCall); ok {
+			return x.ToolCall
 		}
 	}
 	return nil
 }
 
-func (x *Content) GetFunctionResponse() *FunctionResponseContent {
+func (x *Content) GetToolResult() *ToolResultContent {
 	if x != nil {
-		if x, ok := x.Content.(*Content_FunctionResponse); ok {
-			return x.FunctionResponse
+		if x, ok := x.Type.(*Content_ToolResult); ok {
+			return x.ToolResult
 		}
 	}
 	return nil
 }
 
-type isContent_Content interface {
-	isContent_Content()
+type isContent_Type interface {
+	isContent_Type()
 }
 
 type Content_Text struct {
@@ -491,24 +653,24 @@ type Content_Text struct {
 }
 
 type Content_Confirmation struct {
-	Confirmation *ConfirmationContent `protobuf:"bytes,26,opt,name=confirmation,proto3,oneof"`
+	Confirmation *ConfirmationContent `protobuf:"bytes,26,opt,name=confirmation,proto3,oneof"` // TODO(jbd): Remove out of the Content.
 }
 
-type Content_FunctionCall struct {
-	FunctionCall *FunctionCallContent `protobuf:"bytes,27,opt,name=function_call,json=functionCall,proto3,oneof"`
+type Content_ToolCall struct {
+	ToolCall *ToolCallContent `protobuf:"bytes,24,opt,name=tool_call,json=toolCall,proto3,oneof"`
 }
 
-type Content_FunctionResponse struct {
-	FunctionResponse *FunctionResponseContent `protobuf:"bytes,28,opt,name=function_response,json=functionResponse,proto3,oneof"`
+type Content_ToolResult struct {
+	ToolResult *ToolResultContent `protobuf:"bytes,25,opt,name=tool_result,json=toolResult,proto3,oneof"`
 }
 
-func (*Content_Text) isContent_Content() {}
+func (*Content_Text) isContent_Type() {}
 
-func (*Content_Confirmation) isContent_Content() {}
+func (*Content_Confirmation) isContent_Type() {}
 
-func (*Content_FunctionCall) isContent_Content() {}
+func (*Content_ToolCall) isContent_Type() {}
 
-func (*Content_FunctionResponse) isContent_Content() {}
+func (*Content_ToolResult) isContent_Type() {}
 
 var File_proto_content_proto protoreflect.FileDescriptor
 
@@ -527,24 +689,33 @@ const file_proto_content_proto_rawDesc = "" +
 	"\bapproval\x18\x05 \x01(\v2\x17.proto.ApprovalDecisionH\x00R\bapproval\x122\n" +
 	"\adecline\x18\x06 \x01(\v2\x16.proto.DeclineDecisionH\x00R\adeclineB\n" +
 	"\n" +
-	"\bdecisionJ\x04\b\x01\x10\x02J\x04\b\x02\x10\x03R\x04type\"\x93\x01\n" +
+	"\bdecisionJ\x04\b\x01\x10\x02J\x04\b\x02\x10\x03R\x04type\"\x8a\x01\n" +
+	"\x0fToolCallContent\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1c\n" +
+	"\tsignature\x18\t \x01(\fR\tsignature\x12A\n" +
+	"\rfunction_call\x18\x02 \x01(\v2\x1a.proto.FunctionCallContentH\x00R\ffunctionCallB\x06\n" +
+	"\x04type\"\xa1\x01\n" +
+	"\x11ToolResultContent\x12\x17\n" +
+	"\acall_id\x18\b \x01(\tR\x06callId\x12\x1c\n" +
+	"\tsignature\x18\t \x01(\fR\tsignature\x12G\n" +
+	"\x0ffunction_result\x18\x02 \x01(\v2\x1c.proto.FunctionResultContentH\x00R\x0efunctionResultB\x06\n" +
+	"\x04typeJ\x04\b\x01\x10\x02\"l\n" +
 	"\x13FunctionCallContent\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\x12+\n" +
-	"\x04args\x18\x02 \x01(\v2\x17.google.protobuf.StructR\x04args\x12\x0e\n" +
-	"\x02id\x18\x03 \x01(\tR\x02id\x12+\n" +
-	"\x11thought_signature\x18\x04 \x01(\fR\x10thoughtSignature\"r\n" +
-	"\x17FunctionResponseContent\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\x123\n" +
-	"\bresponse\x18\x02 \x01(\v2\x17.google.protobuf.StructR\bresponse\x12\x0e\n" +
-	"\x02id\x18\x03 \x01(\tR\x02id\"\xa4\x02\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\x125\n" +
+	"\targuments\x18\x04 \x01(\v2\x17.google.protobuf.StructR\targumentsJ\x04\b\x01\x10\x02J\x04\b\x02\x10\x03\"~\n" +
+	"\x15FunctionResultContent\x12\x12\n" +
+	"\x04name\x18\b \x01(\tR\x04name\x125\n" +
+	"\bresponse\x18\x03 \x01(\v2\x17.google.protobuf.StructH\x00R\bresponseB\b\n" +
+	"\x06resultJ\x04\b\x01\x10\x02J\x04\b\x04\x10\x05R\x04type\"\x83\x02\n" +
 	"\aContent\x12(\n" +
 	"\x04text\x18\n" +
 	" \x01(\v2\x12.proto.TextContentH\x00R\x04text\x12@\n" +
-	"\fconfirmation\x18\x1a \x01(\v2\x1a.proto.ConfirmationContentH\x00R\fconfirmation\x12A\n" +
-	"\rfunction_call\x18\x1b \x01(\v2\x1a.proto.FunctionCallContentH\x00R\ffunctionCall\x12M\n" +
-	"\x11function_response\x18\x1c \x01(\v2\x1e.proto.FunctionResponseContentH\x00R\x10functionResponseB\t\n" +
-	"\acontentJ\x04\b\x01\x10\x05J\x04\b\x06\x10\n" +
-	"J\x04\b\v\x10\x1aB\x1cZ\x1agithub.com/google/ax/protob\x06proto3"
+	"\fconfirmation\x18\x1a \x01(\v2\x1a.proto.ConfirmationContentH\x00R\fconfirmation\x125\n" +
+	"\ttool_call\x18\x18 \x01(\v2\x16.proto.ToolCallContentH\x00R\btoolCall\x12;\n" +
+	"\vtool_result\x18\x19 \x01(\v2\x18.proto.ToolResultContentH\x00R\n" +
+	"toolResultB\x06\n" +
+	"\x04typeJ\x04\b\x01\x10\x05J\x04\b\x06\x10\n" +
+	"J\x04\b\v\x10\x18B\x1cZ\x1agithub.com/google/ax/protob\x06proto3"
 
 var (
 	file_proto_content_proto_rawDescOnce sync.Once
@@ -558,31 +729,35 @@ func file_proto_content_proto_rawDescGZIP() []byte {
 	return file_proto_content_proto_rawDescData
 }
 
-var file_proto_content_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_proto_content_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_proto_content_proto_goTypes = []any{
-	(*TextContent)(nil),             // 0: proto.TextContent
-	(*ApprovalDecision)(nil),        // 1: proto.ApprovalDecision
-	(*DeclineDecision)(nil),         // 2: proto.DeclineDecision
-	(*ConfirmationContent)(nil),     // 3: proto.ConfirmationContent
-	(*FunctionCallContent)(nil),     // 4: proto.FunctionCallContent
-	(*FunctionResponseContent)(nil), // 5: proto.FunctionResponseContent
-	(*Content)(nil),                 // 6: proto.Content
-	(*structpb.Struct)(nil),         // 7: google.protobuf.Struct
+	(*TextContent)(nil),           // 0: proto.TextContent
+	(*ApprovalDecision)(nil),      // 1: proto.ApprovalDecision
+	(*DeclineDecision)(nil),       // 2: proto.DeclineDecision
+	(*ConfirmationContent)(nil),   // 3: proto.ConfirmationContent
+	(*ToolCallContent)(nil),       // 4: proto.ToolCallContent
+	(*ToolResultContent)(nil),     // 5: proto.ToolResultContent
+	(*FunctionCallContent)(nil),   // 6: proto.FunctionCallContent
+	(*FunctionResultContent)(nil), // 7: proto.FunctionResultContent
+	(*Content)(nil),               // 8: proto.Content
+	(*structpb.Struct)(nil),       // 9: google.protobuf.Struct
 }
 var file_proto_content_proto_depIdxs = []int32{
-	1, // 0: proto.ConfirmationContent.approval:type_name -> proto.ApprovalDecision
-	2, // 1: proto.ConfirmationContent.decline:type_name -> proto.DeclineDecision
-	7, // 2: proto.FunctionCallContent.args:type_name -> google.protobuf.Struct
-	7, // 3: proto.FunctionResponseContent.response:type_name -> google.protobuf.Struct
-	0, // 4: proto.Content.text:type_name -> proto.TextContent
-	3, // 5: proto.Content.confirmation:type_name -> proto.ConfirmationContent
-	4, // 6: proto.Content.function_call:type_name -> proto.FunctionCallContent
-	5, // 7: proto.Content.function_response:type_name -> proto.FunctionResponseContent
-	8, // [8:8] is the sub-list for method output_type
-	8, // [8:8] is the sub-list for method input_type
-	8, // [8:8] is the sub-list for extension type_name
-	8, // [8:8] is the sub-list for extension extendee
-	0, // [0:8] is the sub-list for field type_name
+	1,  // 0: proto.ConfirmationContent.approval:type_name -> proto.ApprovalDecision
+	2,  // 1: proto.ConfirmationContent.decline:type_name -> proto.DeclineDecision
+	6,  // 2: proto.ToolCallContent.function_call:type_name -> proto.FunctionCallContent
+	7,  // 3: proto.ToolResultContent.function_result:type_name -> proto.FunctionResultContent
+	9,  // 4: proto.FunctionCallContent.arguments:type_name -> google.protobuf.Struct
+	9,  // 5: proto.FunctionResultContent.response:type_name -> google.protobuf.Struct
+	0,  // 6: proto.Content.text:type_name -> proto.TextContent
+	3,  // 7: proto.Content.confirmation:type_name -> proto.ConfirmationContent
+	4,  // 8: proto.Content.tool_call:type_name -> proto.ToolCallContent
+	5,  // 9: proto.Content.tool_result:type_name -> proto.ToolResultContent
+	10, // [10:10] is the sub-list for method output_type
+	10, // [10:10] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_proto_content_proto_init() }
@@ -594,11 +769,20 @@ func file_proto_content_proto_init() {
 		(*ConfirmationContent_Approval)(nil),
 		(*ConfirmationContent_Decline)(nil),
 	}
-	file_proto_content_proto_msgTypes[6].OneofWrappers = []any{
+	file_proto_content_proto_msgTypes[4].OneofWrappers = []any{
+		(*ToolCallContent_FunctionCall)(nil),
+	}
+	file_proto_content_proto_msgTypes[5].OneofWrappers = []any{
+		(*ToolResultContent_FunctionResult)(nil),
+	}
+	file_proto_content_proto_msgTypes[7].OneofWrappers = []any{
+		(*FunctionResultContent_Response)(nil),
+	}
+	file_proto_content_proto_msgTypes[8].OneofWrappers = []any{
 		(*Content_Text)(nil),
 		(*Content_Confirmation)(nil),
-		(*Content_FunctionCall)(nil),
-		(*Content_FunctionResponse)(nil),
+		(*Content_ToolCall)(nil),
+		(*Content_ToolResult)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -606,7 +790,7 @@ func file_proto_content_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_content_proto_rawDesc), len(file_proto_content_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   7,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

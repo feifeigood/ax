@@ -55,7 +55,7 @@ func (a *CodingAgent) Connect(ctx context.Context, execID string, start *proto.A
 			{
 				Role: "user",
 				Content: &proto.Content{
-					Content: &proto.Content_Text{
+					Type: &proto.Content_Text{
 						Text: &proto.TextContent{
 							Text: "Generate Cloud Run Python server code. Only show Python code, the output should be deployable as a server. We will deploy it to Kubernetes.",
 						},
@@ -134,7 +134,7 @@ func (a *CodingAgent) Connect(ctx context.Context, execID string, start *proto.A
 		Messages: []*proto.Message{{
 			Role: "assistant",
 			Content: &proto.Content{
-				Content: &proto.Content_Text{
+				Type: &proto.Content_Text{
 					Text: &proto.TextContent{
 						Text: "One last step, a summary...",
 					},
@@ -149,7 +149,7 @@ func (a *CodingAgent) Connect(ctx context.Context, execID string, start *proto.A
 		history = append(history, &proto.Message{
 			Role: "user",
 			Content: &proto.Content{
-				Content: &proto.Content_Text{
+				Type: &proto.Content_Text{
 					Text: &proto.TextContent{
 						Text: "Summarize what we did, and list links to the final deployment endpoints. Give instructions how to revert the deployments if needed",
 					},
@@ -195,7 +195,7 @@ func (a *KubernetesDeployAgent) Connect(ctx context.Context, execID string, star
 			Messages: []*proto.Message{{
 				Role: "assistant",
 				Content: &proto.Content{
-					Content: &proto.Content_Text{
+					Type: &proto.Content_Text{
 						Text: &proto.TextContent{
 							Text: fmt.Sprintf("Picked %v region(s) for deployment.", strings.Join(regions, ",")),
 						},
@@ -214,7 +214,7 @@ func (a *KubernetesDeployAgent) Connect(ctx context.Context, execID string, star
 						{
 							Role: "user",
 							Content: &proto.Content{
-								Content: &proto.Content_Text{
+								Type: &proto.Content_Text{
 									Text: &proto.TextContent{
 										Text: "Provide a mirror to the region if the image doesn't exist.",
 									},
@@ -231,7 +231,7 @@ func (a *KubernetesDeployAgent) Connect(ctx context.Context, execID string, star
 				Messages: []*proto.Message{{
 					Role: "assistant",
 					Content: &proto.Content{
-						Content: &proto.Content_Text{
+						Type: &proto.Content_Text{
 							Text: &proto.TextContent{
 								Text: "* Deploying to " + region + ", this may take a while...",
 							},
@@ -245,7 +245,7 @@ func (a *KubernetesDeployAgent) Connect(ctx context.Context, execID string, star
 				Messages: []*proto.Message{{
 					Role: "assistant",
 					Content: &proto.Content{
-						Content: &proto.Content_Text{
+						Type: &proto.Content_Text{
 							Text: &proto.TextContent{
 								Text: "* kubectl apply -f deployment.yaml",
 							},
@@ -261,7 +261,7 @@ func (a *KubernetesDeployAgent) Connect(ctx context.Context, execID string, star
 				Messages: []*proto.Message{{
 					Role: "assistant",
 					Content: &proto.Content{
-						Content: &proto.Content_Text{
+						Type: &proto.Content_Text{
 							Text: &proto.TextContent{
 								Text: fmt.Sprintf("* Deployment complete. You can access the service at https://%v.test.services.acme.com", region),
 							},
@@ -293,7 +293,7 @@ func (a *KubernetesDeployAgent) Connect(ctx context.Context, execID string, star
 		Messages: []*proto.Message{{
 			Role: "assistant",
 			Content: &proto.Content{
-				Content: &proto.Content_Confirmation{
+				Type: &proto.Content_Confirmation{
 					Confirmation: &proto.ConfirmationContent{
 						Id:       confID,
 						Question: fmt.Sprintf("Picked %v region(s) to deploy, continue?", strings.Join(config.Regions, ",")),
