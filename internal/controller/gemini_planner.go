@@ -80,9 +80,7 @@ Guidelines:
 - Once something is approved, try executing it.`
 	}
 
-	client, err := genai.NewClient(ctx, &genai.ClientConfig{
-		APIKey: os.Getenv("GEMINI_API_KEY"),
-	})
+	client, err := genai.NewClient(ctx, &genai.ClientConfig{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Gemini client: %w", err)
 	}
