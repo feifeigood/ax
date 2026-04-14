@@ -120,7 +120,7 @@ func TestController_Exec_ResumptionAndIDGeneration(t *testing.T) {
 	}
 }
 
-func TestController_Exec_LastSeenSeq_Empty(t *testing.T) {
+func TestController_Exec_LastSeq_Empty(t *testing.T) {
 	ctx := context.Background()
 	cid := "test-conv-seq"
 
@@ -175,7 +175,7 @@ func TestController_Exec_LastSeenSeq_Empty(t *testing.T) {
 	}
 }
 
-func TestController_Exec_LastSeenSeq(t *testing.T) {
+func TestController_Exec_LastSeq(t *testing.T) {
 	ctx := context.Background()
 	cid := "test-conv-seq"
 
@@ -221,13 +221,13 @@ func TestController_Exec_LastSeenSeq(t *testing.T) {
 
 	err = c.Exec(ctx, &proto.ExecRequest{
 		ConversationId: cid,
-		LastSeenSeq:    1,
+		LastSeq:    1,
 	}, handler)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// We expect to receive messages from Seq 2 (since LastSeenSeq is 1).
+	// We expect to receive messages from Seq 2 (since LastSeq is 1).
 	if len(msgs) != 1 {
 		t.Fatalf("expected 1 message, got %d", len(msgs))
 	}
@@ -410,7 +410,7 @@ func TestController_Exec_InternalOnly(t *testing.T) {
 		t.Fatalf("expected 'public message' in execEvent, got %v", outputs[1].GetContent().GetText().GetText())
 	}
 
-	// Test resumption with LastSeenSeq
+	// Test resumption with LastSeq
 	var resumedMsgs []*proto.Message
 	resumedHandler := ExecHandler(func(resp *proto.ExecResponse) error {
 		resumedMsgs = append(resumedMsgs, resp.Outputs...)
@@ -432,7 +432,7 @@ func TestController_Exec_InternalOnly(t *testing.T) {
 
 	err = c2.Exec(ctx, &proto.ExecRequest{
 		ConversationId: cid,
-		LastSeenSeq:    1,
+		LastSeq:    1,
 	}, resumedHandler)
 	if err != nil {
 		t.Fatal(err)

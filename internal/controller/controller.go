@@ -99,9 +99,9 @@ func (d *Controller) tryResuming(ctx context.Context, req *proto.ExecRequest, el
 		history = append(history, ev.Messages...)
 	}
 
-	if req.LastSeenSeq != 0 {
+	if req.LastSeq != 0 {
 		for _, ev := range events {
-			if ev.Seq > req.LastSeenSeq {
+			if ev.Seq > req.LastSeq {
 				if err := handler(&proto.ExecResponse{
 					Outputs: ev.Messages,
 					Seq:     ev.Seq,

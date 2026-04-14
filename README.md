@@ -91,7 +91,7 @@ sequence number 12:
 ```bash
 ax exec \
   --conversation d85a4b4e-c53b-4c84-b879-f10d905bce40 \
-  --last-seen-seq 12 \
+  --last-seq 12 \
   --resume
 ```
 

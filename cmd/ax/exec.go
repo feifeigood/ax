@@ -38,7 +38,7 @@ var (
 	execServerAddr     string
 	execConfigFile     string
 	execResume         bool // allow resuming an execution without inputs
-	execLastSeenSeq    int32
+	execLastSeq    int32
 )
 
 var execCmd = &cobra.Command{
@@ -56,7 +56,7 @@ func init() {
 	execCmd.Flags().StringVar(&execServerAddr, "server", "", "gRPC controller server address (if specified, connects to remote server; otherwise runs with a local built-in AX server)")
 	execCmd.Flags().StringVar(&execConfigFile, "config", "ax.yaml", "Path to YAML configuration file (only used with a local built-in AX server)")
 	execCmd.Flags().BoolVar(&execResume, "resume", false, "Resume a conversation without inputs")
-	execCmd.Flags().Int32Var(&execLastSeenSeq, "last-seen-seq", 0, "Last sequence number seen by the client")
+	execCmd.Flags().Int32Var(&execLastSeq, "last-seq", 0, "Last sequence number seen by the client")
 	execCmd.MarkFlagsMutuallyExclusive("input", "resume")
 }
 
@@ -85,7 +85,7 @@ func runExec(cmd *cobra.Command, args []string) error {
 		cancel()
 	}()
 
-	return execLoop(ctx, execConversationID, execAgentID, execInput, execLastSeenSeq)
+	return execLoop(ctx, execConversationID, execAgentID, execInput, execLastSeq)
 }
 
 func execLoop(ctx context.Context, id string, agentID string, input string, lastSeq int32) error {
@@ -122,7 +122,7 @@ func execLoop(ctx context.Context, id string, agentID string, input string, last
 			ConversationId: id,
 			AgentId:        agentID,
 			Inputs:         inputs,
-			LastSeenSeq:    lastSeq,
+			LastSeq:    lastSeq,
 		})
 		lastSeq = 0 // disable resuming from sequence, user sees the seq on the screen
 		if err != nil {

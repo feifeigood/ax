@@ -618,7 +618,7 @@ type ExecRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	ConversationId string                 `protobuf:"bytes,1,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"` // Unique conversation identifier
 	Inputs         []*Message             `protobuf:"bytes,2,rep,name=inputs,proto3" json:"inputs,omitempty"`                                       // New inputs
-	LastSeenSeq    int32                  `protobuf:"varint,3,opt,name=last_seen_seq,json=lastSeenSeq,proto3" json:"last_seen_seq,omitempty"`       // Last sequence number seen by the client
+	LastSeq        int32                  `protobuf:"varint,3,opt,name=last_seq,json=lastSeq,proto3" json:"last_seq,omitempty"`                     // Last sequence number seen by the client
 	AgentId        string                 `protobuf:"bytes,4,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`                      // Agent ID, if empty planner is used
 	AgentConfig    *anypb.Any             `protobuf:"bytes,5,opt,name=agent_config,json=agentConfig,proto3" json:"agent_config,omitempty"`          // Agent configuration if any
 	unknownFields  protoimpl.UnknownFields
@@ -669,9 +669,9 @@ func (x *ExecRequest) GetInputs() []*Message {
 	return nil
 }
 
-func (x *ExecRequest) GetLastSeenSeq() int32 {
+func (x *ExecRequest) GetLastSeq() int32 {
 	if x != nil {
-		return x.LastSeenSeq
+		return x.LastSeq
 	}
 	return 0
 }
@@ -1286,11 +1286,11 @@ const file_proto_ax_proto_rawDesc = "" +
 	"\x12HealthCheckRequest\"I\n" +
 	"\x13HealthCheckResponse\x12\x18\n" +
 	"\ahealthy\x18\x01 \x01(\bR\ahealthy\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\"\xd6\x01\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"\xcd\x01\n" +
 	"\vExecRequest\x12'\n" +
 	"\x0fconversation_id\x18\x01 \x01(\tR\x0econversationId\x12&\n" +
-	"\x06inputs\x18\x02 \x03(\v2\x0e.proto.MessageR\x06inputs\x12\"\n" +
-	"\rlast_seen_seq\x18\x03 \x01(\x05R\vlastSeenSeq\x12\x19\n" +
+	"\x06inputs\x18\x02 \x03(\v2\x0e.proto.MessageR\x06inputs\x12\x19\n" +
+	"\blast_seq\x18\x03 \x01(\x05R\alastSeq\x12\x19\n" +
 	"\bagent_id\x18\x04 \x01(\tR\aagentId\x127\n" +
 	"\fagent_config\x18\x05 \x01(\v2\x14.google.protobuf.AnyR\vagentConfig\"J\n" +
 	"\fExecResponse\x12(\n" +
