@@ -48,27 +48,50 @@ message ConfirmationContent {
   }
 }
 
-message FunctionCallContent {
-  string name = 1;
-  google.protobuf.Struct args = 2;
-  string id = 3;
-  bytes thought_signature = 4;
+message ToolCallContent {
+  string id = 1;       // A unique ID for this specific tool call.
+  bytes signature = 9; // A signature hash for backend validation.
+  oneof type {
+     FunctionCallContent function_call = 2;
+  }
 }
 
-message FunctionResponseContent {
-  string name = 1;
-  google.protobuf.Struct response = 2;
-  string id = 3;
+message ToolResultContent {
+  reserved 1;
+
+  string call_id = 8;  // ID to match the ID from the function call block.
+  bytes signature = 9; // A signature hash for backend validation.
+
+  oneof type {
+    FunctionResultContent function_result = 2;
+  }
+}
+
+message FunctionCallContent {
+  reserved 1, 2;
+
+  string name = 3;
+  google.protobuf.Struct arguments = 4;
+}
+
+message FunctionResultContent {
+  reserved 1, 4;
+  reserved "type";
+
+  string name = 8;
+  oneof result {
+    google.protobuf.Struct response = 3;
+  }
 }
 
 // Content represents a content input or output.
 message Content {
-  reserved 1 to 4, 6 to 9, 11 to 25;
+  reserved 1 to 4, 6 to 9, 11 to 23;
 
-  oneof content {
+  oneof type {
     TextContent text = 10;
-    ConfirmationContent confirmation = 26;
-    FunctionCallContent function_call = 27;
-    FunctionResponseContent function_response = 28;
+    ConfirmationContent confirmation = 26; // TODO(jbd): Remove out of the Content.
+    ToolCallContent tool_call = 24;
+    ToolResultContent tool_result = 25;
   }
 }

@@ -73,7 +73,7 @@ func (s *server) Connect(stream grpc.BidiStreamingServer[proto.AgentMessage, pro
 		responseMsg := &proto.Message{
 			Role: "assistant",
 			Content: &proto.Content{
-				Content: &proto.Content_Text{
+				Type: &proto.Content_Text{
 					Text: &proto.TextContent{
 						Text: responseText,
 					},

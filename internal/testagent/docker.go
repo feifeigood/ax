@@ -29,7 +29,7 @@ func (a *DockerBuilderAgent) Connect(ctx context.Context, execID string, start *
 		Messages: []*proto.Message{{
 			Role: "assistant",
 			Content: &proto.Content{
-				Content: &proto.Content_Text{
+				Type: &proto.Content_Text{
 					Text: &proto.TextContent{
 						Text: "Building the docker image now...",
 					},
@@ -43,7 +43,7 @@ func (a *DockerBuilderAgent) Connect(ctx context.Context, execID string, start *
 		Messages: []*proto.Message{{
 			Role: "assistant",
 			Content: &proto.Content{
-				Content: &proto.Content_Text{
+				Type: &proto.Content_Text{
 					Text: &proto.TextContent{
 						Text: "* us-central1-docker.pkg.dev/acme/test/test:latest is built and is ready to push.",
 					},
@@ -57,7 +57,7 @@ func (a *DockerBuilderAgent) Connect(ctx context.Context, execID string, start *
 		Messages: []*proto.Message{{
 			Role: "assistant",
 			Content: &proto.Content{
-				Content: &proto.Content_Text{
+				Type: &proto.Content_Text{
 					Text: &proto.TextContent{
 						Text: "* The container image is pushed.",
 					},
@@ -84,7 +84,7 @@ func (a *DockerMirrorAgent) Connect(ctx context.Context, execID string, start *p
 		Messages: []*proto.Message{{
 			Role: "assistant",
 			Content: &proto.Content{
-				Content: &proto.Content_Text{
+				Type: &proto.Content_Text{
 					Text: &proto.TextContent{
 						Text: "* Starting pushing docker image now...",
 					},
@@ -98,7 +98,7 @@ func (a *DockerMirrorAgent) Connect(ctx context.Context, execID string, start *p
 		Messages: []*proto.Message{{
 			Role: "assistant",
 			Content: &proto.Content{
-				Content: &proto.Content_Text{
+				Type: &proto.Content_Text{
 					Text: &proto.TextContent{
 						Text: "* The container image is mirrored",
 					},

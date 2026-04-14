@@ -41,7 +41,7 @@ func text(role, s string) *proto.Message {
 	return &proto.Message{
 		Role: role,
 		Content: &proto.Content{
-			Content: &proto.Content_Text{Text: &proto.TextContent{Text: s}},
+			Type: &proto.Content_Text{Text: &proto.TextContent{Text: s}},
 		},
 	}
 }

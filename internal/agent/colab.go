@@ -460,7 +460,7 @@ func (a *ColabAgent) runColabExec(ctx context.Context, sessionName, command stri
 			Messages: []*proto.Message{{
 				Role: "assistant",
 				Content: &proto.Content{
-					Content: &proto.Content_Text{
+					Type: &proto.Content_Text{
 						Text: &proto.TextContent{Text: line},
 					},
 				},
