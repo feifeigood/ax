@@ -48,13 +48,13 @@ func (s *server) Connect(stream grpc.BidiStreamingServer[proto.AgentMessage, pro
 			return err
 		}
 
-		startMsg := incoming.GetStart()
-		if startMsg == nil {
+		start := incoming.GetStart()
+		if start == nil {
 			continue // optionally wait for start
 		}
 
 		var messages []*proto.Message
-		for _, input := range startMsg.Messages {
+		for _, input := range start.Messages {
 			textContent := input.GetContent().GetText()
 			if textContent == nil {
 				continue
@@ -68,14 +68,12 @@ func (s *server) Connect(stream grpc.BidiStreamingServer[proto.AgentMessage, pro
 		// We don't need to uppercase the whole history.
 		// Only uppercase the last text message.
 		lastMsg := messages[len(messages)-1]
-		responseText := strings.ToLower(lastMsg.GetContent().GetText().Text) // Preserving ToLower as in original code
-
 		responseMsg := &proto.Message{
 			Role: "assistant",
 			Content: &proto.Content{
 				Type: &proto.Content_Text{
 					Text: &proto.TextContent{
-						Text: responseText,
+						Text: strings.ToLower(lastMsg.GetContent().GetText().Text),
 					},
 				},
 			},
