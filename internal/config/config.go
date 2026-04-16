@@ -69,6 +69,12 @@ type GeminiPlannerConfig struct {
 	SkillsDir    string  `yaml:"skills_dir,omitempty"` // Directory to discover skills from
 }
 
+// ActorConfig represents actor configuration.
+type ActorConfig struct {
+	Namespace string `yaml:"namespace"` // Actor namespace
+	Template  string `yaml:"template"`  // Actor template name
+}
+
 // RemoteAgentConfig configures a remote agent to register on startup.
 type RemoteAgentConfig struct {
 	ID          string            `yaml:"id"`                 // Unique agent identifier
@@ -76,6 +82,7 @@ type RemoteAgentConfig struct {
 	Description string            `yaml:"description"`        // Description of agent capabilities
 	Address     string            `yaml:"address"`            // gRPC address (e.g., "localhost:50051")
 	Metadata    map[string]string `yaml:"metadata,omitempty"` // Optional metadata
+	Actor       ActorConfig       `yaml:"actor,omitempty"`
 }
 
 // SandboxAgentConfig configures a Kubernetes Sandbox agent to register on startup.

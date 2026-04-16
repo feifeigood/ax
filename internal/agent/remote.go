@@ -67,6 +67,7 @@ func (a *RemoteAgent) connect() (*grpc.ClientConn, error) {
 // Connect handles processing of input content with the remote agent.
 func (a *RemoteAgent) Connect(ctx context.Context, execID string, start *proto.AgentStart, e Executor, o OutputHandler) error {
 	ctx = metadata.AppendToOutgoingContext(ctx, "execution-id", execID)
+
 	conn, err := a.connect()
 	if err != nil {
 		return fmt.Errorf("failed to connect: %w", err)
