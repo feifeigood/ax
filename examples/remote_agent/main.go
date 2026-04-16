@@ -83,10 +83,20 @@ func (s *server) Connect(stream grpc.BidiStreamingServer[proto.AgentMessage, pro
 
 		if err := stream.Send(&proto.AgentMessage{
 			ExecId: incoming.ExecId,
-			Msg: &proto.AgentMessage_Outputs{
+			Type: &proto.AgentMessage_Outputs{
 				Outputs: &proto.AgentOutputs{
 					Messages: []*proto.Message{responseMsg},
 				},
+			},
+		}); err != nil {
+			return err
+		}
+
+		// Send AgentComplete to signal end of outputs.
+		if err := stream.Send(&proto.AgentMessage{
+			ExecId: incoming.ExecId,
+			Type: &proto.AgentMessage_Complete{
+				Complete: &proto.AgentComplete{},
 			},
 		}); err != nil {
 			return err

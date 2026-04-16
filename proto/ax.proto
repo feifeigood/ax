@@ -38,16 +38,17 @@ message AgentOutputs {
   // If true, these outputs are stored only in the execution log
   // (for resumption) and are not emitted to the client or stored
   // in the conversation history.
-  bool internal_only = 2; 
-
-  // TODO: Add awaiting_more field.
+  bool internal_only = 2;
 }
+
+message AgentComplete {}
 
 message AgentMessage {
   string exec_id = 1;
-  oneof msg {
+  oneof type {
     AgentStart start = 2;
     AgentOutputs outputs = 3;
+    AgentComplete complete = 4;
   }
 }
 

@@ -81,7 +81,7 @@ func (a *RemoteAgent) Connect(ctx context.Context, execID string, start *proto.A
 
 	if err := stream.Send(&proto.AgentMessage{
 		ExecId: execID,
-		Msg: &proto.AgentMessage_Start{
+		Type: &proto.AgentMessage_Start{
 			Start: start,
 		},
 	}); err != nil {
@@ -104,7 +104,7 @@ func (a *RemoteAgent) Connect(ctx context.Context, execID string, start *proto.A
 			return fmt.Errorf("failed to receive content: %w", err)
 		}
 
-		switch msg := resp.Msg.(type) {
+		switch msg := resp.Type.(type) {
 		case *proto.AgentMessage_Start:
 			// Start a new agent call
 			if _, err := e.Exec(stream.Context(), resp.ExecId, msg.Start, o); err != nil {
@@ -117,6 +117,9 @@ func (a *RemoteAgent) Connect(ctx context.Context, execID string, start *proto.A
 			if err := o(msg.Outputs); err != nil {
 				return fmt.Errorf("handler error: %w", err)
 			}
+		case *proto.AgentMessage_Complete:
+			// Agent signaled completion
+			return nil
 		default:
 			return fmt.Errorf("unknown message type: %T", msg)
 		}
