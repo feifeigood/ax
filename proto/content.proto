@@ -48,11 +48,27 @@ message ConfirmationContent {
   }
 }
 
+message ThoughtSummaryContent {
+  reserved 2;
+
+  oneof type {
+    TextContent text = 1;
+  }
+}
+
+message ThoughtContent {
+  reserved 1, 2, 3, 4, 5, 8;
+  reserved "type";
+
+  bytes signature = 7;
+  repeated ThoughtSummaryContent summary = 9;
+}
+
 message ToolCallContent {
   string id = 1;       // A unique ID for this specific tool call.
   bytes signature = 9; // A signature hash for backend validation.
   oneof type {
-     FunctionCallContent function_call = 2;
+    FunctionCallContent function_call = 2;
   }
 }
 
@@ -89,6 +105,7 @@ message Content {
   reserved 1 to 4, 6 to 9, 11 to 23;
 
   oneof type {
+    ThoughtContent thought = 5;
     TextContent text = 10;
     ConfirmationContent confirmation = 26; // TODO(jbd): Remove out of the Content.
     ToolCallContent tool_call = 24;
