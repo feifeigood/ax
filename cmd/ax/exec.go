@@ -50,7 +50,7 @@ If no conversation ID is provided, a new UUID will be generated.`,
 }
 
 func init() {
-	execCmd.Flags().StringVar(&execConversationID, "conversation", uuid.NewString(), "Conversation ID (optional, generates UUID if not provided)")
+	execCmd.Flags().StringVar(&execConversationID, "conversation", "", "Conversation ID (optional, generates UUID if not provided)")
 	execCmd.Flags().StringVar(&execAgentID, "agent", "", "Agent ID (optional, planner is used if not specified)")
 	execCmd.Flags().StringVar(&execInput, "input", "", "Input message to send (optional)")
 	execCmd.Flags().StringVar(&execServerAddr, "server", "", "gRPC controller server address (if specified, connects to remote server; otherwise runs with a local built-in AX server)")
@@ -68,6 +68,10 @@ var (
 
 func runExec(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
+
+	if execConversationID == "" {
+		execConversationID = uuid.NewString()
+	}
 
 	// Setup signal handling for graceful shutdown
 	ctx, cancel := context.WithCancel(ctx)
