@@ -26,7 +26,7 @@ import (
 	"github.com/google/ax/proto"
 )
 
-const port = ":8494" // Default port for ATE agent worker
+const port = ":50051"
 
 // server implements the AgentService gRPC server.
 type server struct {
