@@ -290,21 +290,10 @@ planner:
 
 registry:
   remote_agents:
-    - id: "remote-text-processor"
-      name: "Remote Text Processor"
-      description: "Converts text to lowercase."
+    - id: "medical-deep-researcher"
+      name: "Medical Deep Researcher"
+      description: "Performs deep medical research using various resources like pubmed and clinicaltrials.gov"
       address: "localhost:50051"
-      metadata:
-       version: "1.0"
-  k8s_sandbox_agents:
-    - id: "uppercase"
-      name: "Uppercase Agent"
-      description: "Converts text to uppercase."
-      sandbox_template_ref: "uppercase-agent-template"
-      container_port: 8494
-      use_router: true
-      metadata:
-       version: "1.0"
 ```
 
 Example:
