@@ -33,7 +33,7 @@ RUN go mod download
 COPY . .
 
 # Build the ax binary
-RUN go build -o /app/bin/ax ./cmd/ax
+RUN go build -tags ate -o /app/bin/ax ./cmd/ax
 
 # Runtime stage
 # TODO: consider other options instead of Alpine
