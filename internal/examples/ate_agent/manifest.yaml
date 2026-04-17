@@ -25,7 +25,7 @@ metadata:
 spec:
   replicas: 10
   container:
-    image: ko://github.com/google/ax/internal/examples/ate_agent
+    image: gcr.io/ax-container-images/example-ax-agent:latest
     ports:
     - containerPort: 8494
 ---
