@@ -1,7 +1,7 @@
 .PHONY: all build proto test clean install install-ate
 
 # Default container registry for docker
-export DOCKER_REPO ?= gcr.io/ax-container-images
+export KO_DOCKER_REPO ?= gcr.io/ax-container-images
 
 # Build all binaries
 all: proto build
@@ -80,16 +80,8 @@ clean-logs:
 
 ax-image:
 	@echo "Building container image with ko..."
-	@if [ -z "$$KO_DOCKER_REPO" ]; then \
-		echo "Error: KO_DOCKER_REPO is not set. Please set it to your container registry (e.g., gcr.io/my-project)."; \
-		exit 1; \
-	fi
 	GOFLAGS="-tags=ate" ko build --base-import-paths ./cmd/ax
 
 ate-agent-image:
 	@echo "Building ATE agent container image with ko..."
-	@if [ -z "$$KO_DOCKER_REPO" ]; then \
-		echo "Error: KO_DOCKER_REPO is not set. Please set it to your container registry (e.g., gcr.io/my-project)."; \
-		exit 1; \
-	fi
 	GOFLAGS="-tags=ate" ko build --base-import-paths ./internal/examples/ate_agent
