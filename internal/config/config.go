@@ -151,6 +151,13 @@ func LoadFromFile(path string) (*Config, error) {
 	return &cfg, nil
 }
 
+// DefaultConfig returns a configuration with default values set.
+func DefaultConfig() *Config {
+	var cfg Config
+	cfg.setDefaults()
+	return &cfg
+}
+
 // setDefaults sets default values for optional fields.
 func (c *Config) setDefaults() {
 	// Server defaults

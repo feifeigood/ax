@@ -16,6 +16,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -52,10 +53,9 @@ func init() {
 func runServe(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 
-	// Load configuration from YAML file
-	cfg, err := config.LoadFromFile(serveConfigFile)
+	cfg, err := newConfig(cmd)
 	if err != nil {
-		return fmt.Errorf("error loading config file '%s': %w\nTip: Create a config file with 'ax serve --help' to see an example", serveConfigFile, err)
+		return err
 	}
 
 	// Validate configuration
@@ -88,6 +88,17 @@ func runServe(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+func newConfig(cmd *cobra.Command) (*config.Config, error) {
+	cfg, err := config.LoadFromFile(serveConfigFile)
+	if errors.Is(err, os.ErrNotExist) && !cmd.Flags().Changed("config") {
+		return config.DefaultConfig(), nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("error loading config file '%s': %w", serveConfigFile, err)
+	}
+	return cfg, nil
 }
 
 func newControllerFromConfig(ctx context.Context, cfg *config.Config) (*controller.Controller, error) {
