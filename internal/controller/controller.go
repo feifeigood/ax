@@ -161,7 +161,7 @@ func (d *Controller) Exec(ctx context.Context, req *proto.ExecRequest, handler E
 	defer cleanup()
 
 	if inFlight {
-		return fmt.Errorf("execution %q is already in flight", req.ConversationId)
+		return fmt.Errorf("conversation %q is already in flight", req.ConversationId)
 	}
 
 	planner, err := d.plannerBuilder(ctx, d.registry)
