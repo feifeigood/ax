@@ -80,7 +80,6 @@ func runServe(cmd *cobra.Command, args []string) error {
 		log.Println("\nReceived interrupt, shutting down...")
 		srv.GracefulStop()
 	}()
-
 	log.Printf("Starting AX server at %s...\n", cfg.Server.Address)
 	if err := srv.Serve(cfg.Server.Address); err != nil {
 		return fmt.Errorf("error serving: %w", err)
@@ -98,23 +97,28 @@ func newControllerFromConfig(ctx context.Context, cfg *config.Config) (*controll
 
 	// Create planner builder
 	plannerBuilder := func(ctx context.Context, r *controller.Registry) (agent.Agent, error) {
-		// The builder defines which planner to use.
-		// Currently, it uses the Gemini planner.
-		// Gemini config can be customized via environment variables (GEMINI_API_KEY, AX_GEMINI_MODEL)
-		// TODO(lhuan): allow other planners based on cfg.PlannerType
-		timeout, err := time.ParseDuration(cfg.Planner.Gemini.Timeout)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse duration: %v", err)
+		switch cfg.Planner.Type {
+		case "antigravity":
+			return controller.NewAntigravityPlannerAgent(ctx, r, controller.AntigravityPlannerConfig{
+				Endpoint: cfg.Planner.Antigravity.Endpoint,
+			})
+		case "gemini":
+			timeout, err := time.ParseDuration(cfg.Planner.Gemini.Timeout)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse duration: %v", err)
+			}
+			return controller.NewGeminiPlannerAgent(ctx, r, controller.GeminiPlannerConfig{
+				GeminiConfig: &proto.GeminiConfig{
+					Model:        cfg.Planner.Gemini.Model,
+					MaxTokens:    cfg.Planner.Gemini.MaxTokens,
+					Timeout:      durationpb.New(timeout),
+					SystemPrompt: cfg.Planner.Gemini.SystemPrompt,
+				},
+				SkillsDir: cfg.Planner.Gemini.SkillsDir,
+			})
+		default:
+			return nil, fmt.Errorf("unknown planner type: %s", cfg.Planner.Type)
 		}
-		return controller.NewGeminiPlannerAgent(ctx, r, controller.GeminiPlannerConfig{
-			GeminiConfig: &proto.GeminiConfig{
-				Model:        cfg.Planner.Gemini.Model,
-				MaxTokens:    cfg.Planner.Gemini.MaxTokens,
-				Timeout:      durationpb.New(timeout),
-				SystemPrompt: cfg.Planner.Gemini.SystemPrompt,
-			},
-			SkillsDir: cfg.Planner.Gemini.SkillsDir,
-		})
 	}
 
 	// Build controller config

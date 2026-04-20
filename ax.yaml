@@ -20,11 +20,26 @@ eventlog:
     filename: "eventlog/log.sqlite"
 
 planner:
+  # Type of planner to use: "gemini" or "antigravity" (default: "gemini")
+  # Note: Only the configuration block matching this type will be active.
+  type: "antigravity"
+
+  # The Gemini planner uses Google's Gemini models for planning.
   gemini:
     model: "gemini-3-flash-preview"
     timeout: "60s"
     skills_dir: "./examples/skills"
 
+  # The Antigravity planner uses an external Python sidecar. See README for instructions.
+  antigravity:
+    endpoint: "http://localhost:8085/plan"
+
+
+    model: "MODEL_PLACEHOLDER_M18"
+    skills_dir: "./examples/skills"
+
+# Remote agents configuration (optional)
+# List of remote or sandbox agents to register on startup.
 registry:
   # remote_agents:
   #   - id: "medical-deep-researcher"

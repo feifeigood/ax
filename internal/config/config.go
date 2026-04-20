@@ -61,7 +61,22 @@ type EventLogConfig struct {
 
 // PlannerConfig configures the planner.
 type PlannerConfig struct {
-	Gemini GeminiPlannerConfig `yaml:"gemini"`
+	Type   string              `yaml:"type"` // "gemini" or "antigravity"
+	Gemini GeminiPlannerConfig `yaml:"gemini,omitempty"`
+	Antigravity AntigravityPlannerConfig `yaml:"antigravity,omitempty"`
+}
+
+// AntigravityPlannerConfig configures the Antigravity-based planner.
+// TODO: Support additional Antigravity SDK features (e.g., custom tools, hooks, MCP servers, agentic mode).
+type AntigravityPlannerConfig struct {
+	Endpoint string `yaml:"endpoint,omitempty"` // URL of the Python sidecar
+}
+
+// setDefaults sets default values for AntigravityPlannerConfig.
+func (c *AntigravityPlannerConfig) setDefaults() {
+	if c.Endpoint == "" {
+		c.Endpoint = "http://localhost:8085/plan"
+	}
 }
 
 // GeminiPlannerConfig configures the Gemini-based planner.
@@ -165,9 +180,16 @@ func (c *Config) setDefaults() {
 		c.Server.Address = ":8494"
 	}
 
-	// EventLog defaults
 	if c.EventLog.SQLiteConfig.Filename == "" {
 		c.EventLog.SQLiteConfig.Filename = "eventlog/log.sqlite"
+	}
+
+	// Planner defaults
+	if c.Planner.Type == "" {
+		c.Planner.Type = "gemini"
+	}
+	if c.Planner.Type == "antigravity" {
+		c.Planner.Antigravity.setDefaults()
 	}
 
 }

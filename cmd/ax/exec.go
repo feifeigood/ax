@@ -314,6 +314,12 @@ func displayContents(d *internal.Display, contents []*proto.Message) {
 					}
 				}
 			}
+		case *proto.Content_Thought:
+			for _, summary := range o.Thought.GetSummary() {
+				if textContent := summary.GetText(); textContent != nil {
+					d.DisplayOutput(fmt.Sprintf("Thinking: %s", textContent.Text))
+				}
+			}
 		default:
 			d.DisplayOutput(fmt.Sprintf("unknown output type: %v", o))
 		}
