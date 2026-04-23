@@ -22,7 +22,6 @@ import (
 	"net/http"
 	osConfig "os/exec"
 	"runtime"
-	"sort"
 	"time"
 
 	"github.com/google/ax/internal/config"
@@ -183,34 +182,22 @@ func buildExecTraces(rootExecID string, execIDs []string, events []*proto.Execut
 	}
 
 	var execs []ExecTrace
-	for execID, evs := range execsMap {
-		agentID := ""
-		for _, ev := range evs {
-			if ev.AgentID != "" {
-				agentID = ev.AgentID
-				break
+	for _, execID := range execIDs {
+		if evs, ok := execsMap[execID]; ok {
+			agentID := ""
+			for _, ev := range evs {
+				if ev.AgentID != "" {
+					agentID = ev.AgentID
+					break
+				}
 			}
+			execs = append(execs, ExecTrace{
+				ExecID:  execID,
+				AgentID: agentID,
+				Events:  evs,
+			})
 		}
-		execs = append(execs, ExecTrace{
-			ExecID:  execID,
-			AgentID: agentID,
-			Events:  evs,
-		})
 	}
-
-	// Sort execs by the order they appeared in execIDs (chronological)
-	getIndex := func(execID string) int {
-		for idx, id := range execIDs {
-			if id == execID {
-				return idx
-			}
-		}
-		return len(execIDs)
-	}
-
-	sort.Slice(execs, func(i, j int) bool {
-		return getIndex(execs[i].ExecID) < getIndex(execs[j].ExecID)
-	})
 
 	return execs
 }
