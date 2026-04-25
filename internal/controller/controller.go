@@ -28,7 +28,6 @@ import (
 	"github.com/google/ax/internal/testagent"
 	"github.com/google/ax/proto"
 	"github.com/google/uuid"
-	"google.golang.org/protobuf/types/known/anypb"
 )
 
 const plannerAgentID = "__planner"
@@ -205,7 +204,7 @@ func (d *Controller) Exec(ctx context.Context, req *proto.ExecRequest, handler E
 	)
 }
 
-func (d *Controller) execute(ctx context.Context, conversationID string, execID string, agentID string, agentConfig *anypb.Any, history []*proto.Message, newInputs []*proto.Message, registry map[string]agent.Agent, handler ExecHandler) error {
+func (d *Controller) execute(ctx context.Context, conversationID string, execID string, agentID string, agentConfig []byte, history []*proto.Message, newInputs []*proto.Message, registry map[string]agent.Agent, handler ExecHandler) error {
 	e := executor.DefaultExecutor(d.eventLog, registry)
 	outputCapturer := func(outgoing *proto.AgentOutputs) error {
 		if outgoing.InternalOnly {
@@ -236,7 +235,7 @@ func (d *Controller) execute(ctx context.Context, conversationID string, execID 
 	}
 	state, err := e.Exec(ctx, conversationID, execID, &proto.AgentStart{
 		AgentId:  agentID,
-		Config:   agentConfig,
+		AgentConfig: agentConfig,
 		Messages: append(history, newInputs...),
 	}, outputCapturer)
 	if err != nil {

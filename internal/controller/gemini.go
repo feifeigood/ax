@@ -27,6 +27,7 @@ import (
 	"github.com/google/ax/internal/skills"
 	"github.com/google/ax/proto"
 	"google.golang.org/genai"
+	pb "google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -40,7 +41,7 @@ func NewGeminiAgent() *GeminiAgent {
 }
 
 func (a *GeminiAgent) config(start *proto.AgentStart) (*proto.GeminiConfig, error) {
-	if start.Config == nil {
+	if len(start.AgentConfig) == 0 {
 		return &proto.GeminiConfig{
 			Model:   "gemini-3-flash-preview",
 			Timeout: &duration.Duration{Seconds: 30},
@@ -48,7 +49,7 @@ func (a *GeminiAgent) config(start *proto.AgentStart) (*proto.GeminiConfig, erro
 	}
 
 	var cfg proto.GeminiConfig
-	if err := start.Config.UnmarshalTo(&cfg); err != nil {
+	if err := pb.Unmarshal(start.AgentConfig, &cfg); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal Gemini config: %w", err)
 	}
 	return &cfg, nil

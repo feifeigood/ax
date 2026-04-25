@@ -27,7 +27,7 @@ import (
 	testagentpb "github.com/google/ax/internal/testagent/proto"
 	"github.com/google/ax/proto"
 	"github.com/google/uuid"
-	"google.golang.org/protobuf/types/known/anypb"
+	pb "google.golang.org/protobuf/proto"
 )
 
 // Please note that this is not production code. testagent is only for testing ax.
@@ -86,7 +86,7 @@ func (a *CodingAgent) Connect(ctx context.Context, conversationID string, execID
 	}
 
 	{
-		config, err := anypb.New(&testagentpb.KubernetesDeployAgentConfig{
+		config, err := pb.Marshal(&testagentpb.KubernetesDeployAgentConfig{
 			Regions: []string{"us-central1"},
 		})
 		if err != nil {
@@ -95,7 +95,7 @@ func (a *CodingAgent) Connect(ctx context.Context, conversationID string, execID
 		outputs, err := exec.Exec(ctx, conversationID, "deploy", &proto.AgentStart{
 			AgentId:  "kubernetes-deploy",
 			Messages: history,
-			Config:   config,
+			AgentConfig: config,
 		})
 		if err != nil {
 			return err
@@ -109,7 +109,7 @@ func (a *CodingAgent) Connect(ctx context.Context, conversationID string, execID
 	}
 
 	{
-		config, err := anypb.New(&testagentpb.KubernetesDeployAgentConfig{
+		config, err := pb.Marshal(&testagentpb.KubernetesDeployAgentConfig{
 			Regions: []string{"europe-north1", "asia-east1", "us-west2"},
 		})
 		if err != nil {
@@ -118,7 +118,7 @@ func (a *CodingAgent) Connect(ctx context.Context, conversationID string, execID
 		outputs, err := exec.Exec(ctx, conversationID, "deploy-more", &proto.AgentStart{
 			AgentId:  "kubernetes-deploy",
 			Messages: history,
-			Config:   config,
+			AgentConfig: config,
 		})
 		if err != nil {
 			return err
@@ -271,11 +271,11 @@ func (a *KubernetesDeployAgent) Connect(ctx context.Context, conversationID stri
 		return nil
 	}
 
-	if start.Config == nil {
+	if start.AgentConfig == nil {
 		return fmt.Errorf("no config for id=%v", execID)
 	}
 	var config testagentpb.KubernetesDeployAgentConfig
-	if err := start.Config.UnmarshalTo(&config); err != nil {
+	if err := pb.Unmarshal(start.AgentConfig, &config); err != nil {
 		return err
 	}
 	if len(config.Regions) == 0 {

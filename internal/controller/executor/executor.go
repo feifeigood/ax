@@ -170,7 +170,7 @@ func logPending(ctx context.Context, el EventLog, execID string, start *proto.Ag
 		Timestamp:   timestamppb.Now(),
 		ExecId:      execID,
 		AgentId:     start.AgentId,
-		AgentConfig: start.Config,
+		AgentConfig: start.AgentConfig,
 		Inputs:      start.Messages,
 		State:       proto.State_STATE_PENDING,
 	})

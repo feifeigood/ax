@@ -17,7 +17,6 @@ syntax = "proto3";
 package ax;
 
 import "google/protobuf/timestamp.proto";
-import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "proto/content.proto";
 
@@ -28,7 +27,7 @@ option go_package = "github.com/google/ax/proto";
 
 message AgentStart {
   string agent_id = 1;
-  google.protobuf.Any config = 2;
+  bytes agent_config = 2;
   repeated Message messages = 3;
 }
 
@@ -76,7 +75,7 @@ message ConversationEvent {
 message ExecutionEvent {
   string exec_id = 1;
   string agent_id = 2;
-  google.protobuf.Any agent_config = 3;
+  bytes agent_config = 3;
   repeated Message inputs = 4;
   repeated Message outputs = 5;
   State state = 6;
@@ -122,7 +121,7 @@ message ExecRequest {
   int32 last_seq = 3;                    // Last sequence number seen by the client
 
   string agent_id = 4;                   // Agent ID, if empty planner is used
-  google.protobuf.Any agent_config = 5;  // Agent configuration if any
+  bytes agent_config = 5;                // Agent configuration if any
 }
 
 // ExecResponse contains the result of an execution.
