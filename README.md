@@ -11,32 +11,36 @@ and execution resumption, even in complex distributed setups.
 
 ## Features
 
-- **Distributed Runtime**: Controller, skills, tools, and agents can execute in isolation without having side effects on each other
+- **Distributed Runtime**: Controller, skills, tools, and agents can execute in isolation
 - **Resumption**: Automatic recovery from failures or interruptions
 - **Skills, Tools, Agents**: Support for skill, tool, and agent selection and execution
-- **Auditing and Policy**: All user and agentic calls are coordinated by a central controller, easy to control and audit the overall execution and skill/tool/agent calls
-- **Built-in Capabilities**: Antigravity as the default harness, integrated Bash tool, and Gemini agent support
+- **Auditing & Policy**: All user and agentic calls are coordinated by a common controller, easy to control and audit the overall execution and skill/tool/agent calls
+- **Portability**: Runs anywhere, scales to small and large deployments
+- **Customizability**: Agnostic of harness and model, uses Antigravity as the default harness
 
 Built-in consistency and resumability features:
-- **Single-Writer Architecture**: Centralized controller ensures consistent state management
+- **Single-Writer Architecture**: Single controller ensures consistent state management
 - **Event Log**: Durable execution state with automatic recovery
 - **Advanced Resumption**: Support for compute-layer actor resumption on compatible platforms
 
 ## Overview
 
-```
-┌────────────────────────┐
-│      [Controller]      │                 ┌──────────────┐
-│  - Executor            │--(in process)---| local  agent |
-│  - Event Log           │                 └──────────────┘
-│  - Registry            │                 ┌──────────────┐
-│  - Tools               │--(gRPC stream)--| remote agent |
-│  - Skills              │                 └──────────────┘
-└────────────────────────┘
+```mermaid
+graph LR
+    Client
+    Controller["AX Controller<br/>(executor, event log, registry)"]
+    RemoteAgent["Agent (isolated actor)"]
+    Tool["Tool (MCP server)"]
+    Skill["Skill (isolated actor)"]
+
+    Client -->|resumable stream| Controller
+    Controller <-->|resumable bidi stream| RemoteAgent
+    Controller --> Skill
+    Controller --> Tool
 ```
 
 As agents evolve from simple assistants to autonomous long running workers,
-builders need a robust runtime to manage state, ensure reliability,
+developers need a robust runtime to manage state, ensure reliability,
 and audit execution. As we are moving away from monolithic agents towards
 distributed harnesses where tools, skills and agents are deployed as
 isolated actors, a distributed runtime with dynamically spawned isolated
@@ -46,8 +50,8 @@ While compute-agnostic, AX is optimized to provide the best
 experience on Kubernetes.
 
 We expect every sophisticated agentic application will need the capabilities provided by AX.
-We are building this layer as a general widely available foundation,
-enabling builders to focus on building their applications rather than infrastructure.
+We are building this layer as a widely available foundation,
+enabling developers to focus on building their applications rather than infrastructure.
 We decided to build this project in public to validate every design decision before
 a stable release is cut. We highly encourage you to give us feedback.
 
@@ -92,9 +96,8 @@ ax exec \
   --input "Show me the contents of README.md"
 ```
 
-You can continue from a previous sequence if client got disconnected
-during a conversation. In this example, we skip seeing the events up to 
-sequence number 12:
+You can continue from a previous sequence if the client gets disconnected.
+In this example, we resume from sequence number 12:
 
 ```bash
 ax exec \
@@ -230,13 +233,13 @@ ax eventlog fork --src-conversation 38460323-9a78-41cb-8991-022b0ff2c19c --src-s
 
 ### Trace
 
-Visualize the trace of an agentic execution in a Web UI, directly fetching from the SQLite event log.
+Visualize the trace of an agentic execution in a Web UI, directly fetching from the event log.
 
 ```bash
 ax eventlog trace --conversation <id> [--addr <address>] [--config <file>]
 ```
 
-This will parse the execution logs and spin up a local web server (defaulting to e.g. `http://localhost:8080`), automatically opening it in your browser.
+This will parse the execution logs and spin up a local web server, automatically opening it in your browser.
 
 Options:
 - `--addr`: Server address to listen on (optional, defaults to "localhost:8080")
@@ -368,17 +371,15 @@ the `AgentService` interface defined in `proto/ax.proto`:
 ## What AX is NOT?
 * An agentic framework, AX is agnostic of the framework used to build agents. We are working with
   framework authors (e.g. ADK) to provide built-in support for AX.
-* A container or job scheduler, we delegate it to the new capabilities in Kubernetes.
 * A specific harness like a coding agent, we allow bringing any harness as an agent.
 * A model specific controller. AX is agnostic of the models used.
 
 ## Acknowledgements
 
-We thank Google DeepMind for their earlier work in distributed harnesses and
-their current work on Antigravity. AX is heavily influenced by this collobration
-and the internal agentic stack we together have built for Google.
-We thank the Google Kubernetes Engine team for their deep contributions and
-insights regarding isolation, resumption and job scheduling.
+We thank Google DeepMind for their earlier work in distributed harnesses which
+heavily influenced AX.
+We thank the Google Kubernetes Engine team for their deep contributions
+regarding isolation, resumption and job scheduling.
 
 ## License
 
