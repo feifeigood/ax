@@ -199,6 +199,49 @@ ax exec --server localhost:8494 --input "Hello agents!"
 ax exec --agent coding --input "Hello coding agent, write me a cool Go program!"
 ```
 
+### Serve
+
+```bash
+ax serve [--config <path>]
+```
+
+Starts the controller as a gRPC server using a YAML configuration file.
+
+Options:
+- `--config`: Path to YAML configuration file (default: "ax.yaml")
+
+Example configuration file (`ax.yaml`):
+```yaml
+server:
+  address: ":8494"
+
+eventlog:
+  sqlite:
+    filename: "eventlog/log.sqlite"
+
+planner:
+  gemini:
+    model: "gemini-3-flash-preview"
+    timeout: "60s"
+    skills_dir: "./examples/skills"
+
+registry:
+  remote_agents:
+    - id: "medical-deep-researcher"
+      name: "Medical Deep Researcher"
+      description: "Performs deep medical research using various resources like pubmed and clinicaltrials.gov"
+      address: "localhost:50051"
+```
+
+Example:
+```bash
+# Start server with default config (ax.yaml)
+ax serve
+
+# Start server with custom config
+ax serve --config my-config.yaml
+```
+
 ### Fork
 
 Fork an existing agentic event log from a specific checkpoint (or the latest state)
@@ -272,49 +315,6 @@ Options:
 - `--agent-name`: Human-readable name for the agent (required)
 - `--agent-description`: Description of agent capabilities (required)
 - `--server`: gRPC controller server address (default: "localhost:8494")
-
-#### Serve
-
-```bash
-ax serve [--config <path>]
-```
-
-Starts the controller as a gRPC server using a YAML configuration file.
-
-Options:
-- `--config`: Path to YAML configuration file (default: "ax.yaml")
-
-Example configuration file (`ax.yaml`):
-```yaml
-server:
-  address: ":8494"
-
-eventlog:
-  sqlite:
-    filename: "eventlog/log.sqlite"
-
-planner:
-  gemini:
-    model: "gemini-3-flash-preview"
-    timeout: "60s"
-    skills_dir: "./examples/skills"
-
-registry:
-  remote_agents:
-    - id: "medical-deep-researcher"
-      name: "Medical Deep Researcher"
-      description: "Performs deep medical research using various resources like pubmed and clinicaltrials.gov"
-      address: "localhost:50051"
-```
-
-Example:
-```bash
-# Start server with default config (ax.yaml)
-ax serve
-
-# Start server with custom config
-ax serve --config my-config.yaml
-```
 
 ## Event Log Format
 
