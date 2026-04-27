@@ -72,7 +72,7 @@ ax-image:
 
 ate-agent-image:
 	@echo "Building ATE agent container image with ko..."
-	GOFLAGS="-tags=ate" ko build --base-import-paths ./internal/examples/ate_agent
+	GOFLAGS="-tags=ate" ko build --base-import-paths ./internal/experimental/examples/ate_agent
 
 k8s-sandbox-router-image:
 	@echo "Building sandbox-router container image with ko..."

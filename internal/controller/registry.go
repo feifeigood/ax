@@ -21,6 +21,7 @@ import (
 
 	"github.com/google/ax/internal/agent"
 	"github.com/google/ax/internal/config"
+	expagent "github.com/google/ax/internal/experimental/agent"
 )
 
 // AgentInfo contains metadata about a registered agent.
@@ -125,7 +126,7 @@ func (r *Registry) RegisterKubernetesSandbox(ctx context.Context, cfg config.San
 		return fmt.Errorf("agent %s already registered", cfg.ID)
 	}
 
-	sandboxAgent, err := agent.NewKubernetesSandboxAgent(ctx, agent.KubernetesSandboxAgentConfig{
+	sandboxAgent, err := expagent.NewKubernetesSandboxAgent(ctx, expagent.KubernetesSandboxAgentConfig{
 		ID:                 cfg.ID,
 		SandboxTemplateRef: cfg.SandboxTemplateRef,
 		ContainerPort:      cfg.ContainerPort,
@@ -160,7 +161,7 @@ func (r *Registry) RegisterColab(cfg config.ColabAgentConfig) error {
 		return fmt.Errorf("agent %s already registered", cfg.ID)
 	}
 
-	colabAgent, err := agent.NewColabAgent(agent.ColabAgentConfig{
+	colabAgent, err := expagent.NewColabAgent(expagent.ColabAgentConfig{
 		ID:              cfg.ID,
 		LocalFile:       cfg.LocalFile,
 		DriveFile:       cfg.DriveFile,

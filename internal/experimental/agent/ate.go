@@ -22,7 +22,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/google/ax/internal/ate"
+	"github.com/google/ax/internal/agent"
+	"github.com/google/ax/internal/experimental/k8s/ate"
 	"github.com/google/ax/proto"
 )
 
@@ -55,7 +56,7 @@ func NewATEAgent(endpoint string, config ATEAgentConfig) (*ATEAgent, error) {
 }
 
 // Connect handles processing of input content by creating an actor and delegating to RemoteAgent.
-func (a *ATEAgent) Connect(ctx context.Context, conversationID string, execID string, start *proto.AgentStart, e Executor, o OutputHandler) error {
+func (a *ATEAgent) Connect(ctx context.Context, conversationID string, execID string, start *proto.AgentStart, e agent.Executor, o agent.OutputHandler) error {
 	// 1. Create Actor
 	resp, err := a.ateClient.CreateActor(ctx, execID)
 	if err != nil {
@@ -74,7 +75,7 @@ func (a *ATEAgent) Connect(ctx context.Context, conversationID string, execID st
 	}
 
 	remoteAddr := fmt.Sprintf("%s:%d", worker.Ip, a.config.Port)
-	remoteAgent, err := NewRemoteAgent(RemoteAgentConfig{
+	remoteAgent, err := agent.NewRemoteAgent(agent.RemoteAgentConfig{
 		Address:    remoteAddr,
 		Reconnect:  true,
 		MaxRetries: 3,

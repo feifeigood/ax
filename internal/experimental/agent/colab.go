@@ -29,6 +29,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/ax/internal/agent"
 	"github.com/google/ax/proto"
 )
 
@@ -157,7 +158,7 @@ const (
 // the agent code, and tears the session down. If the session is terminated
 // due to idle timeout (e.g. while the user is authorizing Drive access),
 // it automatically recreates the session and retries once.
-func (a *ColabAgent) Connect(ctx context.Context, conversationID string, execID string, start *proto.AgentStart, e Executor, o OutputHandler) error {
+func (a *ColabAgent) Connect(ctx context.Context, conversationID string, execID string, start *proto.AgentStart, e agent.Executor, o agent.OutputHandler) error {
 	sessionName := colabSessionName(a.config.ID, execID)
 
 	for attempt := 0; attempt <= maxRetries; attempt++ {
@@ -201,7 +202,7 @@ func (a *ColabAgent) Connect(ctx context.Context, conversationID string, execID 
 
 // run executes the setup and agent code on an existing Colab session.
 // This is called by Connect and may be retried if the session times out.
-func (a *ColabAgent) run(ctx context.Context, sessionName string, start *proto.AgentStart, o OutputHandler) error {
+func (a *ColabAgent) run(ctx context.Context, sessionName string, start *proto.AgentStart, o agent.OutputHandler) error {
 	// Mount Google Drive if any Drive feature is used (drive_file,
 	// output_drive_path, or explicit drive_mount_path). This step is
 	// interactive because drivemount may prompt for OAuth authorization
@@ -425,7 +426,7 @@ func (a *ColabAgent) runColabExecBatch(ctx context.Context, sessionName, command
 // runColabExec pipes Python code to colab exec via stdin and streams stdout
 // line-by-line to the OutputHandler as the script runs. Stderr is buffered
 // and treated as an error after the process exits.
-func (a *ColabAgent) runColabExec(ctx context.Context, sessionName, command string, o OutputHandler) error {
+func (a *ColabAgent) runColabExec(ctx context.Context, sessionName, command string, o agent.OutputHandler) error {
 	cmd := exec.CommandContext(ctx, "colab", "exec", "-s", sessionName)
 	cmd.Stdin = strings.NewReader(command)
 

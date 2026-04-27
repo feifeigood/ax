@@ -25,7 +25,7 @@ import (
 
 	"github.com/google/ax/internal/agent"
 	"github.com/google/ax/internal/controller/executor"
-	"github.com/google/ax/internal/testagent"
+	"github.com/google/ax/internal/experimental/testagent"
 	"github.com/google/ax/proto"
 	"github.com/google/uuid"
 )

@@ -24,7 +24,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/ax/internal/sandboxclient"
+	"github.com/google/ax/internal/agent"
+	"github.com/google/ax/internal/experimental/k8s/sandboxclient"
 	"github.com/google/ax/proto"
 	"google.golang.org/grpc/metadata"
 )
@@ -76,7 +77,7 @@ func newKubernetesSandboxAgentWithClient(ctx context.Context, client *sandboxcli
 	return agent, nil
 }
 
-func (a *KubernetesSandboxAgent) Connect(ctx context.Context, conversationID string, execID string, start *proto.AgentStart, e Executor, o OutputHandler) error {
+func (a *KubernetesSandboxAgent) Connect(ctx context.Context, conversationID string, execID string, start *proto.AgentStart, e agent.Executor, o agent.OutputHandler) error {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
@@ -175,7 +176,7 @@ func (a *KubernetesSandboxAgent) Connect(ctx context.Context, conversationID str
 	}
 
 	// Connect to the agent (either direct or via router)
-	remoteAgent, err := NewRemoteAgent(RemoteAgentConfig{
+	remoteAgent, err := agent.NewRemoteAgent(agent.RemoteAgentConfig{
 		Address: remoteAddr,
 		// TODO: allow setup reconnect and max retires in yaml.
 		// TODO: implement dynamic mTLS or PSK interceptors to secure the unauthenticated gRPC Sandbox transport

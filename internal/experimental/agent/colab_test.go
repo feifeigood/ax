@@ -21,6 +21,7 @@ import (
 	"strings"
 	"testing"
 
+	baseagent "github.com/google/ax/internal/agent"
 	"github.com/google/ax/proto"
 )
 
@@ -201,7 +202,7 @@ func TestConnect_FullSequence(t *testing.T) {
 	t.Setenv("COLAB_EXEC_STDOUT", "line 1\nline 2\nline 3")
 
 	var outputs []string
-	handler := OutputHandler(func(resp *proto.AgentOutputs) error {
+	handler := baseagent.OutputHandler(func(resp *proto.AgentOutputs) error {
 		for _, m := range resp.Messages {
 			if t := m.GetContent().GetText(); t != nil {
 				outputs = append(outputs, t.Text)
@@ -362,7 +363,7 @@ func TestConnect_RetryOnSessionTimeout(t *testing.T) {
 	}
 
 	var output string
-	handler := OutputHandler(func(resp *proto.AgentOutputs) error {
+	handler := baseagent.OutputHandler(func(resp *proto.AgentOutputs) error {
 		for _, m := range resp.Messages {
 			if txt := m.GetContent().GetText(); txt != nil {
 				output = txt.Text
@@ -398,7 +399,7 @@ func TestConnect_RetryOnSessionTimeout(t *testing.T) {
 // Test helpers
 // ---------------------------------------------------------------------------
 
-var noopHandler = OutputHandler(func(*proto.AgentOutputs) error { return nil })
+var noopHandler = baseagent.OutputHandler(func(*proto.AgentOutputs) error { return nil })
 
 const fakeColabScript = `#!/bin/sh
 echo "$*" >> "$COLAB_TEST_LOG"
