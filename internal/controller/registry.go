@@ -23,8 +23,6 @@ import (
 	"github.com/google/ax/internal/config"
 )
 
-
-
 // AgentInfo contains metadata about a registered agent.
 type AgentInfo struct {
 	ID          string

@@ -30,7 +30,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-
 var (
 	conversationID  string
 	traceServerAddr string
@@ -74,7 +73,6 @@ func runTrace(cmd *cobra.Command, args []string) error {
 
 	return serveTraceUI(listener, data, indexHTML)
 }
-
 
 type Text struct {
 	Text string `json:"text"`
@@ -243,8 +241,6 @@ func extractExecutionEvent(execID string, protoEv *proto.ExecutionEvent) Executi
 
 	return ev
 }
-
-
 
 func openBrowser(url string) {
 	var err error

@@ -45,12 +45,12 @@ type Display struct {
 
 func NewDisplay(id string) *Display {
 	return &Display{
-		id: id,
-		userStyle: lipgloss.NewStyle().Foreground(purple),
+		id:              id,
+		userStyle:       lipgloss.NewStyle().Foreground(purple),
 		checkpointStyle: lipgloss.NewStyle().Foreground(comment),
-		idStyle: lipgloss.NewStyle().Foreground(comment),
-		resumeStyle: lipgloss.NewStyle().Foreground(comment),
-		loadingStopCh: make(chan bool),
+		idStyle:         lipgloss.NewStyle().Foreground(comment),
+		resumeStyle:     lipgloss.NewStyle().Foreground(comment),
+		loadingStopCh:   make(chan bool),
 	}
 }
 

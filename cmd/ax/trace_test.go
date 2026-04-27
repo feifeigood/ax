@@ -23,7 +23,7 @@ import (
 func TestBuildExecTraces_PreservesOrderOfExecIDs(t *testing.T) {
 	rootExecID := "root-exec"
 	execIDs := []string{"root-exec", "child-exec-1", "child-exec-2"}
-	
+
 	// Events arrive in arbitrary order
 	events := []*proto.ExecutionEvent{
 		{ExecId: "child-exec-2"},

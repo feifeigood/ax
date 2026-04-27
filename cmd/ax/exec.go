@@ -38,7 +38,7 @@ var (
 	execServerAddr     string
 	execConfigFile     string
 	execResume         bool // allow resuming an execution without inputs
-	execLastSeq    int32
+	execLastSeq        int32
 )
 
 var execCmd = &cobra.Command{
@@ -138,7 +138,7 @@ func execLoop(ctx context.Context, id string, agentID string, input string, last
 			ConversationId: id,
 			AgentId:        agentID,
 			Inputs:         inputs,
-			LastSeq:    lastSeq,
+			LastSeq:        lastSeq,
 		})
 		lastSeq = 0 // disable resuming from sequence, user sees the seq on the screen
 		if err != nil {
