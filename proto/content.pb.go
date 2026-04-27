@@ -36,6 +36,333 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// Resolution for input media (images/video).
+type MediaResolution int32
+
+const (
+	MediaResolution_MEDIA_RESOLUTION_UNSPECIFIED MediaResolution = 0
+	MediaResolution_LOW                          MediaResolution = 1
+	MediaResolution_MEDIUM                       MediaResolution = 2
+	MediaResolution_HIGH                         MediaResolution = 3
+	MediaResolution_ULTRA_HIGH                   MediaResolution = 4
+)
+
+// Enum value maps for MediaResolution.
+var (
+	MediaResolution_name = map[int32]string{
+		0: "MEDIA_RESOLUTION_UNSPECIFIED",
+		1: "LOW",
+		2: "MEDIUM",
+		3: "HIGH",
+		4: "ULTRA_HIGH",
+	}
+	MediaResolution_value = map[string]int32{
+		"MEDIA_RESOLUTION_UNSPECIFIED": 0,
+		"LOW":                          1,
+		"MEDIUM":                       2,
+		"HIGH":                         3,
+		"ULTRA_HIGH":                   4,
+	}
+)
+
+func (x MediaResolution) Enum() *MediaResolution {
+	p := new(MediaResolution)
+	*p = x
+	return p
+}
+
+func (x MediaResolution) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (MediaResolution) Descriptor() protoreflect.EnumDescriptor {
+	return file_proto_content_proto_enumTypes[0].Descriptor()
+}
+
+func (MediaResolution) Type() protoreflect.EnumType {
+	return &file_proto_content_proto_enumTypes[0]
+}
+
+func (x MediaResolution) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use MediaResolution.Descriptor instead.
+func (MediaResolution) EnumDescriptor() ([]byte, []int) {
+	return file_proto_content_proto_rawDescGZIP(), []int{0}
+}
+
+type ImageContent_MimeType int32
+
+const (
+	ImageContent_TYPE_UNSPECIFIED ImageContent_MimeType = 0
+	ImageContent_TYPE_PNG         ImageContent_MimeType = 1 // image/png
+	ImageContent_TYPE_JPEG        ImageContent_MimeType = 2 // image/jpeg
+	ImageContent_TYPE_WEBP        ImageContent_MimeType = 3 // image/webp
+	ImageContent_TYPE_HEIC        ImageContent_MimeType = 4 // image/heic
+	ImageContent_TYPE_HEIF        ImageContent_MimeType = 5 // image/heif
+	ImageContent_TYPE_GIF         ImageContent_MimeType = 7 // image/gif
+	ImageContent_TYPE_BMP         ImageContent_MimeType = 8 // image/bmp
+	ImageContent_TYPE_TIFF        ImageContent_MimeType = 9 // image/tiff
+)
+
+// Enum value maps for ImageContent_MimeType.
+var (
+	ImageContent_MimeType_name = map[int32]string{
+		0: "TYPE_UNSPECIFIED",
+		1: "TYPE_PNG",
+		2: "TYPE_JPEG",
+		3: "TYPE_WEBP",
+		4: "TYPE_HEIC",
+		5: "TYPE_HEIF",
+		7: "TYPE_GIF",
+		8: "TYPE_BMP",
+		9: "TYPE_TIFF",
+	}
+	ImageContent_MimeType_value = map[string]int32{
+		"TYPE_UNSPECIFIED": 0,
+		"TYPE_PNG":         1,
+		"TYPE_JPEG":        2,
+		"TYPE_WEBP":        3,
+		"TYPE_HEIC":        4,
+		"TYPE_HEIF":        5,
+		"TYPE_GIF":         7,
+		"TYPE_BMP":         8,
+		"TYPE_TIFF":        9,
+	}
+)
+
+func (x ImageContent_MimeType) Enum() *ImageContent_MimeType {
+	p := new(ImageContent_MimeType)
+	*p = x
+	return p
+}
+
+func (x ImageContent_MimeType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ImageContent_MimeType) Descriptor() protoreflect.EnumDescriptor {
+	return file_proto_content_proto_enumTypes[1].Descriptor()
+}
+
+func (ImageContent_MimeType) Type() protoreflect.EnumType {
+	return &file_proto_content_proto_enumTypes[1]
+}
+
+func (x ImageContent_MimeType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ImageContent_MimeType.Descriptor instead.
+func (ImageContent_MimeType) EnumDescriptor() ([]byte, []int) {
+	return file_proto_content_proto_rawDescGZIP(), []int{10, 0}
+}
+
+type AudioContent_MimeType int32
+
+const (
+	AudioContent_TYPE_UNSPECIFIED AudioContent_MimeType = 0
+	AudioContent_TYPE_WAV         AudioContent_MimeType = 1  // audio/wav
+	AudioContent_TYPE_MP3         AudioContent_MimeType = 2  // audio/mp3
+	AudioContent_TYPE_AIFF        AudioContent_MimeType = 3  // audio/aiff
+	AudioContent_TYPE_AAC         AudioContent_MimeType = 4  // audio/aac
+	AudioContent_TYPE_OGG         AudioContent_MimeType = 5  // audio/ogg
+	AudioContent_TYPE_FLAC        AudioContent_MimeType = 6  // audio/flac
+	AudioContent_TYPE_MPEG        AudioContent_MimeType = 7  // audio/mpeg
+	AudioContent_TYPE_M4A         AudioContent_MimeType = 8  // audio/m4a
+	AudioContent_TYPE_L16         AudioContent_MimeType = 9  // audio/l16
+	AudioContent_TYPE_S16LE       AudioContent_MimeType = 10 // audio/s16le
+	AudioContent_TYPE_OPUS        AudioContent_MimeType = 11 // audio/opus
+	AudioContent_TYPE_ALAW        AudioContent_MimeType = 12 // audio/alaw
+	AudioContent_TYPE_MULAW       AudioContent_MimeType = 13 // audio/mulaw
+)
+
+// Enum value maps for AudioContent_MimeType.
+var (
+	AudioContent_MimeType_name = map[int32]string{
+		0:  "TYPE_UNSPECIFIED",
+		1:  "TYPE_WAV",
+		2:  "TYPE_MP3",
+		3:  "TYPE_AIFF",
+		4:  "TYPE_AAC",
+		5:  "TYPE_OGG",
+		6:  "TYPE_FLAC",
+		7:  "TYPE_MPEG",
+		8:  "TYPE_M4A",
+		9:  "TYPE_L16",
+		10: "TYPE_S16LE",
+		11: "TYPE_OPUS",
+		12: "TYPE_ALAW",
+		13: "TYPE_MULAW",
+	}
+	AudioContent_MimeType_value = map[string]int32{
+		"TYPE_UNSPECIFIED": 0,
+		"TYPE_WAV":         1,
+		"TYPE_MP3":         2,
+		"TYPE_AIFF":        3,
+		"TYPE_AAC":         4,
+		"TYPE_OGG":         5,
+		"TYPE_FLAC":        6,
+		"TYPE_MPEG":        7,
+		"TYPE_M4A":         8,
+		"TYPE_L16":         9,
+		"TYPE_S16LE":       10,
+		"TYPE_OPUS":        11,
+		"TYPE_ALAW":        12,
+		"TYPE_MULAW":       13,
+	}
+)
+
+func (x AudioContent_MimeType) Enum() *AudioContent_MimeType {
+	p := new(AudioContent_MimeType)
+	*p = x
+	return p
+}
+
+func (x AudioContent_MimeType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (AudioContent_MimeType) Descriptor() protoreflect.EnumDescriptor {
+	return file_proto_content_proto_enumTypes[2].Descriptor()
+}
+
+func (AudioContent_MimeType) Type() protoreflect.EnumType {
+	return &file_proto_content_proto_enumTypes[2]
+}
+
+func (x AudioContent_MimeType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use AudioContent_MimeType.Descriptor instead.
+func (AudioContent_MimeType) EnumDescriptor() ([]byte, []int) {
+	return file_proto_content_proto_rawDescGZIP(), []int{11, 0}
+}
+
+type DocumentContent_MimeType int32
+
+const (
+	DocumentContent_TYPE_UNSPECIFIED DocumentContent_MimeType = 0
+	DocumentContent_TYPE_PDF         DocumentContent_MimeType = 1 // application/pdf
+	DocumentContent_TYPE_JSON        DocumentContent_MimeType = 2 // application/json
+	DocumentContent_TYPE_PYTHON      DocumentContent_MimeType = 3 // text/x-python
+)
+
+// Enum value maps for DocumentContent_MimeType.
+var (
+	DocumentContent_MimeType_name = map[int32]string{
+		0: "TYPE_UNSPECIFIED",
+		1: "TYPE_PDF",
+		2: "TYPE_JSON",
+		3: "TYPE_PYTHON",
+	}
+	DocumentContent_MimeType_value = map[string]int32{
+		"TYPE_UNSPECIFIED": 0,
+		"TYPE_PDF":         1,
+		"TYPE_JSON":        2,
+		"TYPE_PYTHON":      3,
+	}
+)
+
+func (x DocumentContent_MimeType) Enum() *DocumentContent_MimeType {
+	p := new(DocumentContent_MimeType)
+	*p = x
+	return p
+}
+
+func (x DocumentContent_MimeType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (DocumentContent_MimeType) Descriptor() protoreflect.EnumDescriptor {
+	return file_proto_content_proto_enumTypes[3].Descriptor()
+}
+
+func (DocumentContent_MimeType) Type() protoreflect.EnumType {
+	return &file_proto_content_proto_enumTypes[3]
+}
+
+func (x DocumentContent_MimeType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use DocumentContent_MimeType.Descriptor instead.
+func (DocumentContent_MimeType) EnumDescriptor() ([]byte, []int) {
+	return file_proto_content_proto_rawDescGZIP(), []int{12, 0}
+}
+
+type VideoContent_MimeType int32
+
+const (
+	VideoContent_TYPE_UNSPECIFIED VideoContent_MimeType = 0
+	VideoContent_TYPE_MP4         VideoContent_MimeType = 1 // video/mp4
+	VideoContent_TYPE_MPEG        VideoContent_MimeType = 2 // video/mpeg
+	VideoContent_TYPE_MPG         VideoContent_MimeType = 3 // video/mpg
+	VideoContent_TYPE_MOV         VideoContent_MimeType = 4 // video/mov
+	VideoContent_TYPE_AVI         VideoContent_MimeType = 5 // video/avi
+	VideoContent_TYPE_X_FLV       VideoContent_MimeType = 6 // video/x-flv
+	VideoContent_TYPE_WEBM        VideoContent_MimeType = 7 // video/webm
+	VideoContent_TYPE_WMV         VideoContent_MimeType = 8 // video/wmv
+	VideoContent_TYPE_3GPP        VideoContent_MimeType = 9 // video/3gpp
+)
+
+// Enum value maps for VideoContent_MimeType.
+var (
+	VideoContent_MimeType_name = map[int32]string{
+		0: "TYPE_UNSPECIFIED",
+		1: "TYPE_MP4",
+		2: "TYPE_MPEG",
+		3: "TYPE_MPG",
+		4: "TYPE_MOV",
+		5: "TYPE_AVI",
+		6: "TYPE_X_FLV",
+		7: "TYPE_WEBM",
+		8: "TYPE_WMV",
+		9: "TYPE_3GPP",
+	}
+	VideoContent_MimeType_value = map[string]int32{
+		"TYPE_UNSPECIFIED": 0,
+		"TYPE_MP4":         1,
+		"TYPE_MPEG":        2,
+		"TYPE_MPG":         3,
+		"TYPE_MOV":         4,
+		"TYPE_AVI":         5,
+		"TYPE_X_FLV":       6,
+		"TYPE_WEBM":        7,
+		"TYPE_WMV":         8,
+		"TYPE_3GPP":        9,
+	}
+)
+
+func (x VideoContent_MimeType) Enum() *VideoContent_MimeType {
+	p := new(VideoContent_MimeType)
+	*p = x
+	return p
+}
+
+func (x VideoContent_MimeType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (VideoContent_MimeType) Descriptor() protoreflect.EnumDescriptor {
+	return file_proto_content_proto_enumTypes[4].Descriptor()
+}
+
+func (VideoContent_MimeType) Type() protoreflect.EnumType {
+	return &file_proto_content_proto_enumTypes[4]
+}
+
+func (x VideoContent_MimeType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use VideoContent_MimeType.Descriptor instead.
+func (VideoContent_MimeType) EnumDescriptor() ([]byte, []int) {
+	return file_proto_content_proto_rawDescGZIP(), []int{13, 0}
+}
+
 // TextContent represents a text content.
 type TextContent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -675,6 +1002,402 @@ type FunctionResultContent_Response struct {
 
 func (*FunctionResultContent_Response) isFunctionResultContent_Result() {}
 
+// An image content block.
+type ImageContent struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	MimeType ImageContent_MimeType  `protobuf:"varint,1,opt,name=mime_type,json=mimeType,proto3,enum=ax.ImageContent_MimeType" json:"mime_type,omitempty"`
+	// Types that are valid to be assigned to DataOrUri:
+	//
+	//	*ImageContent_Data
+	//	*ImageContent_Uri
+	DataOrUri     isImageContent_DataOrUri `protobuf_oneof:"data_or_uri"`
+	Resolution    MediaResolution          `protobuf:"varint,5,opt,name=resolution,proto3,enum=ax.MediaResolution" json:"resolution,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ImageContent) Reset() {
+	*x = ImageContent{}
+	mi := &file_proto_content_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ImageContent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ImageContent) ProtoMessage() {}
+
+func (x *ImageContent) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_content_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ImageContent.ProtoReflect.Descriptor instead.
+func (*ImageContent) Descriptor() ([]byte, []int) {
+	return file_proto_content_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *ImageContent) GetMimeType() ImageContent_MimeType {
+	if x != nil {
+		return x.MimeType
+	}
+	return ImageContent_TYPE_UNSPECIFIED
+}
+
+func (x *ImageContent) GetDataOrUri() isImageContent_DataOrUri {
+	if x != nil {
+		return x.DataOrUri
+	}
+	return nil
+}
+
+func (x *ImageContent) GetData() []byte {
+	if x != nil {
+		if x, ok := x.DataOrUri.(*ImageContent_Data); ok {
+			return x.Data
+		}
+	}
+	return nil
+}
+
+func (x *ImageContent) GetUri() string {
+	if x != nil {
+		if x, ok := x.DataOrUri.(*ImageContent_Uri); ok {
+			return x.Uri
+		}
+	}
+	return ""
+}
+
+func (x *ImageContent) GetResolution() MediaResolution {
+	if x != nil {
+		return x.Resolution
+	}
+	return MediaResolution_MEDIA_RESOLUTION_UNSPECIFIED
+}
+
+type isImageContent_DataOrUri interface {
+	isImageContent_DataOrUri()
+}
+
+type ImageContent_Data struct {
+	Data []byte `protobuf:"bytes,2,opt,name=data,proto3,oneof"`
+}
+
+type ImageContent_Uri struct {
+	Uri string `protobuf:"bytes,6,opt,name=uri,proto3,oneof"`
+}
+
+func (*ImageContent_Data) isImageContent_DataOrUri() {}
+
+func (*ImageContent_Uri) isImageContent_DataOrUri() {}
+
+// An audio content block.
+type AudioContent struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	MimeType AudioContent_MimeType  `protobuf:"varint,1,opt,name=mime_type,json=mimeType,proto3,enum=ax.AudioContent_MimeType" json:"mime_type,omitempty"`
+	// Types that are valid to be assigned to DataOrUri:
+	//
+	//	*AudioContent_Data
+	//	*AudioContent_Uri
+	DataOrUri     isAudioContent_DataOrUri `protobuf_oneof:"data_or_uri"`
+	Channels      int32                    `protobuf:"varint,7,opt,name=channels,proto3" json:"channels,omitempty"`
+	SampleRate    int32                    `protobuf:"varint,8,opt,name=sample_rate,json=sampleRate,proto3" json:"sample_rate,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AudioContent) Reset() {
+	*x = AudioContent{}
+	mi := &file_proto_content_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AudioContent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AudioContent) ProtoMessage() {}
+
+func (x *AudioContent) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_content_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AudioContent.ProtoReflect.Descriptor instead.
+func (*AudioContent) Descriptor() ([]byte, []int) {
+	return file_proto_content_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *AudioContent) GetMimeType() AudioContent_MimeType {
+	if x != nil {
+		return x.MimeType
+	}
+	return AudioContent_TYPE_UNSPECIFIED
+}
+
+func (x *AudioContent) GetDataOrUri() isAudioContent_DataOrUri {
+	if x != nil {
+		return x.DataOrUri
+	}
+	return nil
+}
+
+func (x *AudioContent) GetData() []byte {
+	if x != nil {
+		if x, ok := x.DataOrUri.(*AudioContent_Data); ok {
+			return x.Data
+		}
+	}
+	return nil
+}
+
+func (x *AudioContent) GetUri() string {
+	if x != nil {
+		if x, ok := x.DataOrUri.(*AudioContent_Uri); ok {
+			return x.Uri
+		}
+	}
+	return ""
+}
+
+func (x *AudioContent) GetChannels() int32 {
+	if x != nil {
+		return x.Channels
+	}
+	return 0
+}
+
+func (x *AudioContent) GetSampleRate() int32 {
+	if x != nil {
+		return x.SampleRate
+	}
+	return 0
+}
+
+type isAudioContent_DataOrUri interface {
+	isAudioContent_DataOrUri()
+}
+
+type AudioContent_Data struct {
+	Data []byte `protobuf:"bytes,2,opt,name=data,proto3,oneof"`
+}
+
+type AudioContent_Uri struct {
+	Uri string `protobuf:"bytes,5,opt,name=uri,proto3,oneof"`
+}
+
+func (*AudioContent_Data) isAudioContent_DataOrUri() {}
+
+func (*AudioContent_Uri) isAudioContent_DataOrUri() {}
+
+// A document content block.
+type DocumentContent struct {
+	state    protoimpl.MessageState   `protogen:"open.v1"`
+	MimeType DocumentContent_MimeType `protobuf:"varint,1,opt,name=mime_type,json=mimeType,proto3,enum=ax.DocumentContent_MimeType" json:"mime_type,omitempty"`
+	// Types that are valid to be assigned to DataOrUri:
+	//
+	//	*DocumentContent_Data
+	//	*DocumentContent_Uri
+	DataOrUri     isDocumentContent_DataOrUri `protobuf_oneof:"data_or_uri"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DocumentContent) Reset() {
+	*x = DocumentContent{}
+	mi := &file_proto_content_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DocumentContent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DocumentContent) ProtoMessage() {}
+
+func (x *DocumentContent) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_content_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DocumentContent.ProtoReflect.Descriptor instead.
+func (*DocumentContent) Descriptor() ([]byte, []int) {
+	return file_proto_content_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *DocumentContent) GetMimeType() DocumentContent_MimeType {
+	if x != nil {
+		return x.MimeType
+	}
+	return DocumentContent_TYPE_UNSPECIFIED
+}
+
+func (x *DocumentContent) GetDataOrUri() isDocumentContent_DataOrUri {
+	if x != nil {
+		return x.DataOrUri
+	}
+	return nil
+}
+
+func (x *DocumentContent) GetData() []byte {
+	if x != nil {
+		if x, ok := x.DataOrUri.(*DocumentContent_Data); ok {
+			return x.Data
+		}
+	}
+	return nil
+}
+
+func (x *DocumentContent) GetUri() string {
+	if x != nil {
+		if x, ok := x.DataOrUri.(*DocumentContent_Uri); ok {
+			return x.Uri
+		}
+	}
+	return ""
+}
+
+type isDocumentContent_DataOrUri interface {
+	isDocumentContent_DataOrUri()
+}
+
+type DocumentContent_Data struct {
+	Data []byte `protobuf:"bytes,2,opt,name=data,proto3,oneof"`
+}
+
+type DocumentContent_Uri struct {
+	Uri string `protobuf:"bytes,5,opt,name=uri,proto3,oneof"`
+}
+
+func (*DocumentContent_Data) isDocumentContent_DataOrUri() {}
+
+func (*DocumentContent_Uri) isDocumentContent_DataOrUri() {}
+
+// A video content block.
+type VideoContent struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	MimeType VideoContent_MimeType  `protobuf:"varint,1,opt,name=mime_type,json=mimeType,proto3,enum=ax.VideoContent_MimeType" json:"mime_type,omitempty"`
+	// Types that are valid to be assigned to DataOrUri:
+	//
+	//	*VideoContent_Data
+	//	*VideoContent_Uri
+	DataOrUri     isVideoContent_DataOrUri `protobuf_oneof:"data_or_uri"`
+	Resolution    MediaResolution          `protobuf:"varint,5,opt,name=resolution,proto3,enum=ax.MediaResolution" json:"resolution,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *VideoContent) Reset() {
+	*x = VideoContent{}
+	mi := &file_proto_content_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *VideoContent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*VideoContent) ProtoMessage() {}
+
+func (x *VideoContent) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_content_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use VideoContent.ProtoReflect.Descriptor instead.
+func (*VideoContent) Descriptor() ([]byte, []int) {
+	return file_proto_content_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *VideoContent) GetMimeType() VideoContent_MimeType {
+	if x != nil {
+		return x.MimeType
+	}
+	return VideoContent_TYPE_UNSPECIFIED
+}
+
+func (x *VideoContent) GetDataOrUri() isVideoContent_DataOrUri {
+	if x != nil {
+		return x.DataOrUri
+	}
+	return nil
+}
+
+func (x *VideoContent) GetData() []byte {
+	if x != nil {
+		if x, ok := x.DataOrUri.(*VideoContent_Data); ok {
+			return x.Data
+		}
+	}
+	return nil
+}
+
+func (x *VideoContent) GetUri() string {
+	if x != nil {
+		if x, ok := x.DataOrUri.(*VideoContent_Uri); ok {
+			return x.Uri
+		}
+	}
+	return ""
+}
+
+func (x *VideoContent) GetResolution() MediaResolution {
+	if x != nil {
+		return x.Resolution
+	}
+	return MediaResolution_MEDIA_RESOLUTION_UNSPECIFIED
+}
+
+type isVideoContent_DataOrUri interface {
+	isVideoContent_DataOrUri()
+}
+
+type VideoContent_Data struct {
+	Data []byte `protobuf:"bytes,2,opt,name=data,proto3,oneof"`
+}
+
+type VideoContent_Uri struct {
+	Uri string `protobuf:"bytes,6,opt,name=uri,proto3,oneof"`
+}
+
+func (*VideoContent_Data) isVideoContent_DataOrUri() {}
+
+func (*VideoContent_Uri) isVideoContent_DataOrUri() {}
+
 // Content represents a content input or output.
 type Content struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -682,6 +1405,10 @@ type Content struct {
 	//
 	//	*Content_Thought
 	//	*Content_Text
+	//	*Content_Image
+	//	*Content_Audio
+	//	*Content_Document
+	//	*Content_Video
 	//	*Content_Confirmation
 	//	*Content_ToolCall
 	//	*Content_ToolResult
@@ -692,7 +1419,7 @@ type Content struct {
 
 func (x *Content) Reset() {
 	*x = Content{}
-	mi := &file_proto_content_proto_msgTypes[10]
+	mi := &file_proto_content_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -704,7 +1431,7 @@ func (x *Content) String() string {
 func (*Content) ProtoMessage() {}
 
 func (x *Content) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_content_proto_msgTypes[10]
+	mi := &file_proto_content_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -717,7 +1444,7 @@ func (x *Content) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Content.ProtoReflect.Descriptor instead.
 func (*Content) Descriptor() ([]byte, []int) {
-	return file_proto_content_proto_rawDescGZIP(), []int{10}
+	return file_proto_content_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *Content) GetType() isContent_Type {
@@ -740,6 +1467,42 @@ func (x *Content) GetText() *TextContent {
 	if x != nil {
 		if x, ok := x.Type.(*Content_Text); ok {
 			return x.Text
+		}
+	}
+	return nil
+}
+
+func (x *Content) GetImage() *ImageContent {
+	if x != nil {
+		if x, ok := x.Type.(*Content_Image); ok {
+			return x.Image
+		}
+	}
+	return nil
+}
+
+func (x *Content) GetAudio() *AudioContent {
+	if x != nil {
+		if x, ok := x.Type.(*Content_Audio); ok {
+			return x.Audio
+		}
+	}
+	return nil
+}
+
+func (x *Content) GetDocument() *DocumentContent {
+	if x != nil {
+		if x, ok := x.Type.(*Content_Document); ok {
+			return x.Document
+		}
+	}
+	return nil
+}
+
+func (x *Content) GetVideo() *VideoContent {
+	if x != nil {
+		if x, ok := x.Type.(*Content_Video); ok {
+			return x.Video
 		}
 	}
 	return nil
@@ -784,6 +1547,22 @@ type Content_Text struct {
 	Text *TextContent `protobuf:"bytes,10,opt,name=text,proto3,oneof"`
 }
 
+type Content_Image struct {
+	Image *ImageContent `protobuf:"bytes,11,opt,name=image,proto3,oneof"`
+}
+
+type Content_Audio struct {
+	Audio *AudioContent `protobuf:"bytes,12,opt,name=audio,proto3,oneof"`
+}
+
+type Content_Document struct {
+	Document *DocumentContent `protobuf:"bytes,13,opt,name=document,proto3,oneof"`
+}
+
+type Content_Video struct {
+	Video *VideoContent `protobuf:"bytes,14,opt,name=video,proto3,oneof"`
+}
+
 type Content_Confirmation struct {
 	Confirmation *ConfirmationContent `protobuf:"bytes,26,opt,name=confirmation,proto3,oneof"` // TODO(jbd): Remove out of the Content.
 }
@@ -799,6 +1578,14 @@ type Content_ToolResult struct {
 func (*Content_Thought) isContent_Type() {}
 
 func (*Content_Text) isContent_Type() {}
+
+func (*Content_Image) isContent_Type() {}
+
+func (*Content_Audio) isContent_Type() {}
+
+func (*Content_Document) isContent_Type() {}
+
+func (*Content_Video) isContent_Type() {}
 
 func (*Content_Confirmation) isContent_Type() {}
 
@@ -846,17 +1633,103 @@ const file_proto_content_proto_rawDesc = "" +
 	"\x15FunctionResultContent\x12\x12\n" +
 	"\x04name\x18\b \x01(\tR\x04name\x125\n" +
 	"\bresponse\x18\x03 \x01(\v2\x17.google.protobuf.StructH\x00R\bresponseB\b\n" +
-	"\x06resultJ\x04\b\x01\x10\x02J\x04\b\x04\x10\x05R\x04type\"\xa7\x02\n" +
+	"\x06resultJ\x04\b\x01\x10\x02J\x04\b\x04\x10\x05R\x04type\"\xde\x02\n" +
+	"\fImageContent\x126\n" +
+	"\tmime_type\x18\x01 \x01(\x0e2\x19.ax.ImageContent.MimeTypeR\bmimeType\x12\x14\n" +
+	"\x04data\x18\x02 \x01(\fH\x00R\x04data\x12\x12\n" +
+	"\x03uri\x18\x06 \x01(\tH\x00R\x03uri\x123\n" +
+	"\n" +
+	"resolution\x18\x05 \x01(\x0e2\x13.ax.MediaResolutionR\n" +
+	"resolution\"\x9b\x01\n" +
+	"\bMimeType\x12\x14\n" +
+	"\x10TYPE_UNSPECIFIED\x10\x00\x12\f\n" +
+	"\bTYPE_PNG\x10\x01\x12\r\n" +
+	"\tTYPE_JPEG\x10\x02\x12\r\n" +
+	"\tTYPE_WEBP\x10\x03\x12\r\n" +
+	"\tTYPE_HEIC\x10\x04\x12\r\n" +
+	"\tTYPE_HEIF\x10\x05\x12\f\n" +
+	"\bTYPE_GIF\x10\a\x12\f\n" +
+	"\bTYPE_BMP\x10\b\x12\r\n" +
+	"\tTYPE_TIFF\x10\t\"\x04\b\x06\x10\x06B\r\n" +
+	"\vdata_or_uriJ\x04\b\x03\x10\x04R\x04type\"\xb6\x03\n" +
+	"\fAudioContent\x126\n" +
+	"\tmime_type\x18\x01 \x01(\x0e2\x19.ax.AudioContent.MimeTypeR\bmimeType\x12\x14\n" +
+	"\x04data\x18\x02 \x01(\fH\x00R\x04data\x12\x12\n" +
+	"\x03uri\x18\x05 \x01(\tH\x00R\x03uri\x12\x1a\n" +
+	"\bchannels\x18\a \x01(\x05R\bchannels\x12\x1f\n" +
+	"\vsample_rate\x18\b \x01(\x05R\n" +
+	"sampleRate\"\xdf\x01\n" +
+	"\bMimeType\x12\x14\n" +
+	"\x10TYPE_UNSPECIFIED\x10\x00\x12\f\n" +
+	"\bTYPE_WAV\x10\x01\x12\f\n" +
+	"\bTYPE_MP3\x10\x02\x12\r\n" +
+	"\tTYPE_AIFF\x10\x03\x12\f\n" +
+	"\bTYPE_AAC\x10\x04\x12\f\n" +
+	"\bTYPE_OGG\x10\x05\x12\r\n" +
+	"\tTYPE_FLAC\x10\x06\x12\r\n" +
+	"\tTYPE_MPEG\x10\a\x12\f\n" +
+	"\bTYPE_M4A\x10\b\x12\f\n" +
+	"\bTYPE_L16\x10\t\x12\x0e\n" +
+	"\n" +
+	"TYPE_S16LE\x10\n" +
+	"\x12\r\n" +
+	"\tTYPE_OPUS\x10\v\x12\r\n" +
+	"\tTYPE_ALAW\x10\f\x12\x0e\n" +
+	"\n" +
+	"TYPE_MULAW\x10\rB\r\n" +
+	"\vdata_or_uriJ\x04\b\x03\x10\x04J\x04\b\x06\x10\aR\x04typeR\x04rate\"\xe1\x01\n" +
+	"\x0fDocumentContent\x129\n" +
+	"\tmime_type\x18\x01 \x01(\x0e2\x1c.ax.DocumentContent.MimeTypeR\bmimeType\x12\x14\n" +
+	"\x04data\x18\x02 \x01(\fH\x00R\x04data\x12\x12\n" +
+	"\x03uri\x18\x05 \x01(\tH\x00R\x03uri\"N\n" +
+	"\bMimeType\x12\x14\n" +
+	"\x10TYPE_UNSPECIFIED\x10\x00\x12\f\n" +
+	"\bTYPE_PDF\x10\x01\x12\r\n" +
+	"\tTYPE_JSON\x10\x02\x12\x0f\n" +
+	"\vTYPE_PYTHON\x10\x03B\r\n" +
+	"\vdata_or_uriJ\x04\b\x03\x10\x04R\x04type\"\xe6\x02\n" +
+	"\fVideoContent\x126\n" +
+	"\tmime_type\x18\x01 \x01(\x0e2\x19.ax.VideoContent.MimeTypeR\bmimeType\x12\x14\n" +
+	"\x04data\x18\x02 \x01(\fH\x00R\x04data\x12\x12\n" +
+	"\x03uri\x18\x06 \x01(\tH\x00R\x03uri\x123\n" +
+	"\n" +
+	"resolution\x18\x05 \x01(\x0e2\x13.ax.MediaResolutionR\n" +
+	"resolution\"\xa3\x01\n" +
+	"\bMimeType\x12\x14\n" +
+	"\x10TYPE_UNSPECIFIED\x10\x00\x12\f\n" +
+	"\bTYPE_MP4\x10\x01\x12\r\n" +
+	"\tTYPE_MPEG\x10\x02\x12\f\n" +
+	"\bTYPE_MPG\x10\x03\x12\f\n" +
+	"\bTYPE_MOV\x10\x04\x12\f\n" +
+	"\bTYPE_AVI\x10\x05\x12\x0e\n" +
+	"\n" +
+	"TYPE_X_FLV\x10\x06\x12\r\n" +
+	"\tTYPE_WEBM\x10\a\x12\f\n" +
+	"\bTYPE_WMV\x10\b\x12\r\n" +
+	"\tTYPE_3GPP\x10\tB\r\n" +
+	"\vdata_or_uriJ\x04\b\x03\x10\x04R\x04type\"\xd8\x03\n" +
 	"\aContent\x12.\n" +
 	"\athought\x18\x05 \x01(\v2\x12.ax.ThoughtContentH\x00R\athought\x12%\n" +
 	"\x04text\x18\n" +
-	" \x01(\v2\x0f.ax.TextContentH\x00R\x04text\x12=\n" +
+	" \x01(\v2\x0f.ax.TextContentH\x00R\x04text\x12(\n" +
+	"\x05image\x18\v \x01(\v2\x10.ax.ImageContentH\x00R\x05image\x12(\n" +
+	"\x05audio\x18\f \x01(\v2\x10.ax.AudioContentH\x00R\x05audio\x121\n" +
+	"\bdocument\x18\r \x01(\v2\x13.ax.DocumentContentH\x00R\bdocument\x12(\n" +
+	"\x05video\x18\x0e \x01(\v2\x10.ax.VideoContentH\x00R\x05video\x12=\n" +
 	"\fconfirmation\x18\x1a \x01(\v2\x17.ax.ConfirmationContentH\x00R\fconfirmation\x122\n" +
 	"\ttool_call\x18\x18 \x01(\v2\x13.ax.ToolCallContentH\x00R\btoolCall\x128\n" +
 	"\vtool_result\x18\x19 \x01(\v2\x15.ax.ToolResultContentH\x00R\n" +
 	"toolResultB\x06\n" +
 	"\x04typeJ\x04\b\x01\x10\x05J\x04\b\x06\x10\n" +
-	"J\x04\b\v\x10\x18B\x1cZ\x1agithub.com/google/ax/protob\x06proto3"
+	"J\x04\b\x0f\x10\x18*b\n" +
+	"\x0fMediaResolution\x12 \n" +
+	"\x1cMEDIA_RESOLUTION_UNSPECIFIED\x10\x00\x12\a\n" +
+	"\x03LOW\x10\x01\x12\n" +
+	"\n" +
+	"\x06MEDIUM\x10\x02\x12\b\n" +
+	"\x04HIGH\x10\x03\x12\x0e\n" +
+	"\n" +
+	"ULTRA_HIGH\x10\x04B\x1cZ\x1agithub.com/google/ax/protob\x06proto3"
 
 var (
 	file_proto_content_proto_rawDescOnce sync.Once
@@ -870,40 +1743,60 @@ func file_proto_content_proto_rawDescGZIP() []byte {
 	return file_proto_content_proto_rawDescData
 }
 
-var file_proto_content_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_proto_content_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
+var file_proto_content_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_proto_content_proto_goTypes = []any{
-	(*TextContent)(nil),           // 0: ax.TextContent
-	(*ApprovalDecision)(nil),      // 1: ax.ApprovalDecision
-	(*DeclineDecision)(nil),       // 2: ax.DeclineDecision
-	(*ConfirmationContent)(nil),   // 3: ax.ConfirmationContent
-	(*ThoughtSummaryContent)(nil), // 4: ax.ThoughtSummaryContent
-	(*ThoughtContent)(nil),        // 5: ax.ThoughtContent
-	(*ToolCallContent)(nil),       // 6: ax.ToolCallContent
-	(*ToolResultContent)(nil),     // 7: ax.ToolResultContent
-	(*FunctionCallContent)(nil),   // 8: ax.FunctionCallContent
-	(*FunctionResultContent)(nil), // 9: ax.FunctionResultContent
-	(*Content)(nil),               // 10: ax.Content
-	(*structpb.Struct)(nil),       // 11: google.protobuf.Struct
+	(MediaResolution)(0),          // 0: ax.MediaResolution
+	(ImageContent_MimeType)(0),    // 1: ax.ImageContent.MimeType
+	(AudioContent_MimeType)(0),    // 2: ax.AudioContent.MimeType
+	(DocumentContent_MimeType)(0), // 3: ax.DocumentContent.MimeType
+	(VideoContent_MimeType)(0),    // 4: ax.VideoContent.MimeType
+	(*TextContent)(nil),           // 5: ax.TextContent
+	(*ApprovalDecision)(nil),      // 6: ax.ApprovalDecision
+	(*DeclineDecision)(nil),       // 7: ax.DeclineDecision
+	(*ConfirmationContent)(nil),   // 8: ax.ConfirmationContent
+	(*ThoughtSummaryContent)(nil), // 9: ax.ThoughtSummaryContent
+	(*ThoughtContent)(nil),        // 10: ax.ThoughtContent
+	(*ToolCallContent)(nil),       // 11: ax.ToolCallContent
+	(*ToolResultContent)(nil),     // 12: ax.ToolResultContent
+	(*FunctionCallContent)(nil),   // 13: ax.FunctionCallContent
+	(*FunctionResultContent)(nil), // 14: ax.FunctionResultContent
+	(*ImageContent)(nil),          // 15: ax.ImageContent
+	(*AudioContent)(nil),          // 16: ax.AudioContent
+	(*DocumentContent)(nil),       // 17: ax.DocumentContent
+	(*VideoContent)(nil),          // 18: ax.VideoContent
+	(*Content)(nil),               // 19: ax.Content
+	(*structpb.Struct)(nil),       // 20: google.protobuf.Struct
 }
 var file_proto_content_proto_depIdxs = []int32{
-	1,  // 0: ax.ConfirmationContent.approval:type_name -> ax.ApprovalDecision
-	2,  // 1: ax.ConfirmationContent.decline:type_name -> ax.DeclineDecision
-	0,  // 2: ax.ThoughtSummaryContent.text:type_name -> ax.TextContent
-	4,  // 3: ax.ThoughtContent.summary:type_name -> ax.ThoughtSummaryContent
-	8,  // 4: ax.ToolCallContent.function_call:type_name -> ax.FunctionCallContent
-	9,  // 5: ax.ToolResultContent.function_result:type_name -> ax.FunctionResultContent
-	11, // 6: ax.FunctionCallContent.arguments:type_name -> google.protobuf.Struct
-	11, // 7: ax.FunctionResultContent.response:type_name -> google.protobuf.Struct
-	5,  // 8: ax.Content.thought:type_name -> ax.ThoughtContent
-	0,  // 9: ax.Content.text:type_name -> ax.TextContent
-	3,  // 10: ax.Content.confirmation:type_name -> ax.ConfirmationContent
-	6,  // 11: ax.Content.tool_call:type_name -> ax.ToolCallContent
-	7,  // 12: ax.Content.tool_result:type_name -> ax.ToolResultContent
-	13, // [13:13] is the sub-list for method output_type
-	13, // [13:13] is the sub-list for method input_type
-	13, // [13:13] is the sub-list for extension type_name
-	13, // [13:13] is the sub-list for extension extendee
-	0,  // [0:13] is the sub-list for field type_name
+	6,  // 0: ax.ConfirmationContent.approval:type_name -> ax.ApprovalDecision
+	7,  // 1: ax.ConfirmationContent.decline:type_name -> ax.DeclineDecision
+	5,  // 2: ax.ThoughtSummaryContent.text:type_name -> ax.TextContent
+	9,  // 3: ax.ThoughtContent.summary:type_name -> ax.ThoughtSummaryContent
+	13, // 4: ax.ToolCallContent.function_call:type_name -> ax.FunctionCallContent
+	14, // 5: ax.ToolResultContent.function_result:type_name -> ax.FunctionResultContent
+	20, // 6: ax.FunctionCallContent.arguments:type_name -> google.protobuf.Struct
+	20, // 7: ax.FunctionResultContent.response:type_name -> google.protobuf.Struct
+	1,  // 8: ax.ImageContent.mime_type:type_name -> ax.ImageContent.MimeType
+	0,  // 9: ax.ImageContent.resolution:type_name -> ax.MediaResolution
+	2,  // 10: ax.AudioContent.mime_type:type_name -> ax.AudioContent.MimeType
+	3,  // 11: ax.DocumentContent.mime_type:type_name -> ax.DocumentContent.MimeType
+	4,  // 12: ax.VideoContent.mime_type:type_name -> ax.VideoContent.MimeType
+	0,  // 13: ax.VideoContent.resolution:type_name -> ax.MediaResolution
+	10, // 14: ax.Content.thought:type_name -> ax.ThoughtContent
+	5,  // 15: ax.Content.text:type_name -> ax.TextContent
+	15, // 16: ax.Content.image:type_name -> ax.ImageContent
+	16, // 17: ax.Content.audio:type_name -> ax.AudioContent
+	17, // 18: ax.Content.document:type_name -> ax.DocumentContent
+	18, // 19: ax.Content.video:type_name -> ax.VideoContent
+	8,  // 20: ax.Content.confirmation:type_name -> ax.ConfirmationContent
+	11, // 21: ax.Content.tool_call:type_name -> ax.ToolCallContent
+	12, // 22: ax.Content.tool_result:type_name -> ax.ToolResultContent
+	23, // [23:23] is the sub-list for method output_type
+	23, // [23:23] is the sub-list for method input_type
+	23, // [23:23] is the sub-list for extension type_name
+	23, // [23:23] is the sub-list for extension extendee
+	0,  // [0:23] is the sub-list for field type_name
 }
 
 func init() { file_proto_content_proto_init() }
@@ -928,8 +1821,28 @@ func file_proto_content_proto_init() {
 		(*FunctionResultContent_Response)(nil),
 	}
 	file_proto_content_proto_msgTypes[10].OneofWrappers = []any{
+		(*ImageContent_Data)(nil),
+		(*ImageContent_Uri)(nil),
+	}
+	file_proto_content_proto_msgTypes[11].OneofWrappers = []any{
+		(*AudioContent_Data)(nil),
+		(*AudioContent_Uri)(nil),
+	}
+	file_proto_content_proto_msgTypes[12].OneofWrappers = []any{
+		(*DocumentContent_Data)(nil),
+		(*DocumentContent_Uri)(nil),
+	}
+	file_proto_content_proto_msgTypes[13].OneofWrappers = []any{
+		(*VideoContent_Data)(nil),
+		(*VideoContent_Uri)(nil),
+	}
+	file_proto_content_proto_msgTypes[14].OneofWrappers = []any{
 		(*Content_Thought)(nil),
 		(*Content_Text)(nil),
+		(*Content_Image)(nil),
+		(*Content_Audio)(nil),
+		(*Content_Document)(nil),
+		(*Content_Video)(nil),
 		(*Content_Confirmation)(nil),
 		(*Content_ToolCall)(nil),
 		(*Content_ToolResult)(nil),
@@ -939,13 +1852,14 @@ func file_proto_content_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_content_proto_rawDesc), len(file_proto_content_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   11,
+			NumEnums:      5,
+			NumMessages:   15,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
 		GoTypes:           file_proto_content_proto_goTypes,
 		DependencyIndexes: file_proto_content_proto_depIdxs,
+		EnumInfos:         file_proto_content_proto_enumTypes,
 		MessageInfos:      file_proto_content_proto_msgTypes,
 	}.Build()
 	File_proto_content_proto = out.File
