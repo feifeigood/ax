@@ -15,202 +15,128 @@
 package controller
 
 import (
-	"bufio"
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
-	"net/http"
-	"time"
-
 	"github.com/google/ax/internal/agent"
 	"github.com/google/ax/proto"
-)
-
-const (
-	streamResponseInitialBufferSize = 64 * 1024   // 64 KB
-	streamResponseMaxBufferSize     = 1024 * 1024 // 1 MB
+	"github.com/gorilla/websocket"
+	"google.golang.org/protobuf/encoding/protojson"
+	"log"
 )
 
 // AntigravityPlannerConfig configures the Antigravity-based planner.
 type AntigravityPlannerConfig struct {
-	Endpoint string
-	Timeout  string
+	Endpoint string // ws://localhost:8765 or similar
 }
 
-// AntigravityPlannerAgent implements the agent.Agent interface by calling an external Python server.
+// AntigravityPlannerAgent implements the agent.Agent interface by calling an external Python server via WebSocket.
 type AntigravityPlannerAgent struct {
-	registry   *Registry
-	config     AntigravityPlannerConfig
-	httpClient *http.Client
+	registry *Registry
+	config   AntigravityPlannerConfig
+	wsConn   *websocket.Conn
 }
 
 // NewAntigravityPlannerAgent creates a new Antigravity-based planner agent.
-func NewAntigravityPlannerAgent(ctx context.Context, registry *Registry, cfg AntigravityPlannerConfig) (agent.Agent, error) {
-	timeoutStr := cfg.Timeout
-	if timeoutStr == "" {
-		// TODO(lhuan): optimize and reduce latency
-		timeoutStr = "5m" // Default timeout
-	}
-	timeout, err := time.ParseDuration(timeoutStr)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse duration %q: %w", timeoutStr, err)
-	}
+func NewAntigravityPlannerAgent(_ context.Context, registry *Registry, cfg AntigravityPlannerConfig) (agent.Agent, error) {
 	return &AntigravityPlannerAgent{
 		registry: registry,
 		config:   cfg,
-		httpClient: &http.Client{
-			Timeout: timeout,
-		},
 	}, nil
 }
 
 // Connect starts the agent loop.
 func (p *AntigravityPlannerAgent) Connect(ctx context.Context, conversationID string, execID string, start *proto.AgentStart, e agent.Executor, handler agent.OutputHandler) error {
-	return p.loop(ctx, conversationID, execID, start, e, handler)
+	// TODO(lhuan): remove when stable
+	log.Printf("[AX] Connecting to Antigravity WebSocket for execution %s", execID)
+
+	conn, _, err := websocket.DefaultDialer.DialContext(ctx, p.config.Endpoint, nil)
+	if err != nil {
+		return fmt.Errorf("failed to dial WebSocket: %w", err)
+	}
+	defer conn.Close() // Ensure connection is closed when function exits
+
+	// Create local message channel and read goroutine
+	msgCh := make(chan []byte, 10)
+	go func() {
+		defer close(msgCh)
+		for {
+			_, message, err := conn.ReadMessage()
+			if err != nil {
+				// Exit when connection closed or read error occurs
+				return
+			}
+			msgCh <- message
+		}
+	}()
+
+	return p.loop(ctx, conversationID, execID, start, e, handler, conn, msgCh)
 }
 
 // loop is the main execution loop for the Antigravity planner.
-func (p *AntigravityPlannerAgent) loop(ctx context.Context, conversationID string, execID string, start *proto.AgentStart, e agent.Executor, handler agent.OutputHandler) error {
-	payload, err := p.preparePayload(execID, start)
+func (p *AntigravityPlannerAgent) loop(ctx context.Context, conversationID string, execID string, start *proto.AgentStart, e agent.Executor, handler agent.OutputHandler, conn *websocket.Conn, msgCh <-chan []byte) error {
+
+	agentMsg := &proto.AgentMessage{
+		Type: &proto.AgentMessage_Start{
+			Start: start,
+		},
+	}
+
+	payload, err := protojson.Marshal(agentMsg)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to marshal AgentMessage: %w", err)
 	}
 
-	resp, err := p.sendRequest(ctx, payload)
-	if err != nil {
-		return err
+	if err := conn.WriteMessage(websocket.TextMessage, payload); err != nil {
+		return fmt.Errorf("failed to send request over WebSocket: %w", err)
 	}
-	defer resp.Body.Close()
 
-	return p.handleStreamingResponse(ctx, resp, handler)
-}
+	for {
+		nextAgentID, keepLooping, err := p.process(ctx, conn, msgCh, handler)
+		if err != nil {
+			return err
+		}
+		if !keepLooping && nextAgentID == "" {
+			return nil
+		}
 
-func (p *AntigravityPlannerAgent) preparePayload(execID string, start *proto.AgentStart) ([]byte, error) {
-	type Message struct {
-		Role string `json:"role"`
-		Text string `json:"text"`
-	}
-	var messages []Message
-	for _, msg := range start.Messages {
-		role := msg.Role
-		text := ""
-		if msg.Content != nil {
-			switch content := msg.Content.Type.(type) {
-			case *proto.Content_Text:
-				text = content.Text.Text
+		if nextAgentID != "" {
+			startMsg := &proto.AgentStart{
+				AgentId:  nextAgentID,
+				Messages: start.Messages,
 			}
-			// TODO: Add support for other content types.
-		}
-		messages = append(messages, Message{
-			Role: role,
-			Text: text,
-		})
-	}
 
-	reqData := map[string]interface{}{
-		"conversation_id": execID,
-		"messages":        messages,
-	}
+			var toolOutputs []*proto.Message
+			outputCapturer := func(resp *proto.AgentOutputs) error {
+				toolOutputs = append(toolOutputs, resp.Messages...)
+				return handler(resp)
+			}
 
-	return json.Marshal(reqData)
-}
+			if _, err := e.Exec(ctx, conversationID, nextAgentID, startMsg, outputCapturer); err != nil {
+				log.Printf("Failed to execute tool via controller: %v", err)
+			}
+			// TODO: remove this log later
+			log.Printf("[AX] Captured %d tool outputs for %s", len(toolOutputs), nextAgentID)
 
-func (p *AntigravityPlannerAgent) sendRequest(ctx context.Context, payload []byte) (*http.Response, error) {
-	log.Printf("Sending request to Antigravity Server at %s", p.config.Endpoint)
-	req, err := http.NewRequestWithContext(ctx, "POST", p.config.Endpoint, bytes.NewBuffer(payload))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := p.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to call Antigravity Server: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		resp.Body.Close()
-		return nil, fmt.Errorf("Antigravity Server returned error status: %s", resp.Status)
-	}
-
-	return resp, nil
-}
-
-func (p *AntigravityPlannerAgent) handleStreamingResponse(ctx context.Context, resp *http.Response, handler agent.OutputHandler) error {
-	scanner := bufio.NewScanner(resp.Body)
-	buf := make([]byte, 0, streamResponseInitialBufferSize)
-	scanner.Buffer(buf, streamResponseMaxBufferSize)
-
-	for scanner.Scan() {
-		line := scanner.Bytes()
-		if len(line) == 0 {
-			continue
-		}
-
-		// TODO(lhuan): to update / add more types per antigravity proto
-		var result struct {
-			Type     string `json:"type"`
-			Text     string `json:"text,omitempty"`
-			ToolCall *struct {
-				Name string                 `json:"name"`
-				Args map[string]interface{} `json:"args"`
-			} `json:"tool_call,omitempty"`
-		}
-		if err := json.Unmarshal(line, &result); err != nil {
-			log.Printf("Failed to unmarshal streaming chunk: %v", err)
-			continue
-		}
-
-		switch result.Type {
-		case "thinking":
-			handler(&proto.AgentOutputs{
-				Messages: []*proto.Message{
-					{
-						Role: "assistant",
-						Content: &proto.Content{
-							Type: &proto.Content_Thought{
-								Thought: &proto.ThoughtContent{
-									Summary: []*proto.ThoughtSummaryContent{
-										{
-											Type: &proto.ThoughtSummaryContent_Text{
-												Text: &proto.TextContent{Text: result.Text},
-											},
-										},
-									},
-								},
-							},
-						},
+			// Capture output and send back to Python
+			outputsMsg := &proto.AgentMessage{
+				Type: &proto.AgentMessage_Outputs{
+					Outputs: &proto.AgentOutputs{
+						Messages: toolOutputs,
 					},
 				},
-			})
-
-		case "text":
-			handler(&proto.AgentOutputs{
-				Messages: []*proto.Message{
-					{
-						Role: "assistant",
-						Content: &proto.Content{
-							Type: &proto.Content_Text{
-								Text: &proto.TextContent{Text: result.Text},
-							},
-						},
-					},
-				},
-			})
-
-		// TODO(lhuan): Support tool_call and tool_result types when needed.
-		default:
-			log.Printf("Warning: unhandled response type: %s", result.Type)
+			}
+			payload, err := protojson.Marshal(outputsMsg)
+			if err != nil {
+				log.Printf("Failed to marshal tool outputs: %v", err)
+				continue
+			}
+			if err := conn.WriteMessage(websocket.TextMessage, payload); err != nil {
+				log.Printf("Failed to send tool outputs over WebSocket: %v", err)
+				return fmt.Errorf("failed to send tool outputs: %w", err)
+			}
 		}
 	}
-
-	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("error reading streaming response: %w", err)
-	}
-
-	return nil
 }
 
 // HealthCheck implements the agent.Agent interface.
@@ -221,4 +147,87 @@ func (p *AntigravityPlannerAgent) HealthCheck(ctx context.Context) error {
 // Close implements the agent.Agent interface.
 func (p *AntigravityPlannerAgent) Close() error {
 	return nil
+}
+
+func (p *AntigravityPlannerAgent) process(ctx context.Context, conn *websocket.Conn, msgCh <-chan []byte, handler agent.OutputHandler) (string, bool, error) {
+	for {
+		var message []byte
+		var ok bool
+		select {
+		case message, ok = <-msgCh:
+			if !ok {
+				return "", false, fmt.Errorf("WebSocket channel closed")
+			}
+		case <-ctx.Done():
+			return "", false, ctx.Err()
+		}
+
+
+		// Check for custom confirmation message
+		var customMsg struct {
+			Confirmation struct {
+				Id       string `json:"id"`
+				Question string `json:"question"`
+			} `json:"confirmation"`
+		}
+		if err := json.Unmarshal(message, &customMsg); err == nil && customMsg.Confirmation.Id != "" {
+			log.Printf("[AX] Received confirmation request for tool: %s", customMsg.Confirmation.Id)
+			outputs := &proto.AgentOutputs{
+				Messages: []*proto.Message{
+					{
+						Content: &proto.Content{
+							Type: &proto.Content_Confirmation{
+								Confirmation: &proto.ConfirmationContent{
+									Id:       customMsg.Confirmation.Id,
+									Question: customMsg.Confirmation.Question,
+								},
+							},
+						},
+					},
+				},
+			}
+			handler(outputs)
+			return "", false, nil
+		}
+
+		// Check for custom done message
+		var doneMsg struct {
+			Type string `json:"type"`
+		}
+		if err := json.Unmarshal(message, &doneMsg); err == nil && doneMsg.Type == "done" {
+			log.Printf("[AX] Conversation completed.")
+			return "", false, nil
+		}
+
+		var agentMsg proto.AgentMessage
+		if err := (protojson.UnmarshalOptions{DiscardUnknown: true}).Unmarshal(message, &agentMsg); err != nil {
+			log.Printf("Failed to unmarshal WebSocket message as AgentMessage: %v", err)
+			continue
+		}
+
+		if outputs := agentMsg.GetOutputs(); outputs != nil {
+			handler(outputs)
+
+			for _, msg := range outputs.Messages {
+				if msg.Content != nil {
+					switch o := msg.Content.Type.(type) {
+					case *proto.Content_Confirmation:
+						// TODO(lhuan): still need to implement logic end to end
+						log.Printf("[AX] Waiting for user response via client resumption...")
+						return "", false, nil
+					case *proto.Content_ToolCall:
+						log.Printf("[AX] Handling tool call: %s", o.ToolCall.GetFunctionCall().GetName())
+						nextAgentID := o.ToolCall.GetFunctionCall().GetName()
+						return nextAgentID, false, nil
+					}
+				}
+			}
+			continue
+		}
+
+		if agentMsg.GetEnd() != nil {
+			log.Printf("[AX] Conversation completed.")
+			return "", false, nil
+		}
+	}
 }
