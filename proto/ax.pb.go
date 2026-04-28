@@ -150,12 +150,8 @@ func (x *AgentStart) GetMessages() []*Message {
 }
 
 type AgentOutputs struct {
-	state    protoimpl.MessageState `protogen:"open.v1"`
-	Messages []*Message             `protobuf:"bytes,1,rep,name=messages,proto3" json:"messages,omitempty"`
-	// If true, these outputs are stored only in the execution log
-	// (for resumption) and are not emitted to the client or stored
-	// in the conversation history.
-	InternalOnly  bool `protobuf:"varint,2,opt,name=internal_only,json=internalOnly,proto3" json:"internal_only,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Messages      []*Message             `protobuf:"bytes,1,rep,name=messages,proto3" json:"messages,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -195,13 +191,6 @@ func (x *AgentOutputs) GetMessages() []*Message {
 		return x.Messages
 	}
 	return nil
-}
-
-func (x *AgentOutputs) GetInternalOnly() bool {
-	if x != nil {
-		return x.InternalOnly
-	}
-	return false
 }
 
 type AgentEnd struct {
@@ -356,9 +345,13 @@ func (*AgentMessage_End) isAgentMessage_Type() {}
 
 // Message is a message in the history.
 type Message struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Role          string                 `protobuf:"bytes,1,opt,name=role,proto3" json:"role,omitempty"`       // user, assistant, or model
-	Content       *Content               `protobuf:"bytes,2,opt,name=content,proto3" json:"content,omitempty"` // content of the message
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Role    string                 `protobuf:"bytes,1,opt,name=role,proto3" json:"role,omitempty"`       // user, assistant, or model
+	Content *Content               `protobuf:"bytes,2,opt,name=content,proto3" json:"content,omitempty"` // content of the message
+	// If true, the message is stored only in the execution log
+	// (for resumption) but not in the conversation history,
+	// and not emitted to the client or any agent.
+	InternalOnly  bool `protobuf:"varint,3,opt,name=internal_only,json=internalOnly,proto3" json:"internal_only,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -405,6 +398,13 @@ func (x *Message) GetContent() *Content {
 		return x.Content
 	}
 	return nil
+}
+
+func (x *Message) GetInternalOnly() bool {
+	if x != nil {
+		return x.InternalOnly
+	}
+	return false
 }
 
 // A conversation is the historical session that consist of
@@ -1267,10 +1267,9 @@ const file_proto_ax_proto_rawDesc = "" +
 	"AgentStart\x12\x19\n" +
 	"\bagent_id\x18\x01 \x01(\tR\aagentId\x12!\n" +
 	"\fagent_config\x18\x02 \x01(\fR\vagentConfig\x12'\n" +
-	"\bmessages\x18\x03 \x03(\v2\v.ax.MessageR\bmessages\"\\\n" +
+	"\bmessages\x18\x03 \x03(\v2\v.ax.MessageR\bmessages\"7\n" +
 	"\fAgentOutputs\x12'\n" +
-	"\bmessages\x18\x01 \x03(\v2\v.ax.MessageR\bmessages\x12#\n" +
-	"\rinternal_only\x18\x02 \x01(\bR\finternalOnly\"\n" +
+	"\bmessages\x18\x01 \x03(\v2\v.ax.MessageR\bmessages\"\n" +
 	"\n" +
 	"\bAgentEnd\"\xd0\x01\n" +
 	"\fAgentMessage\x12'\n" +
@@ -1279,10 +1278,11 @@ const file_proto_ax_proto_rawDesc = "" +
 	"\x05start\x18\x03 \x01(\v2\x0e.ax.AgentStartH\x00R\x05start\x12,\n" +
 	"\aoutputs\x18\x04 \x01(\v2\x10.ax.AgentOutputsH\x00R\aoutputs\x12 \n" +
 	"\x03end\x18\x05 \x01(\v2\f.ax.AgentEndH\x00R\x03endB\x06\n" +
-	"\x04type\"D\n" +
+	"\x04type\"i\n" +
 	"\aMessage\x12\x12\n" +
 	"\x04role\x18\x01 \x01(\tR\x04role\x12%\n" +
-	"\acontent\x18\x02 \x01(\v2\v.ax.ContentR\acontent\"\xb1\x01\n" +
+	"\acontent\x18\x02 \x01(\v2\v.ax.ContentR\acontent\x12#\n" +
+	"\rinternal_only\x18\x03 \x01(\bR\finternalOnly\"\xb1\x01\n" +
 	"\x11ConversationEvent\x12'\n" +
 	"\x0fconversation_id\x18\x01 \x01(\tR\x0econversationId\x12\x10\n" +
 	"\x03seq\x18\x02 \x01(\x05R\x03seq\x12\x17\n" +

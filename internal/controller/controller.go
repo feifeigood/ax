@@ -207,13 +207,21 @@ func (d *Controller) Exec(ctx context.Context, req *proto.ExecRequest, handler E
 func (d *Controller) execute(ctx context.Context, conversationID string, execID string, agentID string, agentConfig []byte, history []*proto.Message, newInputs []*proto.Message, registry map[string]agent.Agent, handler ExecHandler) error {
 	e := executor.DefaultExecutor(d.eventLog, registry)
 	outputCapturer := func(outgoing *proto.AgentOutputs) error {
-		if outgoing.InternalOnly {
+		// Filter out internal-only messages.
+		var outputs []*proto.Message
+		for _, m := range outgoing.Messages {
+			if m.GetInternalOnly() {
+				continue
+			}
+			outputs = append(outputs, m)
+		}
+		if len(outputs) == 0 {
 			return nil
 		}
 		msg := &proto.ConversationEvent{
 			ConversationId: conversationID,
 			ExecId:         execID,
-			Messages:       outgoing.Messages,
+			Messages:       outputs,
 			State:          proto.State_STATE_PENDING,
 		}
 		seq, err := d.eventLog.Append(ctx, msg)

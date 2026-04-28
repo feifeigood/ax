@@ -327,6 +327,10 @@ func protoToContents(inputs []*proto.Message) []*genai.Content {
 
 	// Convert each message to Gemini format
 	for _, msg := range inputs {
+		// Skip internal messages.
+		if msg.GetInternalOnly() {
+			continue
+		}
 		role := msg.Role
 		if role != "user" {
 			role = "model"

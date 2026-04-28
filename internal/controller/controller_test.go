@@ -330,9 +330,12 @@ func TestController_Exec_InternalOnly(t *testing.T) {
 			// Emit internal-only message
 			if err := o(&proto.AgentOutputs{
 				Messages: []*proto.Message{
-					{Role: "assistant", Content: &proto.Content{Type: &proto.Content_Text{Text: &proto.TextContent{Text: "internal message"}}}},
+					{
+						Role:         "assistant",
+						InternalOnly: true,
+						Content:      &proto.Content{Type: &proto.Content_Text{Text: &proto.TextContent{Text: "internal message"}}},
+					},
 				},
-				InternalOnly: true,
 			}); err != nil {
 				return err
 			}
