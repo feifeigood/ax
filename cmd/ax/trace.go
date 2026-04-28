@@ -203,6 +203,10 @@ func buildExecTraces(rootExecID string, execIDs []string, events []*proto.Execut
 func extractMsgs(protoContents []*proto.Message) []Content {
 	var results []Content
 	for _, c := range protoContents {
+		// Skip messages flagged as internal-only.
+		if c.GetInternalOnly() {
+			continue
+		}
 		content := Content{Role: c.Role}
 		msgContent := c.GetContent()
 		if msgContent == nil {
