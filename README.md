@@ -248,7 +248,7 @@ Fork an existing agentic event log from a specific checkpoint (or the latest sta
 into a new event log.
 
 ```bash
-ax eventlog fork \
+ax fork \
     --src-conversation <id> \
     [--src-seq <number>] \
     [--dest-conversation <id>] \
@@ -265,13 +265,13 @@ Options:
 
 ```bash
 # Fork from the latest state
-ax eventlog fork --src-conversation 38460323-9a78-41cb-8991-022b0ff2c19c
+ax fork --src-conversation 38460323-9a78-41cb-8991-022b0ff2c19c
 
 # Fork from a specific checkpoint
-ax eventlog fork --src-conversation 38460323-9a78-41cb-8991-022b0ff2c19c --src-seq 12
+ax fork --src-conversation 38460323-9a78-41cb-8991-022b0ff2c19c --src-seq 12
 
 # Fork from a specific checkpoint to a new event log with a specific new ID
-ax eventlog fork --src-conversation 38460323-9a78-41cb-8991-022b0ff2c19c --src-seq 12 --dest-conversation e5e26e38-53a2-4f22-b1cb-ae867357df83
+ax fork --src-conversation 38460323-9a78-41cb-8991-022b0ff2c19c --src-seq 12 --dest-conversation e5e26e38-53a2-4f22-b1cb-ae867357df83
 ```
 
 ### Trace
@@ -279,7 +279,7 @@ ax eventlog fork --src-conversation 38460323-9a78-41cb-8991-022b0ff2c19c --src-s
 Visualize the trace of an agentic execution in a Web UI, directly fetching from the event log.
 
 ```bash
-ax eventlog trace --conversation <id> [--addr <address>] [--config <file>]
+ax trace --conversation <id> [--addr <address>] [--config <file>]
 ```
 
 This will parse the execution logs and spin up a local web server, automatically opening it in your browser.
@@ -292,10 +292,10 @@ Options:
 
 ```bash
 # Trace on default server localhost:8080
-ax eventlog trace --conversation 1a6e0b29-87c2-4af0-81ac-0c73bf8fa293
+ax trace --conversation 1a6e0b29-87c2-4af0-81ac-0c73bf8fa293
 
 # Trace on a custom server address and port
-ax eventlog trace --conversation 1a6e0b29-87c2-4af0-81ac-0c73bf8fa293 --addr 0.0.0.0:9090
+ax trace --conversation 1a6e0b29-87c2-4af0-81ac-0c73bf8fa293 --addr 0.0.0.0:9090
 ```
 
 ### Register
