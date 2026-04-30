@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package controller
+package gemini_test
 
 import (
 	"context"
@@ -22,6 +22,8 @@ import (
 	"testing"
 
 	"github.com/google/ax/internal/agent"
+	"github.com/google/ax/internal/controller"
+	"github.com/google/ax/internal/gemini"
 	"github.com/google/ax/proto"
 )
 
@@ -32,13 +34,13 @@ func TestIntegrationGeminiPlanner(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	registry := NewRegistry()
+	registry := controller.NewRegistry()
 
-	cfg := GeminiPlannerConfig{
+	cfg := gemini.GeminiPlannerConfig{
 		MaxSteps: 5,
 	}
 
-	planner, err := NewGeminiPlannerAgent(ctx, registry, cfg)
+	planner, err := gemini.NewGeminiPlannerAgent(ctx, registry, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}

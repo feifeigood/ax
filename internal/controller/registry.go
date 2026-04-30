@@ -24,27 +24,19 @@ import (
 	expagent "github.com/google/ax/internal/experimental/agent"
 )
 
-// AgentInfo contains metadata about a registered agent.
-type AgentInfo struct {
-	ID          string
-	Name        string
-	Description string
-	Metadata    map[string]string
-}
-
 // Registry manages a collection of local and remote agents.
 // It provides agent discovery, health monitoring, and load balancing.
 type Registry struct {
 	mu        sync.RWMutex
 	agents    map[string]agent.Agent
-	agentInfo map[string]*AgentInfo
+	agentInfo map[string]*agent.AgentInfo
 }
 
 // NewRegistry creates a new agent registry.
 func NewRegistry() *Registry {
 	return &Registry{
 		agents:    make(map[string]agent.Agent),
-		agentInfo: make(map[string]*AgentInfo),
+		agentInfo: make(map[string]*agent.AgentInfo),
 	}
 }
 
@@ -69,7 +61,7 @@ func (r *Registry) RegisterLocal(cfg config.LocalAgentConfig) error {
 	}
 
 	r.agents[cfg.ID] = cfg.Agent
-	r.agentInfo[cfg.ID] = &AgentInfo{
+	r.agentInfo[cfg.ID] = &agent.AgentInfo{
 		ID:          cfg.ID,
 		Name:        cfg.Name,
 		Description: cfg.Description,
@@ -103,7 +95,7 @@ func (r *Registry) RegisterRemote(cfg config.RemoteAgentConfig) error {
 	}
 
 	r.agents[cfg.ID] = remoteAgent
-	r.agentInfo[cfg.ID] = &AgentInfo{
+	r.agentInfo[cfg.ID] = &agent.AgentInfo{
 		ID:          cfg.ID,
 		Name:        cfg.Name,
 		Description: cfg.Description,
@@ -137,7 +129,7 @@ func (r *Registry) RegisterKubernetesSandbox(ctx context.Context, cfg config.San
 	}
 
 	r.agents[cfg.ID] = sandboxAgent
-	r.agentInfo[cfg.ID] = &AgentInfo{
+	r.agentInfo[cfg.ID] = &agent.AgentInfo{
 		ID:          cfg.ID,
 		Name:        cfg.Name,
 		Description: cfg.Description,
@@ -177,7 +169,7 @@ func (r *Registry) RegisterColab(cfg config.ColabAgentConfig) error {
 	}
 
 	r.agents[cfg.ID] = colabAgent
-	r.agentInfo[cfg.ID] = &AgentInfo{
+	r.agentInfo[cfg.ID] = &agent.AgentInfo{
 		ID:          cfg.ID,
 		Name:        cfg.Name,
 		Description: cfg.Description,
@@ -201,7 +193,7 @@ func (r *Registry) Get(id string) (agent.Agent, error) {
 }
 
 // GetInfo retrieves agent metadata by ID.
-func (r *Registry) GetInfo(id string) (*AgentInfo, error) {
+func (r *Registry) GetInfo(id string) (*agent.AgentInfo, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 

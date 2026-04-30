@@ -41,3 +41,11 @@ type Agent interface {
 	// Close gracefully shuts down the agent and releases resources.
 	Close() error
 }
+
+// AgentInfo contains metadata about a registered agent.
+type AgentInfo struct {
+	ID          string
+	Name        string
+	Description string
+	Metadata    map[string]string
+}

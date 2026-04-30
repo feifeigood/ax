@@ -26,6 +26,7 @@ import (
 	"github.com/google/ax/internal/agent"
 	"github.com/google/ax/internal/controller/executor"
 	"github.com/google/ax/internal/experimental/testagent"
+	"github.com/google/ax/internal/gemini"
 	"github.com/google/ax/proto"
 	"github.com/google/uuid"
 )
@@ -62,7 +63,7 @@ func New(ctx context.Context, config Config) (*Controller, error) {
 	// If no planner builder is provided, use the default Gemini planner.
 	if config.PlannerBuilder == nil {
 		config.PlannerBuilder = func(ctx context.Context, r *Registry) (agent.Agent, error) {
-			return NewGeminiPlannerAgent(ctx, r, GeminiPlannerConfig{})
+			return gemini.NewGeminiPlannerAgent(ctx, r, gemini.GeminiPlannerConfig{})
 		}
 	}
 
@@ -174,9 +175,9 @@ func (d *Controller) Exec(ctx context.Context, req *proto.ExecRequest, handler E
 	if err != nil {
 		return fmt.Errorf("failed to create planner: %w", err)
 	}
-	registry := d.registry.Map()
+	registry := maps.Clone(d.registry.Map())
 	registry[plannerAgentID] = planner
-	registry["gemini"] = NewGeminiAgent()
+	registry["gemini"] = gemini.NewGeminiAgent()
 
 	// For testing only! Remove this once the project is stable.
 	// TODO(jbd): Remove this before the release.

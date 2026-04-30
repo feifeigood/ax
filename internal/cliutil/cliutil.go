@@ -23,6 +23,7 @@ import (
 	"github.com/google/ax/internal/config"
 	"github.com/google/ax/internal/controller"
 	"github.com/google/ax/internal/controller/executor"
+	"github.com/google/ax/internal/gemini"
 	"github.com/google/ax/internal/experimental/antigravity"
 )
 
@@ -53,7 +54,7 @@ func NewControllerFromConfig(ctx context.Context, cfg *config.Config) (*controll
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse duration: %v", err)
 			}
-			return controller.NewGeminiPlannerAgent(ctx, r, controller.GeminiPlannerConfig{
+			return gemini.NewGeminiPlannerAgent(ctx, r, gemini.GeminiPlannerConfig{
 				GeminiConfig: &config.GeminiConfig{
 					Model:        cfg.Planner.Gemini.Model,
 					MaxTokens:    cfg.Planner.Gemini.MaxTokens,

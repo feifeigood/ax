@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package controller
+package gemini
 
 import (
 	"context"
@@ -28,6 +28,12 @@ import (
 	"google.golang.org/genai"
 )
 
+// AgentRegistry defines the interface needed by the planner to discover agents.
+type AgentRegistry interface {
+	List() []string
+	GetInfo(id string) (*agent.AgentInfo, error)
+}
+
 // GeminiPlannerConfig configures the Gemini-based planner.
 type GeminiPlannerConfig struct {
 	GeminiConfig *config.GeminiConfig
@@ -41,11 +47,11 @@ type geminiPlannerAgent struct {
 	client     *genai.Client
 	bashTool   Tool
 	skillsTool Tool
-	registry   *Registry
+	registry   AgentRegistry
 }
 
 // NewGeminiPlannerAgent creates a new Gemini-based agent.
-func NewGeminiPlannerAgent(ctx context.Context, registry *Registry, cfg GeminiPlannerConfig) (agent.Agent, error) {
+func NewGeminiPlannerAgent(ctx context.Context, registry AgentRegistry, cfg GeminiPlannerConfig) (agent.Agent, error) {
 	if cfg.GeminiConfig == nil {
 		cfg.GeminiConfig = &config.GeminiConfig{}
 	}
@@ -291,7 +297,7 @@ func (p *geminiPlannerAgent) handleConfirmationAnswer(inputs []*proto.Message) (
 }
 
 // agentsToTools converts registry agents to Gemini function declarations.
-func agentsToTools(registry *Registry, nativeTools ...Tool) ([]*genai.Tool, error) {
+func agentsToTools(registry AgentRegistry, nativeTools ...Tool) ([]*genai.Tool, error) {
 	agents := registry.List()
 
 	var tools []*genai.Tool
