@@ -21,7 +21,6 @@ import (
 )
 
 func TestBuildExecTraces_PreservesOrderOfExecIDs(t *testing.T) {
-	rootExecID := "root-exec"
 	execIDs := []string{"root-exec", "child-exec-1", "child-exec-2"}
 
 	// Events arrive in arbitrary order
@@ -31,7 +30,7 @@ func TestBuildExecTraces_PreservesOrderOfExecIDs(t *testing.T) {
 		{ExecId: "child-exec-1"},
 	}
 
-	execs := buildExecTraces(rootExecID, execIDs, events)
+	execs := buildExecTraces(execIDs, events)
 
 	if len(execs) != 3 {
 		t.Fatalf("expected 3 execution traces, got %d", len(execs))

@@ -116,21 +116,23 @@ type TraceData struct {
 }
 
 func loadTraceData(ctx context.Context, cfg *config.Config, convID string) (*TraceData, error) {
-	events, rootExecID, execIDs, err := fetchEventsByConversation(ctx, cfg, convID)
+	events, rootExecID, execIDs, err := fetch(ctx, cfg, convID)
 	if err != nil {
 		return nil, err
 	}
 
-	data := &TraceData{
+	// TODO(jbd): Trace view incorrectly displays graph executions. We are not
+	// changing the EventLog interface to fix this because the executor is being
+	// removed soon in favor of a linear execution model. We will adopt a different
+	// style of visualization once that's done.
+	return &TraceData{
 		ConversationID: convID,
 		RootExecID:     rootExecID,
-		Execs:          buildExecTraces(rootExecID, execIDs, events),
-	}
-
-	return data, nil
+		Execs:          buildExecTraces(execIDs, events),
+	},  nil
 }
 
-func fetchEventsByConversation(ctx context.Context, cfg *config.Config, convID string) ([]*proto.ExecutionEvent, string, []string, error) {
+func fetch(ctx context.Context, cfg *config.Config, convID string) ([]*proto.ExecutionEvent, string, []string, error) {
 	evLog, err := executor.OpenSQLiteEventLog(cfg.EventLog.SQLiteConfig.Filename)
 	if err != nil {
 		return nil, "", nil, fmt.Errorf("could not open sqlite eventlog: %w", err)
@@ -170,7 +172,7 @@ func fetchEventsByConversation(ctx context.Context, cfg *config.Config, convID s
 	return allEvents, rootExecID, execIDs, nil
 }
 
-func buildExecTraces(rootExecID string, execIDs []string, events []*proto.ExecutionEvent) []ExecTrace {
+func buildExecTraces(execIDs []string, events []*proto.ExecutionEvent) []ExecTrace {
 	execsMap := make(map[string][]ExecutionEvent)
 
 	for _, protoEv := range events {
