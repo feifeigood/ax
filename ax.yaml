@@ -28,7 +28,7 @@ planner:
   gemini:
     model: "gemini-3-flash-preview"
     timeout: "60s"
-    skills_dir: "./examples/skills"
+    # skills_dir: "./examples/skills"
 
   # The Antigravity planner uses an external Python sidecar. See README for instructions.
   antigravity:
