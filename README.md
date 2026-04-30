@@ -46,7 +46,7 @@ distributed harnesses where tools, skills and agents are deployed as
 isolated actors, a distributed runtime with dynamically spawned isolated
 workers becomes a necessity. AX provides the foundational layer to fill these gaps.
 
-While compute-agnostic, AX is optimized to provide the best
+While compute-agnostic, AX is aiming to provide the best
 experience on Kubernetes.
 
 We expect every sophisticated agentic application will need the capabilities provided by AX.
@@ -370,11 +370,14 @@ the `AgentService` interface defined in `proto/ax.proto`:
 - [Colab Agents (Experimental)](docs/experimental/colab-agent.md)
 
 ## What AX is NOT?
-* Managed service. AX is self served, and isn't a managed service. We make it easy for users
-  to deploy it on their clusters.
-* An agentic framework, AX is agnostic of the framework used to build agents. We are working with
-  framework authors (e.g. ADK) to provide built-in support for AX.
-* A specific harness like a coding agent, we allow bringing any harness as an agent.
+* Managed service. AX is self-hosted and not a managed service.
+  We aim to make it easy for users to deploy and operate it on
+  their clusters.
+* An agentic framework. AX is agnostic of the framework used to build agents.
+  We are working with other framework authors (e.g., ADK)
+  to provide easy integration with them.
+* A specific harness like a coding agent. We allow bringing any
+  harness as an agent.
 * A model specific controller. AX is agnostic of the models used.
 
 ## Acknowledgements
