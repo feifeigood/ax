@@ -12,7 +12,7 @@
 // the License for the specific language governing permissions and limitations
 // under the License.
 
-package controller
+package antigravity
 
 import (
 	"context"
@@ -32,15 +32,13 @@ type AntigravityPlannerConfig struct {
 
 // AntigravityPlannerAgent implements the agent.Agent interface by calling an external Python server via WebSocket.
 type AntigravityPlannerAgent struct {
-	registry *Registry
 	config   AntigravityPlannerConfig
 	wsConn   *websocket.Conn
 }
 
 // NewAntigravityPlannerAgent creates a new Antigravity-based planner agent.
-func NewAntigravityPlannerAgent(_ context.Context, registry *Registry, cfg AntigravityPlannerConfig) (agent.Agent, error) {
+func NewAntigravityPlannerAgent(_ context.Context, cfg AntigravityPlannerConfig) (agent.Agent, error) {
 	return &AntigravityPlannerAgent{
-		registry: registry,
 		config:   cfg,
 	}, nil
 }

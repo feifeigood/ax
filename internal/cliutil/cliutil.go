@@ -23,6 +23,7 @@ import (
 	"github.com/google/ax/internal/config"
 	"github.com/google/ax/internal/controller"
 	"github.com/google/ax/internal/controller/executor"
+	"github.com/google/ax/internal/experimental/antigravity"
 )
 
 // NewControllerFromConfig creates a new Controller instance based on the provided configuration.
@@ -44,7 +45,7 @@ func NewControllerFromConfig(ctx context.Context, cfg *config.Config) (*controll
 	plannerBuilder := func(ctx context.Context, r *controller.Registry) (agent.Agent, error) {
 		switch cfg.Planner.Type {
 		case "antigravity":
-			return controller.NewAntigravityPlannerAgent(ctx, r, controller.AntigravityPlannerConfig{
+			return antigravity.NewAntigravityPlannerAgent(ctx, antigravity.AntigravityPlannerConfig{
 				Endpoint: cfg.Planner.Antigravity.Endpoint,
 			})
 		case "gemini":
