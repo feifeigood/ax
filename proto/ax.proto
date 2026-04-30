@@ -155,15 +155,6 @@ service ControllerService {
   rpc RegisterAgent(RegisterAgentRequest) returns (RegisterAgentResponse);
 }
 
-message ListRequest {
-  string conversation_id = 1;
-}
-
-message ListResponse {
-  repeated ConversationEvent events = 1;
-  // TODO: Do we need pagination?
-}
-
 message DeleteRequest {
   string conversation_id = 1;
 }
@@ -186,13 +177,10 @@ message ForkResponse {
 }
 
 service EventLogService {
-  // List conversational events.
-  rpc List(ListRequest) returns (ListResponse);
-
   // Deletes conversational events and all event log resources
   // for its children executions.
-  rpc Delete(DeleteRequest) returns (DeleteResponse);
+  rpc DeleteConversation(DeleteRequest) returns (DeleteResponse);
 
   // Fork forks an event log from a specific conversation.
-  rpc Fork(ForkRequest) returns (ForkResponse);
+  rpc ForkConversation(ForkRequest) returns (ForkResponse);
 }

@@ -56,7 +56,7 @@ func (s *Server) Exec(req *proto.ExecRequest, stream grpc.ServerStreamingServer[
 	return s.controller.Exec(stream.Context(), req, outputHandler)
 }
 
-func (s *Server) Fork(ctx context.Context, req *proto.ForkRequest) (*proto.ForkResponse, error) {
+func (s *Server) ForkConversation(ctx context.Context, req *proto.ForkRequest) (*proto.ForkResponse, error) {
 	if req.SrcConversationId == "" {
 		return nil, status.Errorf(codes.InvalidArgument, "src_conversation_id is required")
 	}
@@ -67,11 +67,7 @@ func (s *Server) Fork(ctx context.Context, req *proto.ForkRequest) (*proto.ForkR
 	return &proto.ForkResponse{ConversationId: destID}, nil
 }
 
-func (s *Server) List(ctx context.Context, req *proto.ListRequest) (*proto.ListResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "not implemented")
-}
-
-func (s *Server) Delete(ctx context.Context, req *proto.DeleteRequest) (*proto.DeleteResponse, error) {
+func (s *Server) DeleteConversation(ctx context.Context, req *proto.DeleteRequest) (*proto.DeleteResponse, error) {
 	if req.ConversationId == "" {
 		return nil, status.Errorf(codes.InvalidArgument, "conversation_id is required")
 	}

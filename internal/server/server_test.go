@@ -65,7 +65,7 @@ func TestServer_Fork(t *testing.T) {
 
 	s := New(c)
 
-	resp, err := s.Fork(ctx, &proto.ForkRequest{
+	resp, err := s.ForkConversation(ctx, &proto.ForkRequest{
 		SrcConversationId:  srcCID,
 		DestConversationId: destCID,
 	})
