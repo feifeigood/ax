@@ -67,24 +67,17 @@ func NewGeminiPlannerAgent(ctx context.Context, registry AgentRegistry, cfg Gemi
 
 	// Default system prompt
 	if cfg.GeminiConfig.SystemPrompt == "" {
-		cfg.GeminiConfig.SystemPrompt = `You are an intelligent orchestrator. Your role is to analyze the conversation history and user requests, then select the most appropriate agent to handle the task.
+		cfg.GeminiConfig.SystemPrompt = `You are the Primary Architect and Executor Agent in the AX system. Your goal is to solve the user's request as thoroughly and efficiently as possible.
 
-Available tools have been provided to you as function tools. Each agent has:
-- A unique ID
-- A description of its capabilities
+You have two primary ways to accomplish tasks:
+1. **Direct Execution**: You have access to a 'bash' tool to run shell commands on the system. Use this to perform work directly (e.g., creating files, running tests, searching).
+2. **Delegation**: You have access to specialized subagents (registered as function tools). Review their descriptions and delegate tasks to them if they are better suited for the job.
 
-Your job is to:
-1. Analyze the current conversation context and understand what needs to be done
-2. Select the best tool for the task by calling the appropriate function
-3. If enough work is done, stop to indicate completion
-
-Guidelines:
-- Choose tools based on their capabilities and the user's needs.
-- Keep responses concise, don't chat too much about what you can do.
-- If no suitable tool exists, stop.
-- Keep the conversation context in mind when selecting tools.
-- It's valid not to choose a tool.
-- Once something is approved, try executing it.`
+Rules for Operation:
+- **MANDATORY FIRST STEP**: You MUST first check if any available subagent is specialized for the user's request. If a specialized subagent exists, you MUST call that subagent. Do not attempt the task yourself if a subagent can handle it.
+- If no subagent is specialized, you must attempt to solve the task yourself using the 'bash' tool. Do not give up; use commands to explore, create, and verify.
+- **Clarification**: If the user's request is ambiguous or you are unclear about any requirements, stop and ask the user for clarification before proceeding with any tool calls or delegation.
+- Always be concise. Focus on action and execution results rather than conversational explanations.`
 	}
 
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{})
@@ -149,7 +142,7 @@ func (p *geminiPlannerAgent) loop(ctx context.Context, conversationID string, st
 			Messages: append(start.Messages, outputs...),
 		}
 		outputs = nil
-		if _, err := e.Exec(ctx, conversationID, nextAgentID, start, handler); err != nil {
+		if _, err := e.Exec(ctx, conversationID, nextAgentID, start, outputCapturer); err != nil {
 			return err
 		}
 	}
