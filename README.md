@@ -2,6 +2,8 @@
 
 > [!WARNING]
 > 🚧 This project is in active development and WILL introduce breaking changes.
+> Please note that the resumption protocols will undergo major revisions and
+> breaking changes prior to the stable release.
 
 AX, short for Agent eXecutor, is a distributed agent runtime. It provides a
 runtime that coordinates agentic loops, manages executions with event logging,
@@ -314,7 +316,7 @@ ax exec --agent gemini \
   --input "Hello, how are you?"
 ```
 
-#### Authentication
+### Authentication
 
 The Gemini agent supports authentication using either Google AI Studio or Vertex AI:
 
@@ -346,15 +348,18 @@ requires explicit user approval via a confirmation flow before running.
 
 ### Custom Agents
 
-Custom agents can be registered by implementing
-the `AgentService` interface defined in `proto/ax.proto`:
+Custom agents can be registered on the AX server:
 
 - [Remote Agent](docs/remote-agent.md)
 - [Kubernetes Sandbox Agents (Experimental)](docs/experimental/k8s-sandbox-agent.md)
 - [Colab Agents (Experimental)](docs/experimental/colab-agent.md)
 
+Please note that AX is actively developing a resumable streaming protocol;
+as a result, the server-to-agent communication protocol will undergo significant revisions.
+See the `AgentService` in `proto/ax.proto` to implement remote agents.
+
 ## What AX is NOT?
-* Managed service. AX is self-hosted and not a managed service.
+* A managed service. AX is self-hosted and not a managed service.
   We aim to make it easy for users to deploy and operate it on
   their clusters.
 * An agentic framework. AX is agnostic of the framework used to build agents.
