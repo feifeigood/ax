@@ -3,6 +3,7 @@ module github.com/google/ax
 go 1.26.1
 
 require (
+	github.com/a2aproject/a2a-go/v2 v2.2.0
 	github.com/ai-on-gke/SubstrATE v0.0.0-00010101000000-000000000000
 	github.com/charmbracelet/huh v0.8.0
 	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834
@@ -99,6 +100,7 @@ require (
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/crypto v0.49.0 // indirect
+	golang.org/x/mod v0.33.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sys v0.42.0 // indirect
 	golang.org/x/term v0.41.0 // indirect

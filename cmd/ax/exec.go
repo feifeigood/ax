@@ -321,6 +321,8 @@ func displayContents(d *internal.Display, contents []*proto.Message) {
 					d.DisplayOutput(fmt.Sprintf("Thinking: %s", textContent.Text))
 				}
 			}
+		case *proto.Content_Image, *proto.Content_Audio, *proto.Content_Video, *proto.Content_Document:
+			d.DisplayOutput(fmt.Sprintf("unsupported output type for display: %T", o))
 		default:
 			d.DisplayOutput(fmt.Sprintf("unknown output type: %v", o))
 		}

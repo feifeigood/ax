@@ -78,7 +78,6 @@ func (s *Server) DeleteConversation(ctx context.Context, req *proto.DeleteReques
 	return &proto.DeleteResponse{}, nil
 }
 
-
 // Serve starts the gRPC server on the specified address.
 func (s *Server) Serve(address string, opts ...grpc.ServerOption) error {
 	lis, err := net.Listen("tcp", address)

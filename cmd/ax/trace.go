@@ -129,7 +129,7 @@ func loadTraceData(ctx context.Context, cfg *config.Config, convID string) (*Tra
 		ConversationID: convID,
 		RootExecID:     rootExecID,
 		Execs:          buildExecTraces(execIDs, events),
-	},  nil
+	}, nil
 }
 
 func fetch(ctx context.Context, cfg *config.Config, convID string) ([]*proto.ExecutionEvent, string, []string, error) {
@@ -369,9 +369,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .role-model .c-hdr{background:#dcfce7;color:#166534}
 .role-model .c-body{background:#f0fdf4}
 
+.role-agent{border-color:#ccfbf1}
+.role-agent .c-hdr{background:#ccfbf1;color:#0f766e}
+.role-agent .c-body{background:#f0fdfa}
+
 .role-assistant{border-color:#f3e8ff}
 .role-assistant .c-hdr{background:#f3e8ff;color:#7e22ce}
 .role-assistant .c-body{background:#faf5ff}
+
+.role-unspecified{border-color:#e5e7eb}
+.role-unspecified .c-hdr{background:#f3f4f6;color:#4b5563}
+.role-unspecified .c-body{background:#f9fafb}
 
 .role-unknown{border-color:#e5e7eb}
 .role-unknown .c-hdr{background:#f3f4f6;color:#4b5563}

@@ -21,6 +21,7 @@ import (
 
 	"github.com/google/ax/internal/agent"
 	"github.com/google/ax/internal/config"
+	"github.com/google/ax/internal/experimental/a2abridge"
 	expagent "github.com/google/ax/internal/experimental/agent"
 )
 
@@ -72,19 +73,31 @@ func (r *Registry) RegisterLocal(cfg config.LocalAgentConfig) error {
 }
 
 // RegisterRemote registers a remote agent by creating a remote agent client.
-func (r *Registry) RegisterRemote(cfg config.RemoteAgentConfig) error {
+// The protocol field determines what kind of remote agent to register:
+//   - axp/AXP (default): AX's proto.AgentService.
+//   - a2a/A2A:           A2A protocol.
+func (r *Registry) RegisterRemote(ctx context.Context, cfg config.RemoteAgentConfig) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	if err := validateID(cfg.ID); err != nil {
 		return err
 	}
-
 	if _, ok := r.agents[cfg.ID]; ok {
 		return fmt.Errorf("agent %s already registered", cfg.ID)
 	}
 
-	// Create remote agent client
+	switch cfg.Protocol {
+	case "", "axp", "AXP":
+		return r.registerRemote(cfg)
+	case "a2a", "A2A":
+		return r.registerA2A(ctx, cfg)
+	default:
+		return fmt.Errorf("remote agent %s: invalid protocol %q (want \"axp\" or \"a2a\")", cfg.ID, cfg.Protocol)
+	}
+}
+
+func (r *Registry) registerRemote(cfg config.RemoteAgentConfig) error {
 	remoteAgent, err := agent.NewRemoteAgent(agent.RemoteAgentConfig{
 		Address:    cfg.Address,
 		Reconnect:  true,
@@ -93,7 +106,6 @@ func (r *Registry) RegisterRemote(cfg config.RemoteAgentConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to create remote agent: %w", err)
 	}
-
 	r.agents[cfg.ID] = remoteAgent
 	r.agentInfo[cfg.ID] = &agent.AgentInfo{
 		ID:          cfg.ID,
@@ -101,7 +113,30 @@ func (r *Registry) RegisterRemote(cfg config.RemoteAgentConfig) error {
 		Description: cfg.Description,
 		Metadata:    cfg.Metadata,
 	}
+	return nil
+}
 
+// Creates an A2A-protocol agent client. The agent's AgentCard is resolved at
+// registration time and used to populate the agent's information.
+func (r *Registry) registerA2A(ctx context.Context, cfg config.RemoteAgentConfig) error {
+	a2aAgent, err := expagent.NewA2AAgent(ctx, expagent.A2AAgentConfig{
+		ID:        cfg.ID,
+		Address:   cfg.Address,
+		Auth:      cfg.Auth,
+		Headers:   cfg.Headers,
+		Stateless: cfg.A2A.Stateless,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create a2a agent: %w", err)
+	}
+	name, description := a2abridge.AgentMetadataFromCard(a2aAgent.Card(), cfg.Name, cfg.Description)
+	r.agents[cfg.ID] = a2aAgent
+	r.agentInfo[cfg.ID] = &agent.AgentInfo{
+		ID:          cfg.ID,
+		Name:        name,
+		Description: description,
+		Metadata:    cfg.Metadata,
+	}
 	return nil
 }
 

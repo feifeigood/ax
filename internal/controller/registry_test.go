@@ -17,6 +17,7 @@ package controller
 // TODO(lhuan): Setup a better automated testing framework
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"testing"
@@ -58,7 +59,7 @@ func TestRegistry_GracefulShutdown(t *testing.T) {
 
 	// Register multiple agents to create workload
 	for i := range 50 {
-		err := r.RegisterRemote(config.RemoteAgentConfig{
+		err := r.RegisterRemote(context.Background(), config.RemoteAgentConfig{
 			ID:      fmt.Sprintf("remote-shutdown-test-%d", i),
 			Name:    "Shutdown Test Remote",
 			Address: address,
