@@ -10,7 +10,7 @@ The target Kubernetes cluster is assumed to have
 
 ## 🚀 Deploying to Substrate
 
-This method deploys isolated, warm-standby sandboxes. Workers are live-snapshotted on boot and instantly restored from GCS when a new conversation starts.
+This option deploys to isolated, warm-standby actors. Workers are live-snapshotted on boot and instantly restored from GCS when a new conversation starts.
 
 ### 1. Deploy Sandboxed environment
 
@@ -31,7 +31,7 @@ kubectl get svc ax-router -n ax
 ```bash
 ax exec --server=<EXTERNAL-IP>:443 --input="hello"
 ```
-*Envoy will intercept the request, authorize/resume your sandbox VM using the conversation ID, and stream responses back safely.*
+*Envoy will intercept the request and route traffic using the conversation ID.*
 
 ---
 
