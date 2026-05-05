@@ -1,4 +1,4 @@
-.PHONY: all build proto test clean install install-ate
+.PHONY: all build proto test clean install install-ate images
 
 # Default container registry for docker
 export KO_DOCKER_REPO ?= gcr.io/ax-container-images
@@ -86,3 +86,6 @@ ax-shell-image:
 	# Used to debug ax servers within a cluster.
 	@echo "Building ax shell container image with ko using busybox..."
 	KO_DOCKER_REPO=$(KO_DOCKER_REPO)/ax-shell KO_DEFAULTBASEIMAGE=busybox:1.36 GOFLAGS="-tags=ate" ko build --base-import-paths ./cmd/ax
+
+# Build all container images
+images: ax-image ate-agent-image k8s-sandbox-router-image axepp-image ax-shell-image

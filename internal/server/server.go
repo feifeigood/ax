@@ -20,6 +20,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"log"
 	"net"
 
 	"google.golang.org/grpc"
@@ -50,21 +51,30 @@ func New(c *controller.Controller) *Server {
 
 // Exec executes a new agentic task with streaming responses.
 func (s *Server) Exec(req *proto.ExecRequest, stream grpc.ServerStreamingServer[proto.ExecResponse]) error {
-	// Create output handler to stream outputs back to client
+	log.Printf("Executing %q...", req.ConversationId)
+	ctx := stream.Context()
+
 	outputHandler := controller.ExecHandler(func(resp *proto.ExecResponse) error {
 		return stream.Send(resp)
 	})
-	return s.controller.Exec(stream.Context(), req, outputHandler)
+	err := s.controller.Exec(ctx, req, outputHandler)
+	go suspendActor(req.ConversationId) // TODO(jbd): Move to an interceptor.
+	return err
 }
 
 func (s *Server) ForkConversation(ctx context.Context, req *proto.ForkRequest) (*proto.ForkResponse, error) {
 	if req.SrcConversationId == "" {
 		return nil, status.Errorf(codes.InvalidArgument, "src_conversation_id is required")
 	}
+	if req.DestConversationId == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "dest_conversation_id is required")
+	}
+
 	destID, err := s.controller.Fork(ctx, req.SrcConversationId, req.SrcSeq, req.DestConversationId)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to fork conversation: %v", err)
 	}
+	go suspendActor(req.DestConversationId) // TODO(jbd): Move to an interceptor.
 	return &proto.ForkResponse{ConversationId: destID}, nil
 }
 
@@ -75,6 +85,7 @@ func (s *Server) DeleteConversation(ctx context.Context, req *proto.DeleteReques
 	if err := s.controller.Delete(ctx, req.ConversationId); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to delete conversation: %v", err)
 	}
+	go suspendActor(req.ConversationId) // TODO(jbd): Move to an interceptor.
 	return &proto.DeleteResponse{}, nil
 }
 
@@ -97,7 +108,6 @@ func (s *Server) Serve(address string, opts ...grpc.ServerOption) error {
 	if err := s.grpcServer.Serve(lis); err != nil {
 		return fmt.Errorf("failed to serve: %w", err)
 	}
-
 	return nil
 }
 

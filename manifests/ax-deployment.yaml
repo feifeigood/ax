@@ -33,6 +33,8 @@ spec:
       env:
         - name: GEMINI_API_KEY
           value: "YOUR_API_KEY" # TODO: Use envFrom once it's available.
+        - name: AX_SUBSTRATE
+          value: "1"
 ---
 apiVersion: ate.gke.io/v1alpha1
 kind: ActorTemplate
