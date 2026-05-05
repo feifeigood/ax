@@ -169,21 +169,25 @@ The `ax` command provides several subcommands:
 
 ```bash
 ax exec \
-    --input <text> \
+    [--input <text>] \
     [--conversation <id>] \
     [--agent <id>] \
     [--server <address>] \
-    [--config <file>]
+    [--config <file>] \
+    [--resume] \
+    [--last-seq <number>]
 ```
 
-Executes a new agentic execution or automatically resumes an existing one. If the conversation ID already exists, the execution will be resumed from its last state with the new input (if any).
+Executes a new agentic execution or automatically resumes an existing one. If the conversation ID already exists, the execution will be resumed from its last state.
 
 Options:
-- `--input`: Input message to send to agents (required)
+- `--input`: Input message to send to agents (optional if `--resume` is set, otherwise required)
 - `--conversation`: Conversation ID (optional, generates UUID if not provided, or resumes if exists)
 - `--agent`: Agent ID to use (optional, defaults to planner)
-- `--server`: gRPC controller server address (optional. If not provided, runs with a built-in server)
-- `--config`: Path to YAML configuration file (only used with a built-in server, default: "ax.yaml")
+- `--server`: gRPC controller server address (optional. If not provided, runs with a local built-in AX server)
+- `--config`: Path to YAML configuration file (only used with a local built-in AX server, default: "ax.yaml")
+- `--resume`: Resume a conversation without inputs (optional, mutually exclusive with `--input`)
+- `--last-seq`: Last sequence number seen by the client to resume from (optional)
 
 **Examples:**
 
