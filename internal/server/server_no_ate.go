@@ -16,12 +16,6 @@
 
 package server
 
-import "google.golang.org/grpc"
-
-func (s *Server) substrateInterceptors() []grpc.ServerOption {
-	return nil
-}
-
 func suspendActor(actorID string) {
 	// No-op
 }

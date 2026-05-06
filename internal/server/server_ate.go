@@ -71,18 +71,6 @@ func createATEClient() any {
 	return client
 }
 
-func (s *Server) substrateInterceptors() []grpc.ServerOption {
-	client := createATEClient()
-	if client == nil {
-		return nil
-	}
-	c := client.(*ate.Client)
-	return []grpc.ServerOption{
-		grpc.ChainUnaryInterceptor(ate.NewUnaryServerInterceptor(c)),
-		grpc.ChainStreamInterceptor(ate.NewStreamServerInterceptor(c)),
-	}
-}
-
 func suspendActor(actorID string) {
 	client := createATEClient()
 	c := client.(*ate.Client)
