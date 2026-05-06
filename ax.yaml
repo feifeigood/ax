@@ -47,6 +47,14 @@ registry:
   #     metadata:
   #       version: "1.0"
 
+  # remote_agents:
+  #   - id: "weather-agent"
+  #     name: "Weather agent"
+  #     description: "Agent to answer questions about the weather in a city."
+  #     address: "localhost:50051"
+  #     metadata:
+  #       version: "1.0"
+
   # colab_agents:
   #   - id: "plotter"
   #     name: "Function Plotter"
@@ -63,4 +71,3 @@ registry:
   #     drive_file: "MyDrive/notebooks/data_analysis.ipynb"
   #     input_flag: "query"
   #     output_image: "./examples/colab_agent/chart.png"
-
