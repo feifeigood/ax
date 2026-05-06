@@ -40,9 +40,13 @@ func (r *Registry) RegisterATE(ctx context.Context, ateTarget string, cfg config
 
 	// Create ATE agent client
 	ateAgent, err := expagent.NewATEAgent(ateTarget, expagent.ATEAgentConfig{
+		ID:        cfg.ID,
 		Namespace: cfg.Namespace,
 		Template:  cfg.Template,
 		Port:      cfg.Port,
+		Protocol:  cfg.Protocol,
+		Auth:      cfg.Auth,
+		Headers:   cfg.Headers,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create ATE agent: %w", err)

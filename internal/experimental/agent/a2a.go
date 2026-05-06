@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/a2aproject/a2a-go/v2/a2a"
 	"github.com/a2aproject/a2a-go/v2/a2aclient"
@@ -42,11 +43,12 @@ import (
 //     Use this when targeting an A2A agent that does not maintain its
 //     own per-context state.
 type A2AAgentConfig struct {
-	ID        string
-	Address   string
-	Auth      auth.Auth
-	Headers   auth.Headers
-	Stateless bool
+	ID                string
+	Address           string
+	Auth              auth.Auth
+	Headers           auth.Headers
+	Stateless         bool
+	OverrideCardHosts bool
 }
 
 // A2AAgent bridges AX's Agent interface to an A2A-protocol agent.
@@ -62,9 +64,20 @@ func NewA2AAgent(ctx context.Context, config A2AAgentConfig) (*A2AAgent, error) 
 		return nil, errors.New("a2a agent: address is required")
 	}
 
-	card, err := agentcard.DefaultResolver.Resolve(ctx, config.Address)
+	addr := config.Address
+	if !strings.Contains(addr, "://") {
+		addr = "http://" + addr
+	}
+
+	card, err := agentcard.DefaultResolver.Resolve(ctx, addr)
 	if err != nil {
 		return nil, fmt.Errorf("a2a agent %s: resolve AgentCard: %w", config.ID, err)
+	}
+
+	if config.OverrideCardHosts {
+		if err := a2abridge.OverrideCardHosts(card, addr); err != nil {
+			return nil, fmt.Errorf("a2a agent %s: %w", config.ID, err)
+		}
 	}
 
 	interceptor, err := a2abridge.NewInterceptor(card, config.Auth, config.Headers)

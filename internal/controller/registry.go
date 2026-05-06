@@ -17,6 +17,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/google/ax/internal/agent"
@@ -73,9 +74,10 @@ func (r *Registry) RegisterLocal(cfg config.LocalAgentConfig) error {
 }
 
 // RegisterRemote registers a remote agent by creating a remote agent client.
-// The protocol field determines what kind of remote agent to register:
-//   - axp/AXP (default): AX's proto.AgentService.
-//   - a2a/A2A:           A2A protocol.
+// The protocol field determines what kind of remote agent to register
+// (matched case-insensitively):
+//   - "axp" (default): AX's proto.AgentService.
+//   - "a2a":           A2A protocol.
 func (r *Registry) RegisterRemote(ctx context.Context, cfg config.RemoteAgentConfig) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -87,10 +89,10 @@ func (r *Registry) RegisterRemote(ctx context.Context, cfg config.RemoteAgentCon
 		return fmt.Errorf("agent %s already registered", cfg.ID)
 	}
 
-	switch cfg.Protocol {
-	case "", "axp", "AXP":
+	switch strings.ToLower(cfg.Protocol) {
+	case "", "axp":
 		return r.registerRemote(cfg)
-	case "a2a", "A2A":
+	case "a2a":
 		return r.registerA2A(ctx, cfg)
 	default:
 		return fmt.Errorf("remote agent %s: invalid protocol %q (want \"axp\" or \"a2a\")", cfg.ID, cfg.Protocol)

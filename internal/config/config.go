@@ -118,6 +118,9 @@ type ATEAgentConfig struct {
 	Port        int               `yaml:"port"`               // Port the agent is listening on
 	Namespace   string            `yaml:"namespace"`          // Namespace for actor
 	Template    string            `yaml:"template"`           // Template for actor
+	Protocol    string            `yaml:"protocol,omitempty"` // "axp" (default) or "a2a"
+	Auth        auth.Auth         `yaml:"auth,omitempty"`     // Optional auth
+	Headers     auth.Headers      `yaml:"headers,omitempty"`  // Optional headers
 	Metadata    map[string]string `yaml:"metadata,omitempty"` // Optional metadata
 	// TODO(jbd): Rename this struct before releasing.
 }

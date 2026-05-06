@@ -20,9 +20,11 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/google/ax/internal/agent"
+	"github.com/google/ax/internal/auth"
 	"github.com/google/ax/internal/experimental/k8s/ate"
 	"github.com/google/ax/proto"
 )
@@ -35,9 +37,13 @@ type ATEAgent struct {
 
 // ATEAgentConfig configures an ATE agent client.
 type ATEAgentConfig struct {
+	ID        string
 	Namespace string
 	Template  string
 	Port      int // Port where agent runs in the worker
+	Protocol  string
+	Auth      auth.Auth
+	Headers   auth.Headers
 }
 
 // NewATEAgent creates a new ATE agent client.
@@ -74,16 +80,32 @@ func (a *ATEAgent) Connect(ctx context.Context, conversationID string, execID st
 		return fmt.Errorf("worker has no IP address")
 	}
 
-	remoteAddr := fmt.Sprintf("%s:%d", worker.Ip, a.config.Port)
-	remoteAgent, err := agent.NewRemoteAgent(agent.RemoteAgentConfig{
-		Address:    remoteAddr,
-		Reconnect:  true,
-		MaxRetries: 3,
-	})
+	workerAddr := fmt.Sprintf("%s:%d", worker.Ip, a.config.Port)
+	// 2. Connect to the Actor.
+	var activeAgent agent.Agent
+	switch strings.ToLower(a.config.Protocol) {
+	case "", "axp":
+		activeAgent, err = agent.NewRemoteAgent(agent.RemoteAgentConfig{
+			Address:    workerAddr,
+			Reconnect:  true,
+			MaxRetries: 3,
+		})
+	case "a2a":
+		activeAgent, err = NewA2AAgent(ctx, A2AAgentConfig{
+			ID:                a.config.ID,
+			Address:           workerAddr,
+			Auth:              a.config.Auth,
+			Headers:           a.config.Headers,
+			Stateless:         true,
+			OverrideCardHosts: true,
+		})
+	default:
+		return fmt.Errorf("ate agent %s: invalid protocol %q", a.config.ID, a.config.Protocol)
+	}
 	if err != nil {
 		return fmt.Errorf("failed to create remote agent connection: %w", err)
 	}
-	defer remoteAgent.Close()
+	defer activeAgent.Close()
 
 	// 3. Suspend Actor when done.
 	defer func() {
@@ -98,7 +120,7 @@ func (a *ATEAgent) Connect(ctx context.Context, conversationID string, execID st
 		}
 	}()
 
-	return remoteAgent.Connect(ctx, conversationID, execID, start, e, o)
+	return activeAgent.Connect(ctx, conversationID, execID, start, e, o)
 }
 
 // Close gracefully shuts down the ATE agent connection.
