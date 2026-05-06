@@ -38,7 +38,6 @@ type AgentRegistry interface {
 type GeminiPlannerConfig struct {
 	GeminiConfig *config.GeminiConfig
 	SkillsDir    string // Directory for discovering skills (optional)
-	MaxSteps     int    // Max steps (default: 100)
 }
 
 // geminiPlannerAgent implements task.Agent using Gemini.

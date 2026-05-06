@@ -36,9 +36,7 @@ func TestIntegrationGeminiPlanner(t *testing.T) {
 	ctx := context.Background()
 	registry := controller.NewRegistry()
 
-	cfg := gemini.GeminiPlannerConfig{
-		MaxSteps: 5,
-	}
+	cfg := gemini.GeminiPlannerConfig{}
 
 	planner, err := gemini.NewGeminiPlannerAgent(ctx, registry, cfg)
 	if err != nil {
