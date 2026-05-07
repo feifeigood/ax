@@ -22,6 +22,7 @@ package skills
 import (
 	"bytes"
 	"context"
+	"encoding/xml"
 	"fmt"
 	"io"
 	"os"
@@ -161,11 +162,19 @@ func SystemPrompt(skills []Skill) string {
 	b.WriteString("<available_skills>\n")
 	for _, s := range skills {
 		b.WriteString("  <skill>\n")
-		fmt.Fprintf(&b, "    <name>%s</name>\n", s.Name)
-		fmt.Fprintf(&b, "    <description>%s</description>\n", s.Description)
+		fmt.Fprintf(&b, "    <name>%s</name>\n", xmlEscape(s.Name))
+		fmt.Fprintf(&b, "    <description>%s</description>\n", xmlEscape(s.Description))
 		b.WriteString("  </skill>\n")
 	}
 	b.WriteString("</available_skills>")
+	return b.String()
+}
+
+// xmlEscape escapes XML metacharacters so untrusted skill metadata
+// cannot break out of the surrounding tags or inject new ones.
+func xmlEscape(s string) string {
+	var b strings.Builder
+	_ = xml.EscapeText(&b, []byte(s))
 	return b.String()
 }
 
