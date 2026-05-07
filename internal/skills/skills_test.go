@@ -16,10 +16,48 @@ package skills
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 )
+
+func TestNewExecutor_NoSkills(t *testing.T) {
+	// An empty (but existing) directory should yield ErrNoSkills, not
+	// io.EOF as before — callers should be able to detect "no skills
+	// configured" via errors.Is.
+	tmpDir := t.TempDir()
+	_, err := NewExecutor(tmpDir)
+	if err == nil {
+		t.Fatal("expected error for empty skills dir")
+	}
+	if !errors.Is(err, ErrNoSkills) {
+		t.Errorf("want errors.Is(err, ErrNoSkills) to be true, got %v", err)
+	}
+}
+
+func TestNewExecutor_WithSkills(t *testing.T) {
+	tmpDir := t.TempDir()
+	skillDir := filepath.Join(tmpDir, "test-skill")
+	if err := os.MkdirAll(skillDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(skillDir, "SKILL.md"),
+		[]byte("---\nname: Test\ndescription: Test\n---\nbody"),
+		0644,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	exec, err := NewExecutor(tmpDir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !exec.HasSkills() {
+		t.Error("expected HasSkills() to be true")
+	}
+}
 
 func TestDiscover(t *testing.T) {
 	// Create a temporary skills directory

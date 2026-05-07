@@ -17,7 +17,6 @@ package gemini
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"time"
 
@@ -100,8 +99,10 @@ Rules for Operation:
 		return nil, fmt.Errorf("failed to create Gemini client: %w", err)
 	}
 
+	// NewSkillsTool already converts skills.ErrNoSkills (empty dir)
+	// into a NoopTool with a nil error, so any error here is real.
 	skillsTool, err := NewSkillsTool(cfg.SkillsDir)
-	if err != nil && err != io.EOF {
+	if err != nil {
 		return nil, fmt.Errorf("failed to initialize skills tool: %w", err)
 	}
 

@@ -16,11 +16,16 @@ package skills
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"io"
 
 	"google.golang.org/genai"
 )
+
+// ErrNoSkills is returned by NewExecutor when the skills directory exists
+// and was successfully scanned but contained no SKILL.md files. Callers
+// can use errors.Is to detect this case and fall back to a no-op tool.
+var ErrNoSkills = errors.New("no skills found")
 
 // Executor runs an agentskills.io-compatible agentic loop.
 type Executor struct {
@@ -31,6 +36,10 @@ type Executor struct {
 
 // NewExecutor discovers skills in dir, then creates an Executor. The caller is
 // responsible for creating the client and choosing a model.
+//
+// Returns ErrNoSkills if dir was scanned successfully but contained no
+// SKILL.md files. Other errors (e.g. dir does not exist, permission
+// denied) are returned wrapped from Discover.
 func NewExecutor(dir string) (*Executor, error) {
 
 	found, err := Discover(dir)
@@ -38,7 +47,7 @@ func NewExecutor(dir string) (*Executor, error) {
 		return nil, err
 	}
 	if len(found) == 0 {
-		return nil, io.EOF
+		return nil, ErrNoSkills
 	}
 
 	names := make([]string, len(found))

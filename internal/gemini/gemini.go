@@ -19,7 +19,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"runtime"
@@ -325,7 +324,7 @@ func NewSkillsTool(dir string) (Tool, error) {
 	if err != nil {
 		// If no skills are found or the directory does not exist, fallback to a no-op tool
 		// to avoid hard errors when skills are not configured or available.
-		if errors.Is(err, io.EOF) || errors.Is(err, os.ErrNotExist) {
+		if errors.Is(err, skills.ErrNoSkills) || errors.Is(err, os.ErrNotExist) {
 			return &NoopTool{}, nil
 		}
 		return nil, err
