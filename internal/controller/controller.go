@@ -267,10 +267,13 @@ func (d *Controller) execute(ctx context.Context, conversationID string, execID 
 
 // Delete deletes all events for a specific conversation ID.
 func (d *Controller) Delete(ctx context.Context, conversationID string) error {
-	d.inFlightMu.Lock()
-	_, ok := d.inFlight[conversationID]
-	d.inFlightMu.Unlock()
-	if ok {
+	if conversationID == "" {
+		return fmt.Errorf("conversation_id is required")
+	}
+	inFlight, cleanup := d.markInFlight(conversationID)
+	defer cleanup()
+
+	if inFlight {
 		return fmt.Errorf("conversation %q is in flight, cannot delete", conversationID)
 	}
 
