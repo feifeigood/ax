@@ -95,6 +95,20 @@ func TestLastUserText(t *testing.T) {
 	}
 }
 
+func TestRunColab_NoArgs(t *testing.T) {
+	// runColab indexes args[0] when formatting the error message on
+	// failure, so calling it with no arguments would panic. Guard
+	// against that by returning an error up front.
+	a := &ColabAgent{}
+	_, err := a.runColab(context.Background())
+	if err == nil {
+		t.Fatal("expected error when called with no args")
+	}
+	if !strings.Contains(err.Error(), "at least one argument") {
+		t.Errorf("error message should mention required argument, got: %v", err)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // NewColabAgent validation tests
 // ---------------------------------------------------------------------------

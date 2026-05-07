@@ -375,6 +375,9 @@ func (a *ColabAgent) Close() error {
 // in the error message on failure but is not treated as an error by itself
 // (setup commands like install write progress to stderr).
 func (a *ColabAgent) runColab(ctx context.Context, args ...string) (string, error) {
+	if len(args) == 0 {
+		return "", fmt.Errorf("runColab requires at least one argument (subcommand)")
+	}
 	cmd := exec.CommandContext(ctx, "colab", args...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
