@@ -94,6 +94,10 @@ func runExec(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
+		// Validate configuration (matches `ax serve`).
+		if err := cfg.Validate(); err != nil {
+			return fmt.Errorf("invalid configuration: %w", err)
+		}
 		c, err := cliutil.NewControllerFromConfig(ctx, cfg)
 		if err != nil {
 			return fmt.Errorf("error creating controller: %w", err)
