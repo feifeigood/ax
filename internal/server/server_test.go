@@ -30,8 +30,7 @@ type dummyAgent struct{}
 func (a *dummyAgent) Connect(ctx context.Context, conversationID string, execID string, start *proto.AgentStart, e agent.Executor, o agent.OutputHandler) error {
 	return nil
 }
-func (a *dummyAgent) HealthCheck(ctx context.Context) error { return nil }
-func (a *dummyAgent) Close() error                          { return nil }
+func (a *dummyAgent) Close() error { return nil }
 
 func TestServer_Fork(t *testing.T) {
 	ctx := context.Background()
