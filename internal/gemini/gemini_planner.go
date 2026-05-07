@@ -239,7 +239,12 @@ func (p *geminiPlannerAgent) process(ctx context.Context, start *proto.AgentStar
 		}
 
 		if fc := part.FunctionCall; fc != nil {
-			fc.ID = uuid.NewString()
+			// Preserve Gemini's function-call ID when the model assigns
+			// one so it round-trips correctly in subsequent turns. Only
+			// mint a UUID when the model leaves it empty.
+			if fc.ID == "" {
+				fc.ID = uuid.NewString()
+			}
 			switch fc.Name {
 			case p.bashTool.Name():
 				return "", false, p.bashTool.HandleCall(ctx, fc, handler)
