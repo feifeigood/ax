@@ -262,7 +262,7 @@ func (t *BashTool) HandleExecute(ctx context.Context, fc *genai.FunctionCall, ap
 		})
 	}
 
-	output, err := execute(fc.Args)
+	output, err := execute(ctx, fc.Args)
 	if err != nil {
 		return err
 	}
@@ -556,18 +556,21 @@ func (t *NoopTool) HandleExecute(ctx context.Context, fc *genai.FunctionCall, ap
 	return errors.New("cannot execute noop tool")
 }
 
-func execute(args map[string]any) (string, error) {
+func execute(ctx context.Context, args map[string]any) (string, error) {
 	command, ok := args["command"].(string)
 	if !ok {
 		return "", fmt.Errorf("command parameter missing or invalid")
 	}
 
-	// Execute the command.
+	// Execute the command. exec.CommandContext kills the process if ctx
+	// is cancelled (e.g. the planner loop is shutting down or the gRPC
+	// Exec stream is cancelled), so a long-running command like
+	// `find / -name ...` doesn't outlive the controller.
 	var cmd *exec.Cmd
 	if runtime.GOOS == "windows" {
-		cmd = exec.Command("cmd", "/C", command)
+		cmd = exec.CommandContext(ctx, "cmd", "/C", command)
 	} else {
-		cmd = exec.Command("sh", "-c", command)
+		cmd = exec.CommandContext(ctx, "sh", "-c", command)
 	}
 
 	output, err := cmd.CombinedOutput()
