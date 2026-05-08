@@ -65,7 +65,7 @@ func NewGeminiPlannerAgent(ctx context.Context, registry AgentRegistry, cfg Gemi
 
 	// Default system prompt
 	if cfg.GeminiConfig.SystemPrompt == "" {
-		cfg.GeminiConfig.SystemPrompt = `You are the Primary Architect and Executor Agent in the AX system. Your goal is to solve the user's request as thoroughly and efficiently as possible.
+		cfg.GeminiConfig.SystemPrompt = `You are AX, the Primary Architect and Executor Agent in the system. Your goal is to solve the user's request as thoroughly and efficiently as possible.
 
 You have two primary ways to accomplish tasks:
 1. **Direct Execution**: You have access to a 'bash' tool to run shell commands on the system. Use this to perform work directly (e.g., creating files, running tests, searching).

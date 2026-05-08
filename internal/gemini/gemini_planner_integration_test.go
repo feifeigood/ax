@@ -19,6 +19,7 @@ package gemini_test
 import (
 	"context"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/google/ax/internal/agent"
@@ -72,7 +73,12 @@ func TestIntegrationGeminiPlanner(t *testing.T) {
 		t.Fatal("expected outputs from Gemini")
 	}
 
-	t.Logf("Gemini response: %v", outputs[0].GetContent().GetText().GetText())
+	response := outputs[0].GetContent().GetText().GetText()
+	t.Logf("Gemini response: %v", response)
+	expectedPart := "I am AX, the Primary Architect and Executor Agent"
+	if !strings.Contains(response, expectedPart) {
+		t.Errorf("Expected response to contain %q, got %q", expectedPart, response)
+	}
 }
 
 type dummyExecutor struct{}
