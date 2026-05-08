@@ -1,18 +1,19 @@
 # AX Deployment on Kubernetes
 
 This directory contains Kubernetes manifests and configurations to deploy
-and verify the AX on GKE using Substrate sandboxes.
+and verify the AX on Kubernetes using Agent Substrate.
 
 The target Kubernetes cluster is assumed to have
-[SubstrATE](https://github.com/ai-on-gke/SubstrATE) installed.
+[Agent Substrate](https://github.com/ai-on-gke/SubstrATE) installed.
 
 ---
 
-## 🚀 Deploying to Substrate
+## 🚀 Deploying to Agent Substrate
 
-This option deploys to isolated, warm-standby actors. Workers are live-snapshotted on boot and instantly restored from GCS when a new conversation starts.
+This option deploys to isolated, warm-standby actors. Workers are live-snapshotted on boot and instantly restored from GCS when a new conversation starts. Actors are
+automatically suspended when conversations stop emitting all of their outputs.
 
-### 1. Deploy Sandboxed environment
+### 1. Deploy
 
 ```bash
 kubectl apply -f manifests/ax-deployment.yaml
@@ -37,11 +38,11 @@ ax exec --server=<EXTERNAL-IP>:443 --input="hello"
 
 ## 🛠️ Inspection & Diagnostics
 
-Use the **`kubectl-ate`** CLI tool to inspect the live states of
+Use the **`kubectl ate`** CLI tool to inspect the live states of
 active actors and allocated standby worker pool instances:
 
 ```bash
-kubectl-ate get actors
+kubectl ate get actors
 
-kubectl-ate get workers
+kubectl ate get workers
 ```
