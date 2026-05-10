@@ -158,8 +158,14 @@ func (p *geminiPlannerAgent) loop(ctx context.Context, conversationID string, st
 			Messages: append(start.Messages, outputs...),
 		}
 		outputs = nil
-		if _, err := e.Exec(ctx, conversationID, nextAgentID, start, outputCapturer); err != nil {
+		state, err := e.Exec(ctx, conversationID, nextAgentID, start, outputCapturer)
+		if err != nil {
 			return err
+		}
+		start.Messages = append(start.Messages, outputs...)
+		outputs = nil
+		if state == proto.State_STATE_PENDING {
+			return nil
 		}
 	}
 }
@@ -214,7 +220,7 @@ func (p *geminiPlannerAgent) process(ctx context.Context, start *proto.AgentStar
 		if candidate.FinishReason == genai.FinishReasonStop {
 			return "", false, nil // No more tasks
 		}
-		return "", false, fmt.Errorf("no content in candidates from Gemini")
+		return "", false, fmt.Errorf("no content in candidates from Gemini (reason: %v)", candidate.FinishReason)
 	}
 
 	// Look for function calls in the response

@@ -48,14 +48,14 @@ func DefaultExecutor(eventLog EventLog, registry map[string]agent.Agent) agent.E
 	}
 }
 
-func (tm *defaultExecutor) Exec(ctx context.Context, conversationID string, execID string, start *proto.AgentStart, o agent.OutputHandler) (proto.State, error) {
-	execID = newExecID(tm.execID, execID)
-	a, ok := tm.registry[start.AgentId]
+func (de *defaultExecutor) Exec(ctx context.Context, conversationID string, execID string, start *proto.AgentStart, o agent.OutputHandler) (proto.State, error) {
+	execID = newExecID(de.execID, execID)
+	a, ok := de.registry[start.AgentId]
 	if !ok {
 		return proto.State_STATE_UNSPECIFIED, errors.New("no agent found")
 	}
 
-	allInputs, state, earlierAgentID, err := history(ctx, tm.eventLog, execID)
+	allInputs, state, earlierAgentID, err := history(ctx, de.eventLog, execID)
 	if err != nil {
 		return proto.State_STATE_UNSPECIFIED, err
 	}
@@ -78,10 +78,10 @@ func (tm *defaultExecutor) Exec(ctx context.Context, conversationID string, exec
 	if state == proto.State_STATE_COMPLETED {
 		return proto.State_STATE_COMPLETED, nil
 	}
-	return tm.exec(ctx, conversationID, execID, start, tm.eventLog, a, allInputs, o)
+	return de.exec(ctx, conversationID, execID, start, de.eventLog, a, allInputs, o)
 }
 
-func (tm *defaultExecutor) exec(
+func (de *defaultExecutor) exec(
 	ctx context.Context,
 	conversationID string,
 	execID string,
@@ -90,10 +90,10 @@ func (tm *defaultExecutor) exec(
 	a agent.Agent,
 	history []*proto.Message,
 	o agent.OutputHandler) (proto.State, error) {
-	child := &defaultExecutor{
+	child := &agentExecutor{
 		execID:   execID,
-		eventLog: tm.eventLog,
-		registry: tm.registry,
+		eventLog: de.eventLog,
+		registry: de.registry,
 	}
 
 	var allOutputs []*proto.Message
