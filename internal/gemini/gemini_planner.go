@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/google/ax/internal/agent"
@@ -65,17 +66,19 @@ func NewGeminiPlannerAgent(ctx context.Context, registry AgentRegistry, cfg Gemi
 
 	// Default system prompt
 	if cfg.GeminiConfig.SystemPrompt == "" {
-		cfg.GeminiConfig.SystemPrompt = `You are AX, the Primary Architect and Executor Agent in the system. Your goal is to solve the user's request as thoroughly and efficiently as possible.
-
-You have two primary ways to accomplish tasks:
-1. **Direct Execution**: You have access to a 'bash' tool to run shell commands on the system. Use this to perform work directly (e.g., creating files, running tests, searching).
-2. **Delegation**: You have access to specialized subagents (registered as function tools). Review their descriptions and delegate tasks to them if they are better suited for the job.
+		cfg.GeminiConfig.SystemPrompt = `You are AX. You are the Primary Architect and Executor Agent in the system. Your goal is to solve the user's request as thoroughly and efficiently as possible.
+You can answer your questions if there is no tool or function call you need to make.
+	
+All specialized subagents available to you are registered and provided directly as standard callable function tools. 
+You don't have access to shell, don't use the bash tool.
 
 Rules for Operation:
-- **MANDATORY FIRST STEP**: You MUST first check if any available subagent is specialized for the user's request. If a specialized subagent exists, you MUST call that subagent. Do not attempt the task yourself if a subagent can handle it.
-- If no subagent is specialized, you must attempt to solve the task yourself using the 'bash' tool. Do not give up; use commands to explore, create, and verify.
-- **Clarification**: If the user's request is ambiguous or you are unclear about any requirements, stop and ask the user for clarification before proceeding with any tool calls or delegation.
-- Always be concise. Focus on action and execution results rather than conversational explanations.`
+- **DELEGATE FIRST**: Review all of your active function tool descriptions! If a tool is specialized for a delegated action (like building Docker images or deploying to Kubernetes), immediately execute that tool function. Do NOT try to perform specialized tasks yourself via shell commands if a custom agent tool exists.
+- **Clarification**: If the user's request is highly ambiguous, ask for clarification. Keep all communication crisp, direct, and focused exclusively on action.
+
+Be concise, don't come up with extra steps unless the user asks for it.
+When introducing yourself, simply reply: "I am AX, how can I help you?"
+`
 	}
 
 	// Fail fast if no Gemini credentials are configured. We check the three
@@ -167,11 +170,24 @@ func (p *geminiPlannerAgent) loop(ctx context.Context, conversationID string, st
 		if state == proto.State_STATE_PENDING {
 			return nil
 		}
+
+		// TODO(anjalisridhar): Replace it with function response
+		// for the model to be able to pick up that agent is executed.
+		start.Messages = append(start.Messages, &proto.Message{
+			Role: "assistant",
+			Content: &proto.Content{
+				Type: &proto.Content_Text{
+					Text: &proto.TextContent{
+						Text: fmt.Sprintf("This step is done by the agent %q, figure out the next step if there is one.", nextAgentID),
+					},
+				},
+			},
+		})
 	}
 }
 
 func (p *geminiPlannerAgent) process(ctx context.Context, start *proto.AgentStart, handler agent.OutputHandler) (agentID string, keepLooping bool, err error) {
-	tools, err := agentsToTools(p.registry, p.bashTool, p.skillsTool)
+	tools, err := agentsToTools(p.registry)
 	if err != nil {
 		return "", false, fmt.Errorf("failed to convert agents to tools: %w", err)
 	}
@@ -235,7 +251,7 @@ func (p *geminiPlannerAgent) process(ctx context.Context, start *proto.AgentStar
 					Role: "model",
 					Content: &proto.Content{
 						Type: &proto.Content_Text{
-							Text: &proto.TextContent{Text: part.Text},
+							Text: &proto.TextContent{Text: strings.TrimSpace(part.Text)},
 						},
 					},
 				}},
@@ -259,7 +275,7 @@ func (p *geminiPlannerAgent) process(ctx context.Context, start *proto.AgentStar
 			case "activate_skill":
 				return "", true, p.skillsTool.HandleCall(ctx, fc, handler)
 			default:
-				return fc.Name, false, nil
+				return strings.ReplaceAll(fc.Name, "_", "-"), false, nil
 			}
 		}
 	}
@@ -335,12 +351,20 @@ func agentsToTools(registry AgentRegistry, nativeTools ...Tool) ([]*genai.Tool, 
 			continue // Skip agents we can't get info for
 		}
 
-		// Create a function declaration for this agent
+		// Set safe Gemini tool identifier logic alongside proper schema parameters
 		funcDecl := &genai.FunctionDeclaration{
-			Name:        id, // Use agent ID as function name
+			Name:        strings.ReplaceAll(id, "-", "_"),
 			Description: fmt.Sprintf("%s, %s", info.Name, info.Description),
+			Parameters: &genai.Schema{
+				Type: genai.TypeObject,
+				Properties: map[string]*genai.Schema{
+					"request_instructions": {
+						Type:        genai.TypeString,
+						Description: "Any custom instructions or directives to provide directly to the target execution sequence.",
+					},
+				},
+			},
 		}
-
 		tools = append(tools, &genai.Tool{
 			FunctionDeclarations: []*genai.FunctionDeclaration{funcDecl},
 		})

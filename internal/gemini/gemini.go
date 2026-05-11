@@ -166,7 +166,7 @@ func (t *BashTool) SystemPrompt() string {
 
 func (t *BashTool) FuncDecl() []*genai.Tool {
 	osInfo := fmt.Sprintf("User's Operating System: %s (%s)", runtime.GOOS, runtime.GOARCH)
-	description := fmt.Sprintf("OS specific bash execution tool. %s. Generate commands appropriate for this OS. Returns the command output or error. Never produce code, only use existing command line programs available in the system.", osInfo)
+	description := fmt.Sprintf("OS specific bash execution tool. %s. Generate commands appropriate for this OS. Never produce code, only use existing command line programs available in the system.", osInfo)
 
 	return []*genai.Tool{{
 		FunctionDeclarations: []*genai.FunctionDeclaration{

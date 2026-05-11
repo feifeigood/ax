@@ -120,7 +120,11 @@ func (d *Display) PromptForInput() (string, error) {
 	return userInput, nil
 }
 
-func (d *Display) ShowResumption(id string) {
+func (d *Display) ShowResumption(id string, server string) {
 	fmt.Println(d.resumeStyle.Render("To resume the conversation,"))
-	fmt.Println(d.resumeStyle.Render(fmt.Sprintf("ax exec --conversation %s", id)))
+	if server != "" {
+		fmt.Println(d.resumeStyle.Render(fmt.Sprintf("ax exec --conversation %s --server %s", id, server)))
+	} else {
+		fmt.Println(d.resumeStyle.Render(fmt.Sprintf("ax exec --conversation %s", id)))
+	}
 }

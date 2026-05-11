@@ -349,7 +349,7 @@ func promptUser(d *internal.Display, input string) (string, bool, error) {
 
 	d.DisplayInput(input)
 	if strings.ToLower(strings.TrimSpace(input)) == "q" {
-		d.ShowResumption(execConversationID)
+		d.ShowResumption(execConversationID, execServerAddr)
 		return "", true, nil
 	}
 	return input, false, nil

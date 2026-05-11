@@ -52,7 +52,9 @@ func init() {
 }
 
 func connect(server string) (*grpc.ClientConn, error) {
-	conn, err := grpc.NewClient(server, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(server,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to server: %w", err)
 	}

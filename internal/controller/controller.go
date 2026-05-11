@@ -21,9 +21,9 @@ import (
 	"fmt"
 	"maps"
 	"os"
-	"sync"
 
 	"github.com/google/ax/internal/agent"
+	"github.com/google/ax/internal/config"
 	"github.com/google/ax/internal/controller/executor"
 	"github.com/google/ax/internal/experimental/testagent"
 	"github.com/google/ax/internal/gemini"
@@ -38,8 +38,6 @@ type ExecHandler func(resp *proto.ExecResponse) error
 // Controller is the main controller that coordinates all components.
 // It acts as a single-writer system for managing agentic loops.
 type Controller struct {
-	inFlightMu     sync.Mutex
-	inFlight       map[string]struct{}
 	registry       *Registry
 	eventLog       executor.EventLog
 	plannerBuilder PlannerBuilder
@@ -55,31 +53,51 @@ type Config struct {
 }
 
 // New creates a new controller instance.
-func New(ctx context.Context, config Config) (*Controller, error) {
+func New(ctx context.Context, cfg Config) (*Controller, error) {
 	// Initialize agent registry
 	registry := NewRegistry()
 
 	// Determine plan function
 	// If no planner builder is provided, use the default Gemini planner.
-	if config.PlannerBuilder == nil {
-		config.PlannerBuilder = func(ctx context.Context, r *Registry) (agent.Agent, error) {
+	if cfg.PlannerBuilder == nil {
+		cfg.PlannerBuilder = func(ctx context.Context, r *Registry) (agent.Agent, error) {
 			return gemini.NewGeminiPlannerAgent(ctx, r, gemini.GeminiPlannerConfig{})
 		}
 	}
 
-	if config.EventLogBuilder == nil {
+	if cfg.EventLogBuilder == nil {
 		return nil, fmt.Errorf("event log builder is required")
 	}
-	eventLog, err := config.EventLogBuilder()
+	eventLog, err := cfg.EventLogBuilder()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create event log: %w", err)
 	}
 
+	// For testing only! Remove this once the project is stable.
+	// TODO(jbd): Remove this before the release.
+	if os.Getenv("AX_TEST_AGENTS") == "1" {
+		if err := registry.RegisterLocal(config.LocalAgentConfig{
+			ID: "docker-build",
+			Name: "Docker build",
+			Agent: testagent.DockerBuild(),
+			Description: "Allows building OCI or Docker images from code. Provided with code, it automatically figures out how to build an image and pushes it to the registry.",
+		}); err != nil {
+			return nil, err
+		}
+		if err := registry.RegisterLocal(config.LocalAgentConfig{
+			ID: "kubernetes-deploy",
+			Name: "Production Kubernetes deploy",
+			Agent: testagent.KubernetesDeploy(),
+			Description: "Deploys the provided context to the production regions to Kubernetes clusters.",
+		}); err != nil {
+			return nil, err
+		}
+	}
+
 	return &Controller{
-		inFlight:       make(map[string]struct{}),
 		registry:       registry,
 		eventLog:       eventLog,
-		plannerBuilder: config.PlannerBuilder,
+		plannerBuilder: cfg.PlannerBuilder,
 	}, nil
 }
 
@@ -164,28 +182,16 @@ func (d *Controller) Exec(ctx context.Context, req *proto.ExecRequest, handler E
 		return fmt.Errorf("conversation_id is required")
 	}
 
-	inFlight, cleanup := d.markInFlight(req.ConversationId)
-	defer cleanup()
-
-	if inFlight {
-		return fmt.Errorf("conversation %q is already in flight", req.ConversationId)
-	}
-
 	planner, err := d.plannerBuilder(ctx, d.registry)
 	if err != nil {
 		return fmt.Errorf("failed to create planner: %w", err)
 	}
+	
 	registry := maps.Clone(d.registry.Map())
 	registry[plannerAgentID] = planner
 
 	// TODO(lhuan): consider remove this.
 	registry["gemini"] = gemini.NewGeminiAgent()
-
-	// For testing only! Remove this once the project is stable.
-	// TODO(jbd): Remove this before the release.
-	if os.Getenv("AX_TEST_AGENTS") == "1" {
-		maps.Copy(registry, testagent.Agents())
-	}
 
 	if req.AgentId == "" {
 		req.AgentId = plannerAgentID
@@ -272,12 +278,6 @@ func (d *Controller) Delete(ctx context.Context, conversationID string) error {
 	if conversationID == "" {
 		return fmt.Errorf("conversation_id is required")
 	}
-	inFlight, cleanup := d.markInFlight(conversationID)
-	defer cleanup()
-
-	if inFlight {
-		return fmt.Errorf("conversation %q is in flight, cannot delete", conversationID)
-	}
 
 	return d.eventLog.DeleteEvents(ctx, conversationID)
 }
@@ -290,13 +290,6 @@ func (d *Controller) Fork(ctx context.Context, srcConversationID string, srcSeq 
 	// TODO(anj-s): Check whether destination ID already exists and reject collisions.
 	if destConversationID == "" {
 		destConversationID = uuid.NewString()
-	}
-
-	inFlight, cleanup := d.markInFlight(destConversationID)
-	defer cleanup()
-
-	if inFlight {
-		return "", fmt.Errorf("conversation %q is already in flight", destConversationID)
 	}
 
 	events, err := d.eventLog.Events(ctx, srcConversationID)
@@ -361,21 +354,4 @@ func (d *Controller) Close() error {
 		return fmt.Errorf("failed to close registry: %w", err)
 	}
 	return nil
-}
-
-func (d *Controller) markInFlight(id string) (exists bool, cleanup func()) {
-	d.inFlightMu.Lock()
-	defer d.inFlightMu.Unlock()
-
-	_, ok := d.inFlight[id]
-	if ok {
-		return true, func() {}
-	}
-	d.inFlight[id] = struct{}{}
-
-	return false, func() {
-		d.inFlightMu.Lock()
-		delete(d.inFlight, id)
-		d.inFlightMu.Unlock()
-	}
 }

@@ -42,6 +42,14 @@ func Agents() map[string]agent.Agent {
 	}
 }
 
+func DockerBuild() agent.Agent {
+	return &DockerBuilderAgent{}
+}
+
+func KubernetesDeploy() agent.Agent {
+	return &KubernetesDeployAgent{}
+}
+
 type KubernetesDeployAgentConfig struct {
 	Regions []string `json:"regions"`
 }
@@ -189,97 +197,86 @@ func (a *KubernetesDeployAgent) Connect(ctx context.Context, conversationID stri
 		}
 
 		regions := pendingRegions[conf.Id]
-		if err := o(&proto.AgentOutputs{
-			Messages: []*proto.Message{{
+		var history []*proto.Message
+		history = append(history, start.Messages...)
+
+		out := func(text string) error {
+			msg := &proto.Message{
 				Role: "assistant",
 				Content: &proto.Content{
 					Type: &proto.Content_Text{
 						Text: &proto.TextContent{
-							Text: fmt.Sprintf("Picked %v region(s) for deployment.", strings.Join(regions, ",")),
+							Text: text,
 						},
 					},
 				},
-			}},
-		}); err != nil {
+			}
+			history = append(history, msg)
+			return o(&proto.AgentOutputs{
+				Messages: []*proto.Message{msg},
+			})
+		}
+
+		if err := out(fmt.Sprintf("Picked %v region(s) for deployment.", strings.Join(regions, ","))); err != nil {
 			return err
 		}
 
 		for _, region := range regions {
-			if region != "us-central1" {
-				_, err := exec.Exec(ctx, conversationID, "mirror-"+region, &proto.AgentStart{
-					AgentId: "docker-mirror",
-					Messages: []*proto.Message{
-						{
-							Role: "user",
-							Content: &proto.Content{
-								Type: &proto.Content_Text{
-									Text: &proto.TextContent{
-										Text: "Provide a mirror to the region if the image doesn't exist.",
-									},
-								},
-							},
-						},
-					},
-				})
-				if err != nil {
-					return err
-				}
-			}
-			if err := o(&proto.AgentOutputs{
-				Messages: []*proto.Message{{
-					Role: "assistant",
-					Content: &proto.Content{
-						Type: &proto.Content_Text{
-							Text: &proto.TextContent{
-								Text: "* Deploying to " + region + ", this may take a while...",
-							},
-						},
-					},
-				}},
-			}); err != nil {
-				return err
-			}
-			if err := o(&proto.AgentOutputs{
-				Messages: []*proto.Message{{
-					Role: "assistant",
-					Content: &proto.Content{
-						Type: &proto.Content_Text{
-							Text: &proto.TextContent{
-								Text: "* kubectl apply -f deployment.yaml",
-							},
-						},
-					},
-				}},
-			}); err != nil {
+			if err := out(fmt.Sprintf("* Setting context to gke_acme-production_%s_cluster-1...", region)); err != nil {
 				return err
 			}
 
-			time.Sleep(1500 * time.Millisecond)
-			if err := o(&proto.AgentOutputs{
-				Messages: []*proto.Message{{
-					Role: "assistant",
-					Content: &proto.Content{
-						Type: &proto.Content_Text{
-							Text: &proto.TextContent{
-								Text: fmt.Sprintf("* Deployment complete. You can access the service at https://%v.test.services.acme.com", region),
-							},
-						},
-					},
-				}},
-			}); err != nil {
+			time.Sleep(500 * time.Millisecond)
+			if err := out("* Running: kubectl apply -f deployment.yaml\nnamespace/test-acme unchanged\nconfigmap/test-config created\ndeployment.apps/test-service created\nservice/test-service created"); err != nil {
+				return err
+			}
+
+			time.Sleep(1000 * time.Millisecond)
+
+			for i := 0; i <= 3; i++ {
+				msg := fmt.Sprintf("* Waiting for deployment \"test-service\" rollout to finish: %d of 3 updated replicas are available...", i)
+				if i == 3 {
+					msg = "* deployment \"test-service\" successfully rolled out"
+				}
+				if err := out(msg); err != nil {
+					return err
+				}
+				time.Sleep(1000 * time.Millisecond)
+			}
+
+			if err := out(fmt.Sprintf("* Deployment complete. You can access the service at https://%v.test.services.acme.com", region)); err != nil {
 				return err
 			}
 			delete(pendingRegions, conf.Id)
 		}
+
+		history = append(history, &proto.Message{
+			Role: "user",
+			Content: &proto.Content{
+				Type: &proto.Content_Text{
+					Text: &proto.TextContent{
+						Text: "Summarize in one paragraph what we did.",
+					},
+				},
+			},
+		})
+		if _, err := exec.Exec(ctx, conversationID, "summarize", &proto.AgentStart{
+			AgentId:  "gemini",
+			Messages: history,
+		}); err != nil {
+			return err
+		}
+
 		return nil
 	}
 
-	if start.AgentConfig == nil {
-		return fmt.Errorf("no config for id=%v", execID)
-	}
 	var config KubernetesDeployAgentConfig
-	if err := json.Unmarshal(start.AgentConfig, &config); err != nil {
-		return err
+	if start.AgentConfig == nil {
+		config.Regions = []string{"us-central1", "us-east1", "us-west1"}
+	} else {
+		if err := json.Unmarshal(start.AgentConfig, &config); err != nil {
+			return err
+		}
 	}
 	if len(config.Regions) == 0 {
 		return fmt.Errorf("no regions specified")
@@ -294,7 +291,7 @@ func (a *KubernetesDeployAgent) Connect(ctx context.Context, conversationID stri
 				Type: &proto.Content_Confirmation{
 					Confirmation: &proto.ConfirmationContent{
 						Id:       confID,
-						Question: fmt.Sprintf("Picked %v region(s) to deploy, continue?", strings.Join(config.Regions, ",")),
+						Question: fmt.Sprintf("Picked %v region(s) to deploy, continue?", strings.Join(config.Regions, ", ")),
 					},
 				},
 			},

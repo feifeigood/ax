@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"sync"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -40,12 +41,15 @@ type Server struct {
 
 	controller *controller.Controller
 	grpcServer *grpc.Server
+	inFlight   map[string]struct{}
+	inFlightMu sync.Mutex
 }
 
 // New creates a new controller server.
 func New(c *controller.Controller) *Server {
 	return &Server{
 		controller: c,
+		inFlight:   make(map[string]struct{}),
 	}
 }
 
@@ -54,6 +58,12 @@ func (s *Server) Exec(req *proto.ExecRequest, stream grpc.ServerStreamingServer[
 	ctx := stream.Context()
 	slog.InfoContext(ctx, "Executing...",
 		slog.String("conversation_id", req.ConversationId))
+
+	inFlight, cleanup := s.markInFlight(req.ConversationId)
+	if inFlight {
+		return status.Errorf(codes.FailedPrecondition, "conversation %q is already in flight", req.ConversationId)
+	}
+	defer cleanup()
 
 	outputHandler := controller.ExecHandler(func(resp *proto.ExecResponse) error {
 		return stream.Send(resp)
@@ -81,6 +91,12 @@ func (s *Server) ForkConversation(ctx context.Context, req *proto.ForkConversati
 		return nil, status.Errorf(codes.InvalidArgument, "dest_conversation_id is required")
 	}
 
+	inFlight, cleanup := s.markInFlight(req.DestConversationId)
+	if inFlight {
+		return nil, status.Errorf(codes.FailedPrecondition, "conversation %q is already in flight", req.DestConversationId)
+	}
+	defer cleanup()
+
 	destID, err := s.controller.Fork(ctx, req.SrcConversationId, req.SrcSeq, req.DestConversationId)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to fork conversation: %v", err)
@@ -96,6 +112,12 @@ func (s *Server) DeleteConversation(ctx context.Context, req *proto.DeleteConver
 	if req.ConversationId == "" {
 		return nil, status.Errorf(codes.InvalidArgument, "conversation_id is required")
 	}
+	inFlight, cleanup := s.markInFlight(req.ConversationId)
+	if inFlight {
+		return nil, status.Errorf(codes.FailedPrecondition, "conversation %q is already in flight", req.ConversationId)
+	}
+	defer cleanup()
+
 	if err := s.controller.Delete(ctx, req.ConversationId); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to delete conversation: %v", err)
 	}
@@ -133,5 +155,22 @@ func (s *Server) GracefulStop() {
 	}
 	if s.grpcServer != nil {
 		s.grpcServer.GracefulStop()
+	}
+}
+
+func (s *Server) markInFlight(id string) (exists bool, cleanup func()) {
+	s.inFlightMu.Lock()
+	defer s.inFlightMu.Unlock()
+
+	_, ok := s.inFlight[id]
+	if ok {
+		return true, func() {}
+	}
+	s.inFlight[id] = struct{}{}
+
+	return false, func() {
+		s.inFlightMu.Lock()
+		delete(s.inFlight, id)
+		s.inFlightMu.Unlock()
 	}
 }

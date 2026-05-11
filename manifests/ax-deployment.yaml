@@ -80,6 +80,7 @@ data:
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
               stat_prefix: ingress_http
+              stream_idle_timeout: 0s
               generate_request_id: true
               access_log:
               - name: envoy.access_loggers.stdout
@@ -119,6 +120,7 @@ data:
                     route:
                       cluster: dynamic_forward_proxy_cluster
                       timeout: 0s
+                      idle_timeout: 0s # Support uninterrupted persistent stream socket bounds smoothly
                     typed_per_filter_config:
                       envoy.filters.http.dynamic_forward_proxy:
                         "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_forward_proxy.v3.PerRouteConfig
