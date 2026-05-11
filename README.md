@@ -362,19 +362,15 @@ AX supports multiple ways to bring your own agents into the runtime.
 
 #### Remote agents
 
-Remote agents run outside the AX controller and are invoked over a protocol boundary.
+Remote agents run outside the AX controller and are
+invoked over a protocol boundary.
 
-- [Remote Agent](examples/remote_agent): implement AX's native `AgentService` directly.
-- [ADK Agent (Python)](examples/adk_agent): run a Google ADK agent behind the AX gRPC wrapper so it can be registered as a remote agent.
-- [A2A Agent](examples/a2a_agent): connect agents that speak the [A2A protocol](https://github.com/a2aproject/A2A) through AX's A2A bridge.
+- [Remote Agent](examples/remote_agent) implements AX's native `AgentService` directly.
+- [ADK Agent (Python)](examples/adk_agent) runs a Google ADK agent as a remote agent.
+- [A2A Agent](examples/a2a_agent) connects agents that speak the [A2A protocol](https://github.com/a2aproject/A2A) through AX's A2A bridge.
+- [Colab Agents (Experimental)](examples/colab_agent) runs Python scripts or notebooks in a remote Google Colab session.
 
-#### Sandboxed agents
-
-Sandboxed agents execute user-provided code in an external execution environment managed by AX.
-
-- [Colab Agents](examples/colab_agent)(experimental): run Python scripts or notebooks in a remote Google Colab session.
-
-Please note that AX is actively developing its resumable streaming and agent communication protocols; these interfaces may change before a stable release.
+Please note that AX is actively developing its resumable streaming and agent communication protocols; these interfaces will change before a stable release.
 
 If you are implementing an AX-native remote agent, see `AgentService` in `proto/ax.proto`.
 
