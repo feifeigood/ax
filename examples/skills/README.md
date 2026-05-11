@@ -4,8 +4,6 @@ AX has built-in support for [Agent Skills](https://agentskills.io).
 
 ## Configuration
 
-By default, `SKILLS_DIR` or `~/.agents/skills` are used as the skills directory.
-
 To enable skills with a custom directory, you can set the `skills_dir` in your `ax.yaml` file:
 
 ```yaml
@@ -15,6 +13,8 @@ planner:
     timeout: "60s"
     skills_dir: "./examples/skills"
 ```
+
+If you omit `skills_dir` in your `ax.yaml` file, AX will check the `SKILLS_DIR` environment variable first, and finally fall back to `~/.agents/skills`.
 
 ## Example: Using the `emoji` Skill
 

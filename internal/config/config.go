@@ -89,7 +89,7 @@ type GeminiPlannerConfig struct {
 	MaxTokens    int32   `yaml:"max_tokens,omitempty"`
 	Timeout      string  `yaml:"timeout,omitempty"`
 	SystemPrompt string  `yaml:"system_prompt,omitempty"`
-	SkillsDir    string  `yaml:"skills_dir,omitempty"` // Directory to discover skills from
+	SkillsDir    string  `yaml:"skills_dir,omitempty"` // Directory to discover skills from. If omitted, falls back to SKILLS_DIR env var or ~/.agents/skills.
 }
 
 func (c *GeminiPlannerConfig) setDefaults() {
