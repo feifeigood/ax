@@ -177,6 +177,8 @@ func (d *Controller) Exec(ctx context.Context, req *proto.ExecRequest, handler E
 	}
 	registry := maps.Clone(d.registry.Map())
 	registry[plannerAgentID] = planner
+
+	// TODO(lhuan): consider remove this.
 	registry["gemini"] = gemini.NewGeminiAgent()
 
 	// For testing only! Remove this once the project is stable.
