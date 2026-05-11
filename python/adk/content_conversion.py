@@ -43,7 +43,7 @@ def ax_content_to_adk_part(content: content_pb2.Content) -> types.Part:
                 function_response=types.FunctionResponse(
                     id=content.confirmation.id,
                     name="adk_request_confirmation",
-                    response={"approved": True}
+                    response={"confirmed": True}
                 )
             )
         elif decision == 'decline':
@@ -51,7 +51,7 @@ def ax_content_to_adk_part(content: content_pb2.Content) -> types.Part:
                 function_response=types.FunctionResponse(
                     id=content.confirmation.id,
                     name="adk_request_confirmation",
-                    response={"approved": False}
+                    response={"confirmed": False}
                 )
             )
         else:

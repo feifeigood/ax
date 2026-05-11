@@ -85,7 +85,7 @@ class TestContentConversion(unittest.TestCase):
         self.assertIsNotNone(part.function_response)
         self.assertEqual(part.function_response.name, "adk_request_confirmation")
         self.assertEqual(part.function_response.id, "conf-123")
-        self.assertEqual(part.function_response.response["approved"], True)
+        self.assertEqual(part.function_response.response["confirmed"], True)
 
     def test_ax_content_to_adk_part_confirmation_decline(self):
         content = content_pb2.Content(
@@ -98,7 +98,7 @@ class TestContentConversion(unittest.TestCase):
         self.assertIsNotNone(part.function_response)
         self.assertEqual(part.function_response.name, "adk_request_confirmation")
         self.assertEqual(part.function_response.id, "conf-123")
-        self.assertEqual(part.function_response.response["approved"], False)
+        self.assertEqual(part.function_response.response["confirmed"], False)
 
     def test_adk_part_to_ax_content_confirmation(self):
         class MockFunctionCall:
