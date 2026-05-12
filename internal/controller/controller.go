@@ -31,7 +31,15 @@ import (
 	"github.com/google/uuid"
 )
 
-const plannerAgentID = "__planner"
+const (
+	plannerAgentID = "__planner"
+	geminiAgentID  = "gemini"
+)
+
+var reservedAgentIDs = map[string]struct{}{
+	plannerAgentID: {},
+	geminiAgentID:  {},
+}
 
 type ExecHandler func(resp *proto.ExecResponse) error
 
@@ -191,7 +199,7 @@ func (d *Controller) Exec(ctx context.Context, req *proto.ExecRequest, handler E
 	registry[plannerAgentID] = planner
 
 	// TODO(lhuan): consider remove this.
-	registry["gemini"] = gemini.NewGeminiAgent()
+	registry[geminiAgentID] = gemini.NewGeminiAgent()
 
 	if req.AgentId == "" {
 		req.AgentId = plannerAgentID
