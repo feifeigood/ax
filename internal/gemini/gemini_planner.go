@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -26,12 +27,30 @@ import (
 	"github.com/google/ax/proto"
 	"github.com/google/uuid"
 	"google.golang.org/genai"
+	"google.golang.org/protobuf/types/known/structpb"
 )
+
+type contextKey string
+const disallowConfirmationsKey contextKey = "disallowConfirmations"
 
 // AgentRegistry defines the interface needed by the planner to discover agents.
 type AgentRegistry interface {
 	List() []string
 	GetInfo(id string) (*agent.AgentInfo, error)
+}
+
+// ContentGenerator abstracts Gemini content generation for testing.
+type ContentGenerator interface {
+	GenerateContent(ctx context.Context, model string, contents []*genai.Content, config *genai.GenerateContentConfig) (*genai.GenerateContentResponse, error)
+}
+
+// realContentGenerator implements ContentGenerator using the real genai.Client.
+type realContentGenerator struct {
+	client *genai.Client
+}
+
+func (g *realContentGenerator) GenerateContent(ctx context.Context, model string, contents []*genai.Content, config *genai.GenerateContentConfig) (*genai.GenerateContentResponse, error) {
+	return g.client.Models.GenerateContent(ctx, model, contents, config)
 }
 
 // GeminiPlannerConfig configures the Gemini-based planner.
@@ -43,7 +62,7 @@ type GeminiPlannerConfig struct {
 // geminiPlannerAgent implements task.Agent using Gemini.
 type geminiPlannerAgent struct {
 	config     GeminiPlannerConfig
-	client     *genai.Client
+	client     ContentGenerator
 	bashTool   Tool
 	skillsTool Tool
 	registry   AgentRegistry
@@ -110,7 +129,7 @@ When introducing yourself, simply reply: "I am AX, how can I help you?"
 	}
 
 	p := &geminiPlannerAgent{
-		client:     client,
+		client:     &realContentGenerator{client: client},
 		bashTool:   &BashTool{},
 		skillsTool: skillsTool,
 		registry:   registry,
@@ -139,7 +158,7 @@ func (p *geminiPlannerAgent) loop(ctx context.Context, conversationID string, st
 	}
 
 	for {
-		nextAgentID, keepLooping, err := p.process(ctx, start, outputCapturer)
+		nextAgentID, keepLooping, err := p.process(ctx, conversationID, start, e, outputCapturer)
 		if err != nil {
 			return err
 		}
@@ -170,23 +189,11 @@ func (p *geminiPlannerAgent) loop(ctx context.Context, conversationID string, st
 		if state == proto.State_STATE_PENDING {
 			return nil
 		}
-
-		// TODO(anjalisridhar): Replace it with function response
-		// for the model to be able to pick up that agent is executed.
-		start.Messages = append(start.Messages, &proto.Message{
-			Role: "assistant",
-			Content: &proto.Content{
-				Type: &proto.Content_Text{
-					Text: &proto.TextContent{
-						Text: fmt.Sprintf("This step is done by the agent %q, figure out the next step if there is one.", nextAgentID),
-					},
-				},
-			},
-		})
+	
 	}
 }
 
-func (p *geminiPlannerAgent) process(ctx context.Context, start *proto.AgentStart, handler agent.OutputHandler) (agentID string, keepLooping bool, err error) {
+func (p *geminiPlannerAgent) process(ctx context.Context, conversationID string, start *proto.AgentStart, e agent.Executor, handler agent.OutputHandler) (agentID string, keepLooping bool, err error) {
 	tools, err := agentsToTools(p.registry)
 	if err != nil {
 		return "", false, fmt.Errorf("failed to convert agents to tools: %w", err)
@@ -223,7 +230,7 @@ func (p *geminiPlannerAgent) process(ctx context.Context, start *proto.AgentStar
 		genCfg.Temperature = &t
 	}
 
-	resp, err := p.client.Models.GenerateContent(ctx, p.config.GeminiConfig.Model, contents, genCfg)
+	resp, err := p.client.GenerateContent(ctx, p.config.GeminiConfig.Model, contents, genCfg)
 
 	if err != nil {
 		return "", false, fmt.Errorf("failed to generate in planner: %w", err)
@@ -276,12 +283,178 @@ func (p *geminiPlannerAgent) process(ctx context.Context, start *proto.AgentStar
 			case "activate_skill":
 				return "", true, p.skillsTool.HandleCall(ctx, fc, handler)
 			default:
+				if p.isAgent(fc.Name) {
+					return "", true, p.handleSubagentCall(ctx, conversationID, fc, part.ThoughtSignature, start.Messages, e, handler)
+				}
 				return strings.ReplaceAll(fc.Name, "_", "-"), false, nil
 			}
 		}
 	}
 	return "", false, nil
 }
+
+func (p *geminiPlannerAgent) isAgent(name string) bool {
+	mappedName := strings.ReplaceAll(name, "_", "-")
+	for _, a := range p.registry.List() {
+		if a == mappedName {
+			return true
+		}
+	}
+	return false
+}
+
+func (p *geminiPlannerAgent) handleSubagentCall(ctx context.Context, conversationID string, fc *genai.FunctionCall, signature []byte, history []*proto.Message, e agent.Executor, handler agent.OutputHandler) error {
+
+	prompt, ok := fc.Args["prompt"].(string)
+	if !ok {
+		return fmt.Errorf("missing or invalid 'prompt' argument")
+	}
+
+	// Record the function call in the history.
+	argsStruct, err := structpb.NewStruct(fc.Args)
+	if err != nil {
+		return err
+	}
+	if err := handler(&proto.AgentOutputs{
+		Messages: []*proto.Message{
+			{
+				Role: "model",
+				Content: &proto.Content{
+					Type: &proto.Content_ToolCall{
+						ToolCall: &proto.ToolCallContent{
+							Id:        fc.ID,
+							Signature: signature,
+							Type: &proto.ToolCallContent_FunctionCall{
+								FunctionCall: &proto.FunctionCallContent{
+									Name:      fc.Name,
+									Arguments: argsStruct,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}); err != nil {
+		return err
+	}
+
+	mappedName := strings.ReplaceAll(fc.Name, "_", "-")
+	var historyStr strings.Builder
+	for _, msg := range history {
+		historyStr.WriteString(fmt.Sprintf("%s: ", msg.Role))
+		if msg.Content != nil {
+			if txt := msg.Content.GetText(); txt != nil {
+				historyStr.WriteString(txt.Text)
+			}
+		}
+		historyStr.WriteString("\n")
+	}
+
+	subagentStart := &proto.AgentStart{
+		AgentId:  mappedName,
+		Messages: []*proto.Message{
+			{
+				Role: "user",
+				Content: &proto.Content{
+					Type: &proto.Content_Text{
+						Text: &proto.TextContent{Text: fmt.Sprintf("History Summary:\n%s\n\nPrompt:\n%s", historyStr.String(), prompt)},
+					},
+				},
+			},
+		},
+	}
+
+	var subagentOutputs []*proto.Message
+	capturer := func(outgoing *proto.AgentOutputs) error {
+		subagentOutputs = append(subagentOutputs, outgoing.Messages...)
+		return nil
+	}
+
+	var execErr error
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				execErr = fmt.Errorf("panic: %v\n%s", r, string(debug.Stack()))
+			}
+		}()
+		// Disallow tool confirmations for subagents.
+		// NOTE: We use context here for simplicity, but for robust resumption support
+		// across process restarts, this might need to be persisted in AgentConfig
+		// in the future if the controller does not preserve context on resume.
+		subCtx := context.WithValue(ctx, disallowConfirmationsKey, true)
+		_, execErr = e.Exec(subCtx, conversationID, mappedName, subagentStart, capturer)
+	}()
+
+	if execErr != nil {
+		respStruct, _ := structpb.NewStruct(map[string]any{
+			"result": "sub agent failed",
+			"error":  execErr.Error(),
+		})
+		return handler(&proto.AgentOutputs{
+			Messages: []*proto.Message{
+				{
+					Role: "user",
+					Content: &proto.Content{
+						Type: &proto.Content_ToolResult{
+							ToolResult: &proto.ToolResultContent{
+								CallId: fc.ID,
+								Type: &proto.ToolResultContent_FunctionResult{
+									FunctionResult: &proto.FunctionResultContent{
+										Name: fc.Name,
+										Result: &proto.FunctionResultContent_Response{
+											Response: respStruct,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		})
+	}
+
+
+	var resultText strings.Builder
+	for _, msg := range subagentOutputs {
+		if msg.Content != nil {
+			if txt := msg.Content.GetText(); txt != nil {
+				resultText.WriteString(txt.Text)
+				resultText.WriteString("\n")
+			}
+		}
+	}
+
+	respStruct, err := structpb.NewStruct(map[string]any{"result": resultText.String()})
+	if err != nil {
+		return err
+	}
+
+	return handler(&proto.AgentOutputs{
+		Messages: []*proto.Message{
+			{
+				Role: "user",
+				Content: &proto.Content{
+					Type: &proto.Content_ToolResult{
+						ToolResult: &proto.ToolResultContent{
+							CallId: fc.ID,
+							Type: &proto.ToolResultContent_FunctionResult{
+								FunctionResult: &proto.FunctionResultContent{
+									Name: fc.Name,
+									Result: &proto.FunctionResultContent_Response{
+										Response: respStruct,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	})
+}
+
 
 func (p *geminiPlannerAgent) handleConfirmationAnswer(inputs []*proto.Message) (*genai.FunctionCall, bool) {
 	var conf *proto.ConfirmationContent
@@ -359,11 +532,16 @@ func agentsToTools(registry AgentRegistry, nativeTools ...Tool) ([]*genai.Tool, 
 			Parameters: &genai.Schema{
 				Type: genai.TypeObject,
 				Properties: map[string]*genai.Schema{
-					"request_instructions": {
+					"history": {
 						Type:        genai.TypeString,
-						Description: "Any custom instructions or directives to provide directly to the target execution sequence.",
+						Description: "Summary of the conversation history so far.",
+					},
+					"prompt": {
+						Type:        genai.TypeString,
+						Description: "The last user prompt verbatim.",
 					},
 				},
+				Required: []string{"history", "prompt"},
 			},
 		}
 		tools = append(tools, &genai.Tool{

@@ -15,9 +15,15 @@
 package gemini
 
 import (
+	"context"
+	"fmt"
+	"strings"
 	"testing"
 
+	"github.com/google/ax/internal/agent"
+	"github.com/google/ax/internal/config"
 	"github.com/google/ax/proto"
+	"google.golang.org/genai"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -127,5 +133,306 @@ func TestHandleConfirmationAnswer(t *testing.T) {
 	}
 	if !approved {
 		t.Error("expected approved to be true")
+	}
+}
+
+type mockContentGenerator struct {
+	generateContentFunc func(ctx context.Context, model string, contents []*genai.Content, config *genai.GenerateContentConfig) (*genai.GenerateContentResponse, error)
+}
+
+func (m *mockContentGenerator) GenerateContent(ctx context.Context, model string, contents []*genai.Content, config *genai.GenerateContentConfig) (*genai.GenerateContentResponse, error) {
+	if m.generateContentFunc != nil {
+		return m.generateContentFunc(ctx, model, contents, config)
+	}
+	return nil, nil
+}
+
+type mockExecutor struct {
+	execFunc func(ctx context.Context, conversationID string, execID string, start *proto.AgentStart, o agent.OutputHandler) (proto.State, error)
+}
+
+func (m *mockExecutor) Exec(ctx context.Context, conversationID string, execID string, start *proto.AgentStart, o agent.OutputHandler) (proto.State, error) {
+	if m.execFunc != nil {
+		return m.execFunc(ctx, conversationID, execID, start, o)
+	}
+	return proto.State_STATE_COMPLETED, nil
+}
+
+type mockAgentRegistry struct {
+	listFunc    func() []string
+	getInfoFunc func(id string) (*agent.AgentInfo, error)
+}
+
+func (m *mockAgentRegistry) List() []string {
+	if m.listFunc != nil {
+		return m.listFunc()
+	}
+	return nil
+}
+
+func (m *mockAgentRegistry) GetInfo(id string) (*agent.AgentInfo, error) {
+	if m.getInfoFunc != nil {
+		return m.getInfoFunc(id)
+	}
+	return nil, nil
+}
+
+func TestAgentsToTools_Parameters(t *testing.T) {
+	registry := &mockAgentRegistry{
+		listFunc: func() []string {
+			return []string{"test-agent"}
+		},
+		getInfoFunc: func(id string) (*agent.AgentInfo, error) {
+			return &agent.AgentInfo{
+				ID:          "test-agent",
+				Name:        "Test Agent",
+				Description: "A test agent",
+			}, nil
+		},
+	}
+
+	tools, err := agentsToTools(registry)
+	if err != nil {
+		t.Fatalf("agentsToTools failed: %v", err)
+	}
+
+	if len(tools) != 1 {
+		t.Fatalf("expected 1 tool, got %d", len(tools))
+	}
+
+	decl := tools[0].FunctionDeclarations[0]
+	if decl.Name != "test_agent" {
+		t.Errorf("expected name test_agent, got %s", decl.Name)
+	}
+
+	params := decl.Parameters
+	if params == nil {
+		t.Fatal("expected parameters")
+	}
+
+	if params.Type != genai.TypeObject {
+		t.Errorf("expected type object, got %v", params.Type)
+	}
+
+	if _, ok := params.Properties["history"]; !ok {
+		t.Error("expected 'history' property")
+	}
+	if _, ok := params.Properties["prompt"]; !ok {
+		t.Error("expected 'prompt' property")
+	}
+
+	required := params.Required
+	if len(required) != 2 {
+		t.Errorf("expected 2 required properties, got %d", len(required))
+	}
+	
+	foundHistory := false
+	foundPrompt := false
+	for _, r := range required {
+		if r == "history" {
+			foundHistory = true
+		}
+		if r == "prompt" {
+			foundPrompt = true
+		}
+	}
+	if !foundHistory {
+		t.Error("expected 'history' to be required")
+	}
+	if !foundPrompt {
+		t.Error("expected 'prompt' to be required")
+	}
+}
+
+func TestHandleSubagentCall_Success(t *testing.T) {
+	mockGen := &mockContentGenerator{
+		generateContentFunc: func(ctx context.Context, model string, contents []*genai.Content, config *genai.GenerateContentConfig) (*genai.GenerateContentResponse, error) {
+			return &genai.GenerateContentResponse{
+				Candidates: []*genai.Candidate{
+					{
+						Content: &genai.Content{
+							Parts: []*genai.Part{
+								{Text: "Subagent work summary."},
+							},
+						},
+					},
+				},
+			}, nil
+		},
+	}
+
+	mockExec := &mockExecutor{
+		execFunc: func(ctx context.Context, conversationID string, execID string, start *proto.AgentStart, o agent.OutputHandler) (proto.State, error) {
+			o(&proto.AgentOutputs{
+				Messages: []*proto.Message{
+					{
+						Role: "model",
+						Content: &proto.Content{
+							Type: &proto.Content_Text{
+								Text: &proto.TextContent{Text: "Subagent output step 1"},
+							},
+						},
+					},
+				},
+			})
+			return proto.State_STATE_COMPLETED, nil
+		},
+	}
+
+	p := &geminiPlannerAgent{
+		client: mockGen,
+		config: GeminiPlannerConfig{
+			GeminiConfig: &config.GeminiConfig{Model: "test-model"},
+		},
+	}
+
+	fc := &genai.FunctionCall{
+		Name: "test-subagent",
+		Args: map[string]any{
+			"history": "Previous history summary",
+			"prompt":  "Current user prompt",
+		},
+	}
+
+	var handlerCalled bool
+	var handlerOutput *proto.AgentOutputs
+	handler := func(outgoing *proto.AgentOutputs) error {
+		handlerCalled = true
+		handlerOutput = outgoing
+		return nil
+	}
+
+	err := p.handleSubagentCall(context.Background(), "test-conv", fc, nil, nil, mockExec, handler)
+	if err != nil {
+		t.Fatalf("handleSubagentCall failed: %v", err)
+	}
+
+	if !handlerCalled {
+		t.Fatal("expected handler to be called")
+	}
+
+	if len(handlerOutput.Messages) != 1 {
+		t.Fatalf("expected 1 message, got %d", len(handlerOutput.Messages))
+	}
+	msg := handlerOutput.Messages[0]
+	tr := msg.Content.GetToolResult()
+	if tr == nil {
+		t.Fatal("expected tool result")
+	}
+	fr := tr.GetFunctionResult()
+	if fr == nil {
+		t.Fatal("expected function result")
+	}
+	if fr.Name != "test-subagent" {
+		t.Errorf("expected name test-subagent, got %s", fr.Name)
+	}
+	resp := fr.GetResponse()
+	if resp == nil {
+		t.Fatal("expected response")
+	}
+	resultVal := resp.Fields["result"].GetStringValue()
+	if resultVal != "Subagent output step 1\n" {
+		t.Errorf("expected 'Subagent output step 1\\n', got %s", resultVal)
+	}
+}
+
+func TestHandleSubagentCall_MissingArgs(t *testing.T) {
+	p := &geminiPlannerAgent{}
+	fc := &genai.FunctionCall{
+		Name: "test-subagent",
+		Args: map[string]any{},
+	}
+
+	err := p.handleSubagentCall(context.Background(), "test-conv", fc, nil, nil, nil, nil)
+	if err == nil {
+		t.Fatal("expected error due to missing arguments")
+	}
+	if !strings.Contains(err.Error(), "missing or invalid 'prompt' argument") {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestHandleSubagentCall_Failure(t *testing.T) {
+	mockExec := &mockExecutor{
+		execFunc: func(ctx context.Context, conversationID string, execID string, start *proto.AgentStart, o agent.OutputHandler) (proto.State, error) {
+			return proto.State_STATE_UNSPECIFIED, fmt.Errorf("subagent execution failed")
+		},
+	}
+
+	p := &geminiPlannerAgent{}
+	fc := &genai.FunctionCall{
+		Name: "test-subagent",
+		Args: map[string]any{
+			"history": "Previous history summary",
+			"prompt":  "Current user prompt",
+		},
+	}
+
+	var handlerOutput *proto.AgentOutputs
+	handler := func(outgoing *proto.AgentOutputs) error {
+		handlerOutput = outgoing
+		return nil
+	}
+
+	err := p.handleSubagentCall(context.Background(), "test-conv", fc, nil, nil, mockExec, handler)
+	if err != nil {
+		t.Fatalf("handleSubagentCall failed: %v", err)
+	}
+
+	msg := handlerOutput.Messages[0]
+	tr := msg.Content.GetToolResult()
+	fr := tr.GetFunctionResult()
+	resp := fr.GetResponse()
+	resultVal := resp.Fields["result"].GetStringValue()
+	if resultVal != "sub agent failed" {
+		t.Errorf("expected 'sub agent failed', got %s", resultVal)
+	}
+	errVal := resp.Fields["error"].GetStringValue()
+	if !strings.Contains(errVal, "subagent execution failed") {
+		t.Errorf("expected error to contain 'subagent execution failed', got %s", errVal)
+	}
+}
+
+func TestHandleSubagentCall_Panic(t *testing.T) {
+	mockExec := &mockExecutor{
+		execFunc: func(ctx context.Context, conversationID string, execID string, start *proto.AgentStart, o agent.OutputHandler) (proto.State, error) {
+			panic("something went wrong")
+		},
+	}
+
+	p := &geminiPlannerAgent{}
+	fc := &genai.FunctionCall{
+		Name: "test-subagent",
+		Args: map[string]any{
+			"history": "Previous history summary",
+			"prompt":  "Current user prompt",
+		},
+	}
+
+	var handlerOutput *proto.AgentOutputs
+	handler := func(outgoing *proto.AgentOutputs) error {
+		handlerOutput = outgoing
+		return nil
+	}
+
+	err := p.handleSubagentCall(context.Background(), "test-conv", fc, nil, nil, mockExec, handler)
+	if err != nil {
+		t.Fatalf("handleSubagentCall failed: %v", err)
+	}
+
+	msg := handlerOutput.Messages[0]
+	tr := msg.Content.GetToolResult()
+	fr := tr.GetFunctionResult()
+	resp := fr.GetResponse()
+	resultVal := resp.Fields["result"].GetStringValue()
+	if resultVal != "sub agent failed" {
+		t.Errorf("expected 'sub agent failed', got %s", resultVal)
+	}
+	errVal := resp.Fields["error"].GetStringValue()
+	if !strings.Contains(errVal, "panic: something went wrong") {
+		t.Errorf("expected error to contain 'panic: something went wrong', got %s", errVal)
+	}
+	if !strings.Contains(errVal, "goroutine") {
+		t.Errorf("expected stack trace in error, got %s", errVal)
 	}
 }

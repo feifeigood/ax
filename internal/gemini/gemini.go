@@ -189,6 +189,9 @@ func (t *BashTool) FuncDecl() []*genai.Tool {
 }
 
 func (t *BashTool) HandleCall(ctx context.Context, fc *genai.FunctionCall, o agent.OutputHandler) error {
+	if disallow, _ := ctx.Value(disallowConfirmationsKey).(bool); disallow {
+		return t.HandleExecute(ctx, fc, true, o)
+	}
 	command, _ := fc.Args["command"].(string)
 	argsStruct, err := structpb.NewStruct(fc.Args)
 	if err != nil {
@@ -348,6 +351,9 @@ func (t *SkillsTool) FuncDecl() []*genai.Tool {
 }
 
 func (t *SkillsTool) HandleCall(ctx context.Context, fc *genai.FunctionCall, o agent.OutputHandler) error {
+	if disallow, _ := ctx.Value(disallowConfirmationsKey).(bool); disallow {
+		return t.HandleExecute(ctx, fc, true, o)
+	}
 	argsStruct, err := structpb.NewStruct(fc.Args)
 	if err != nil {
 		return err

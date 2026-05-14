@@ -31,7 +31,8 @@ go run examples/docker_agent/main.go &
 AGENT_PID=$!
 
 echo "Starting AX Server in background..."
-ax serve --config examples/docker_agent/ax.yaml &
+/opt/homebrew/bin/go build -o bin/ax ./cmd/ax
+./bin/ax serve --config examples/docker_agent/ax.yaml &
 SERVER_PID=$!
 
 # Give servers a few seconds to start up
@@ -46,7 +47,7 @@ for i in {1..30}; do
 done
 
 echo "Executing task..."
-ax exec --server localhost:8494 --input "Write a Dockerfile for a Python flask app that says hello world."
+./bin/ax exec --server localhost:8494 --input "Write a Dockerfile for a Python flask app that says hello world."
 
 # Wait for the exec command to finish
 # The trap will kill the background servers when the script exits
