@@ -20,7 +20,7 @@ metadata:
   annotations:
     cloud.google.com/backend-config: '{"default": "ax-backend-config"}'
 spec:
-  type: LoadBalancer
+  type: ClusterIP
   selector:
     app: ax-router
   ports:

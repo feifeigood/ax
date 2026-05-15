@@ -60,11 +60,9 @@ func NewClient(ns, template, target string, opts ...grpc.DialOption) (*Client, e
 func (c *Client) CreateActor(ctx context.Context, execID string) (*ateapipb.CreateActorResponse, error) {
 	client := ateapipb.NewControlClient(c.conn)
 	resp, err := client.CreateActor(ctx, &ateapipb.CreateActorRequest{
-		ActorKey: &ateapipb.ActorKey{
-			ActorTemplateNamespace: c.namespace,
-			ActorTemplateName:      c.template,
-			ActorId:                execID,
-		},
+		ActorId:                execID,
+		ActorTemplateNamespace: c.namespace,
+		ActorTemplateName:      c.template,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("error when calling Control.CreateActor: %w", err)
@@ -76,11 +74,7 @@ func (c *Client) CreateActor(ctx context.Context, execID string) (*ateapipb.Crea
 func (c *Client) SuspendActor(ctx context.Context, execID string) (*ateapipb.SuspendActorResponse, error) {
 	client := ateapipb.NewControlClient(c.conn)
 	resp, err := client.SuspendActor(ctx, &ateapipb.SuspendActorRequest{
-		ActorKey: &ateapipb.ActorKey{
-			ActorTemplateNamespace: c.namespace,
-			ActorTemplateName:      c.template,
-			ActorId:                execID,
-		},
+		ActorId: execID,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("error when calling Control.SuspendActor: %w", err)

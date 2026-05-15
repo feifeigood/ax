@@ -38,6 +38,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/status"
 	protov2 "google.golang.org/protobuf/proto"
 )
 
@@ -54,16 +55,23 @@ type authServer struct {
 }
 
 func runSession(ctx context.Context, sc ateapipb.ControlClient, sessionID string) (*authv3.CheckResponse, error) {
-	key := &ateapipb.ActorKey{
+	slog.InfoContext(ctx, "About to call CreateActor", slog.Any("actor-id", sessionID))
+	if _, err := sc.CreateActor(ctx, &ateapipb.CreateActorRequest{
+		ActorId:                sessionID,
 		ActorTemplateNamespace: *actorTemplateNamespace,
 		ActorTemplateName:      *actorTemplateName,
-		ActorId:                sessionID,
+	}); err != nil {
+		if status.Code(err) != codes.AlreadyExists {
+			slog.ErrorContext(ctx, "CreateActor error", slog.Any("error", err))
+			return &authv3.CheckResponse{
+				Status: &gapistatus.Status{Code: int32(codes.Unavailable), Message: err.Error()},
+			}, nil
+		}
 	}
 
-	slog.InfoContext(ctx, "About to call ResumeActor with AutoCreate", slog.Any("actor-key", key))
+	slog.InfoContext(ctx, "About to call ResumeActor", slog.Any("actor-id", sessionID))
 	resp, err := sc.ResumeActor(ctx, &ateapipb.ResumeActorRequest{
-		ActorKey:   key,
-		AutoCreate: true,
+		ActorId: sessionID,
 	})
 	if err != nil {
 		slog.InfoContext(ctx, "ResumeActor error", slog.Any("error", err))

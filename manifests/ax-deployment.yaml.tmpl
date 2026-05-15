@@ -26,13 +26,13 @@ spec:
   replicas: 5
   containers:
     - name: "ax"
-      image: gcr.io/ax-container-images/ax:latest
+      image: ko://github.com/google/ax/cmd/ax
       command: ["ax", "serve"]
       ports:
       - containerPort: 8494
       env:
         - name: GEMINI_API_KEY
-          value: "YOUR_API_KEY" # TODO: Use envFrom once it's available.
+          value: "${GEMINI_API_KEY}"
         - name: AX_SUBSTRATE
           value: "1"
 ---
@@ -46,7 +46,7 @@ spec:
     name: ax-workerpool
   snapshotsConfig:
     location:
-      bucket: YOUR_BUCKET
+      bucket: ${BUCKET_NAME}
       folder: ax
 ---
 apiVersion: v1
@@ -197,7 +197,7 @@ spec:
         - name: envoy-config
           mountPath: /etc/envoy
       - name: axepp
-        image: gcr.io/ax-container-images/axepp:latest
+        image: ko://github.com/google/ax/cmd/axepp
         args:
           - "--grpc-server-cred-bundle=/run/servicedns.podcert.gke.io/credential-bundle.pem"          
         ports:
