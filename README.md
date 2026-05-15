@@ -1,7 +1,8 @@
 # Agent eXecutor (AX)
 
 > [!WARNING]
-> 🚧 This project is in active development and WILL introduce breaking changes.
+> 🚧 This project is in early active development and
+> WILL introduce major changes.
 > Please note that the resumption protocols will undergo major revisions and
 > breaking changes prior to the stable release.
 

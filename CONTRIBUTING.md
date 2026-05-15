@@ -28,6 +28,13 @@ sign a new one.
 This project follows
 [Google's Open Source Community Guidelines](https://opensource.google/conduct/).
 
+### Pull Requests
+
+We are in the middle of a major refactor for AX, so we're holding off on
+accepting new contributions until the core interfaces stabilize.
+However, please feel free to keep filing bugs and feature
+requests in the meantime!
+
 ### Code reviews
 
 All submissions, including submissions by project members, require review. We
