@@ -1,4 +1,4 @@
-# Agent eXecutor (AX)
+# Agent Executor (AX)
 
 > [!WARNING]
 > 🚧 This project is in early active development and
