@@ -80,7 +80,7 @@ func runSession(ctx context.Context, sc ateapipb.ControlClient, sessionID string
 		}, nil
 	}
 
-	destinationIP := resp.GetActor().GetActiveWorker().GetIp()
+	destinationIP := resp.GetActor().GetAteomPodIp()
 	destrinationAddr := net.JoinHostPort(destinationIP, *axPort)
 	log.Printf("Redirecting to address: %s", destrinationAddr)
 

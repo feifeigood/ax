@@ -24,17 +24,7 @@ metadata:
   namespace: ax
 spec:
   replicas: 5
-  containers:
-    - name: "ax"
-      image: ko://github.com/google/ax/cmd/ax
-      command: ["ax", "serve"]
-      ports:
-      - containerPort: 8494
-      env:
-        - name: GEMINI_API_KEY
-          value: "${GEMINI_API_KEY}"
-        - name: AX_SUBSTRATE
-          value: "1"
+  ateomImage: ko://github.com/ai-on-gke/SubstrATE/cmd/servers/ateom-gvisor
 ---
 apiVersion: ate.gke.io/v1alpha1
 kind: ActorTemplate
@@ -44,10 +34,23 @@ metadata:
 spec:
   workerPoolRef:
     name: ax-workerpool
+    namespace: ax
+  runscVersion: "a45961a9bb9a3f2dfbb8a9740563315c977a10f7"
+  runscURL: "gs://${BUCKET_NAME}/binaries/runsc-a45961a9bb9a3f2dfbb8a9740563315c977a10f7"
+  pauseImage: "gcr.io/gke-release/pause@sha256:bcbd57ba5653580ec647b16d8163cdd1112df3609129b01f912a8032e48265da"
+  containers:
+    - name: "ax"
+      image: ko://github.com/google/ax/cmd/ax
+      command: ["/ko-app/ax", "serve"]
+      ports:
+      - containerPort: 8494
+      env:
+        - name: GEMINI_API_KEY
+          value: "${GEMINI_API_KEY}"
+        - name: AX_SUBSTRATE
+          value: "1"
   snapshotsConfig:
-    location:
-      bucket: ${BUCKET_NAME}
-      folder: ax
+    location: gs://${BUCKET_NAME}/ax/
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -93,7 +96,7 @@ data:
                   grpc_service:
                     envoy_grpc:
                       cluster_name: epp-cluster
-                    timeout: 5s
+                    timeout: 10s
                   transport_api_version: V3
                   with_request_body:
                     max_request_bytes: 1048576

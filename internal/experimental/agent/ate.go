@@ -72,15 +72,11 @@ func (a *ATEAgent) Connect(ctx context.Context, conversationID string, execID st
 	if actor == nil {
 		return fmt.Errorf("received nil actor in response")
 	}
-	worker := actor.ActiveWorker
-	if worker == nil {
-		return fmt.Errorf("actor has no active worker")
-	}
-	if worker.Ip == "" {
-		return fmt.Errorf("worker has no IP address")
+	if actor.AteomPodIp == "" {
+		return fmt.Errorf("actor has no active worker IP address (AteomPodIp is empty)")
 	}
 
-	workerAddr := fmt.Sprintf("%s:%d", worker.Ip, a.config.Port)
+	workerAddr := fmt.Sprintf("%s:%d", actor.AteomPodIp, a.config.Port)
 	// 2. Connect to the Actor.
 	var activeAgent agent.Agent
 	switch strings.ToLower(a.config.Protocol) {
