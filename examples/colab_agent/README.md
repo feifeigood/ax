@@ -1,12 +1,16 @@
 # Colab Agents
 
-AX supports executing Python scripts and Jupyter notebooks on Google Colab sessions via the `colab` CLI. Colab agents provision ephemeral sessions with optional GPU/TPU accelerators, run agent code remotely, stream output back in real time, and tear down the session on completion.
-
-> **Note:** The `colab` CLI is currently only available on gLinux. External availability is coming soon.
+AX supports executing Python scripts and Jupyter notebooks on Google Colab sessions via the [colab CLI](https://github.com/googlecolab/google-colab-cli). Colab agents provision ephemeral sessions with optional GPU/TPU accelerators, run agent code remotely, stream output back in real time, and tear down the session on completion.
 
 ## Prerequisites
 
 - The `colab` CLI installed and available in your `PATH`.
+- Application Default Credentials (ADC) authenticated.
+
+  ```sh
+  gcloud auth application-default login \
+      --scopes=openid,https://www.googleapis.com/auth/cloud-platform,https://www.googleapis.com/auth/userinfo.email,https://www.googleapis.com/auth/colaboratory
+  ```
 
 ## Configuration
 

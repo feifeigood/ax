@@ -64,6 +64,21 @@ type ColabAgentConfig struct {
 	OutputDrivePath string // Google Drive path to save converted .ipynb (e.g. MyDrive/notebooks/out.ipynb)
 }
 
+// validIdentifier matches a valid Python identifier (also valid as a CLI flag name).
+// Used to validate InputFlag to prevent code injection via malformed ax.yaml.
+var validIdentifier = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
+
+const (
+	// maxRetries is the number of times Connect will retry if the Colab session
+	// is terminated due to idle timeout.
+	maxRetries = 1
+
+	// defaultDriveMountPath is the standard mount path used by the Colab CLI
+	// when no path is specified. Used as a fallback for filepath.Join when
+	// drive_mount_path is omitted in the config.
+	defaultDriveMountPath = "/content/drive"
+)
+
 // NewColabAgent creates a new ColabAgent. It validates that the colab CLI
 // binary is available in PATH and that exactly one of LocalFile or RemoteFile
 // is set.
@@ -116,10 +131,6 @@ func NewColabAgent(config ColabAgentConfig) (*ColabAgent, error) {
 	}, nil
 }
 
-// validIdentifier matches a valid Python identifier (also valid as a CLI flag name).
-// Used to validate InputFlag to prevent code injection via malformed ax.yaml.
-var validIdentifier = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
-
 // isNotebook returns true if the file path has a .ipynb extension.
 func isNotebook(path string) bool {
 	return strings.HasSuffix(strings.ToLower(path), ".ipynb")
@@ -143,61 +154,54 @@ func parseAccelerator(accel string) ([]string, error) {
 	return []string{"-" + kind, parts[1]}, nil
 }
 
-const (
-	// maxRetries is the number of times Connect will retry if the Colab session
-	// is terminated due to idle timeout.
-	maxRetries = 1
-
-	// defaultDriveMountPath is the standard mount path used by the Colab CLI
-	// when no path is specified. Used as a fallback for filepath.Join when
-	// drive_mount_path is omitted in the config.
-	defaultDriveMountPath = "/content/drive"
-)
-
-// Connect provisions a new Colab session, sets up the environment, executes
-// the agent code, and tears the session down. If the session is terminated
-// due to idle timeout (e.g. while the user is authorizing Drive access),
-// it automatically recreates the session and retries once.
+// Connect provisions a Colab session, runs user code, and tears it down,
+// retrying once if the session is lost mid-run (e.g. idle timeout).
 func (a *ColabAgent) Connect(ctx context.Context, conversationID string, execID string, start *proto.AgentStart, e agent.Executor, o agent.OutputHandler) error {
 	sessionName := colabSessionName(a.config.ID, execID)
-
 	for attempt := 0; attempt <= maxRetries; attempt++ {
-		// Create a new Colab session (or recreate after timeout).
-		newArgs := []string{"new", "-s", sessionName}
-		newArgs = append(newArgs, a.acceleratorArgs...)
-		if _, err := a.runColab(ctx, newArgs...); err != nil {
-			return fmt.Errorf("failed to create colab session: %w", err)
+		runErr, sessionDied := a.runWithSession(ctx, sessionName, start, o)
+		if runErr == nil {
+			break
 		}
-
-		// Track the active session for Close() cleanup.
-		a.mu.Lock()
-		a.activeSessions[sessionName] = struct{}{}
-		a.mu.Unlock()
-
-		// Run the setup and execution steps.
-		err := a.run(ctx, sessionName, start, o)
-
-		if err == nil {
-			a.stopSession(sessionName)
-			return nil
+		if !sessionDied || attempt == maxRetries {
+			return runErr
 		}
-
-		// Check if the session died on its own (idle timeout) BEFORE
-		// stopping it, so we can distinguish timeout from other errors.
-		sessionDied := !a.isSessionAlive(ctx, sessionName)
-		a.stopSession(sessionName)
-
-		// If the session timed out and we have retries left, recreate
-		// the session and try again.
-		if attempt < maxRetries && sessionDied {
-			log.Printf("Colab session %s timed out, retrying...", sessionName)
-			continue
-		}
-
-		return err
+		log.Printf("Colab session %s timed out, retrying...", sessionName)
 	}
+	return nil
+}
 
-	return fmt.Errorf("colab session timed out after %d retries", maxRetries)
+// runWithSession creates a Colab session, runs the user code, and stops the
+// session on the way out.
+func (a *ColabAgent) runWithSession(ctx context.Context, sessionName string, start *proto.AgentStart, o agent.OutputHandler) (runErr error, sessionDied bool) {
+	if err := a.createSession(ctx, sessionName); err != nil {
+		return err, false
+	}
+	defer func() {
+		if stopErr := a.stopSession(sessionName); stopErr != nil {
+			log.Printf("Warning: %v", stopErr)
+		}
+	}()
+
+	runErr = a.run(ctx, sessionName, start, o)
+	if runErr != nil {
+		// Check whether the session died on its own (idle timeout).
+		sessionDied = !a.isSessionAlive(ctx, sessionName)
+	}
+	return runErr, sessionDied
+}
+
+// createSession provisions a fresh Colab session and records it in the
+// active sessions tracker.
+func (a *ColabAgent) createSession(ctx context.Context, sessionName string) error {
+	args := append([]string{"new", "-s", sessionName}, a.acceleratorArgs...)
+	if _, err := a.runColab(ctx, args...); err != nil {
+		return fmt.Errorf("failed to create colab session: %w", err)
+	}
+	a.mu.Lock()
+	a.activeSessions[sessionName] = struct{}{}
+	a.mu.Unlock()
+	return nil
 }
 
 // run executes the setup and agent code on an existing Colab session.
@@ -255,6 +259,12 @@ func (a *ColabAgent) run(ctx context.Context, sessionName string, start *proto.A
 	pyInput, _ := json.Marshal(userText)
 	shellEscaped := strings.ReplaceAll(userText, "'", "'\\''")
 
+	// The VM path for the output image.
+	var remoteImagePath string
+	if a.config.OutputImage != "" {
+		remoteImagePath = "/content/" + filepath.Base(a.config.OutputImage)
+	}
+
 	if a.notebook {
 		// Notebook execution.
 		// If input_flag is set, set the input variable in the kernel first
@@ -283,8 +293,7 @@ func (a *ColabAgent) run(ctx context.Context, sessionName string, start *proto.A
 		}
 
 		// Pass the output image path to the script if configured.
-		if a.config.OutputImage != "" {
-			remoteImagePath := "/content/" + filepath.Base(a.config.OutputImage)
+		if remoteImagePath != "" {
 			command += fmt.Sprintf(" --output '%s'", remoteImagePath)
 		}
 
@@ -295,9 +304,8 @@ func (a *ColabAgent) run(ctx context.Context, sessionName string, start *proto.A
 	}
 
 	// Download the output image from the Colab VM if configured.
-	if a.config.OutputImage != "" {
-		imageRemotePath := "/content/" + filepath.Base(a.config.OutputImage)
-		if _, err := a.runColab(ctx, "download", "-s", sessionName, imageRemotePath, a.config.OutputImage); err != nil {
+	if remoteImagePath != "" {
+		if _, err := a.runColab(ctx, "download", "-s", sessionName, remoteImagePath, a.config.OutputImage); err != nil {
 			return fmt.Errorf("failed to download output image: %w", err)
 		}
 	}
@@ -324,15 +332,16 @@ func (a *ColabAgent) run(ctx context.Context, sessionName string, start *proto.A
 }
 
 // stopSession stops a Colab session and removes it from the active sessions tracker.
-func (a *ColabAgent) stopSession(sessionName string) {
+func (a *ColabAgent) stopSession(sessionName string) error {
 	stopCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	if _, err := a.runColab(stopCtx, "stop", "-s", sessionName); err != nil {
-		log.Printf("Warning: failed to stop colab session %s: %v", sessionName, err)
+		return fmt.Errorf("failed to stop colab session %s: %w", sessionName, err)
 	}
 	a.mu.Lock()
 	delete(a.activeSessions, sessionName)
 	a.mu.Unlock()
+	return nil
 }
 
 // isSessionAlive checks whether a Colab session still exists by running
@@ -343,31 +352,13 @@ func (a *ColabAgent) isSessionAlive(ctx context.Context, sessionName string) boo
 	return err == nil
 }
 
-// Close stops all currently active Colab sessions. This handles the case where
-// Close() is called (e.g. via SIGINT) while one or more Connect() calls are
-// mid-execution. In ax serve mode, multiple concurrent Connect() calls may
-// each have their own session.
-func (a *ColabAgent) Close() error {
-	a.mu.Lock()
-	sessions := make([]string, 0, len(a.activeSessions))
-	for s := range a.activeSessions {
-		sessions = append(sessions, s)
-	}
-	a.mu.Unlock()
-
-	if len(sessions) == 0 {
-		return nil
-	}
-
-	var firstErr error
-	for _, session := range sessions {
-		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-		if _, err := a.runColab(ctx, "stop", "-s", session); err != nil && firstErr == nil {
-			firstErr = fmt.Errorf("failed to stop colab session %s: %w", session, err)
-		}
-		cancel()
-	}
-	return firstErr
+// newColabCmd builds an exec.Cmd for the colab CLI with the standard
+// environment plus any extras.
+func newColabCmd(ctx context.Context, extraEnv []string, args ...string) *exec.Cmd {
+	cmd := exec.CommandContext(ctx, "colab", args...)
+	cmd.Env = append(os.Environ(), "PYTHONWARNINGS=ignore")
+	cmd.Env = append(cmd.Env, extraEnv...)
+	return cmd
 }
 
 // runColab executes a colab CLI command and returns its stdout.
@@ -378,7 +369,7 @@ func (a *ColabAgent) runColab(ctx context.Context, args ...string) (string, erro
 	if len(args) == 0 {
 		return "", fmt.Errorf("runColab requires at least one argument (subcommand)")
 	}
-	cmd := exec.CommandContext(ctx, "colab", args...)
+	cmd := newColabCmd(ctx, nil, args...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -400,14 +391,13 @@ func (a *ColabAgent) runColab(ctx context.Context, args ...string) (string, erro
 // small portion would be visible. Routing to stderr bypasses the display layer
 // and ensures the full auth prompt is shown to the user.
 func (a *ColabAgent) runColabInteractive(ctx context.Context, args ...string) error {
-	cmd := exec.CommandContext(ctx, "colab", args...)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stderr // Use stderr to bypass ax CLI display layer (see comment above).
-	cmd.Stderr = os.Stderr
 	// Set a request timeout for the colab CLI. The default is 60s, which is too
 	// short for interactive commands like drivemount where the user needs time
 	// to authorize in the browser.
-	cmd.Env = append(os.Environ(), "REQUEST_TIMEOUT=600")
+	cmd := newColabCmd(ctx, []string{"REQUEST_TIMEOUT=600"}, args...)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stderr // Use stderr to bypass ax CLI display layer (see comment above).
+	cmd.Stderr = os.Stderr
 	return cmd.Run()
 }
 
@@ -415,7 +405,7 @@ func (a *ColabAgent) runColabInteractive(ctx context.Context, args ...string) er
 // completion. Output is discarded. Used for setup commands like setting
 // variables in the kernel before running a notebook.
 func (a *ColabAgent) runColabExecBatch(ctx context.Context, sessionName, command string) (string, error) {
-	cmd := exec.CommandContext(ctx, "colab", "exec", "-s", sessionName)
+	cmd := newColabCmd(ctx, nil, "exec", "-s", sessionName)
 	cmd.Stdin = strings.NewReader(command)
 	var stdoutBuf, stderrBuf bytes.Buffer
 	cmd.Stdout = &stdoutBuf
@@ -430,7 +420,7 @@ func (a *ColabAgent) runColabExecBatch(ctx context.Context, sessionName, command
 // line-by-line to the OutputHandler as the script runs. Stderr is buffered
 // and treated as an error after the process exits.
 func (a *ColabAgent) runColabExec(ctx context.Context, sessionName, command string, o agent.OutputHandler) error {
-	cmd := exec.CommandContext(ctx, "colab", "exec", "-s", sessionName)
+	cmd := newColabCmd(ctx, nil, "exec", "-s", sessionName)
 	cmd.Stdin = strings.NewReader(command)
 
 	stdout, err := cmd.StdoutPipe()
@@ -498,4 +488,24 @@ func lastUserText(messages []*proto.Message) string {
 		}
 	}
 	return ""
+}
+
+// Close stops all currently active Colab sessions. This handles the case where
+// Close() is called (e.g. via SIGINT) while one or more Connect() calls are
+// mid-execution. In ax serve mode, multiple concurrent Connect() calls may
+// each have their own session.
+func (a *ColabAgent) Close() error {
+	a.mu.Lock()
+	sessions := make([]string, 0, len(a.activeSessions))
+	for s := range a.activeSessions {
+		sessions = append(sessions, s)
+	}
+	a.mu.Unlock()
+	var firstErr error
+	for _, s := range sessions {
+		if err := a.stopSession(s); err != nil && firstErr == nil {
+			firstErr = err
+		}
+	}
+	return firstErr
 }
