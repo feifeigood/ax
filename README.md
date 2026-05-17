@@ -50,7 +50,7 @@ isolated actors, a distributed runtime with dynamically spawned isolated
 workers becomes a necessity. AX provides the foundational layer to fill these gaps.
 
 While compute-agnostic, AX is aiming to provide the best
-experience on [Kubernetes](./manifests/README.md).
+experience on Kubernetes.
 
 We expect every sophisticated agentic application will need the capabilities provided by AX.
 We are building this layer as a widely available foundation,
@@ -75,6 +75,13 @@ ax --help
 ```
 
 You should see the ax CLI usage information.
+
+### Kubernetes
+
+AX is natively supported on Agent Substrate on Kubernetes
+and it's the recommended deployment option for production
+use. For more details on setup and configuration, see the
+[deployment guide](./manifests/README.md).
 
 ## Quick Start
 
