@@ -20,12 +20,9 @@ import (
 	"context"
 	"fmt"
 	"maps"
-	"os"
 
 	"github.com/google/ax/internal/agent"
-	"github.com/google/ax/internal/config"
 	"github.com/google/ax/internal/controller/executor"
-	"github.com/google/ax/internal/experimental/testagent"
 	"github.com/google/ax/internal/gemini"
 	"github.com/google/ax/proto"
 	"github.com/google/uuid"
@@ -81,26 +78,7 @@ func New(ctx context.Context, cfg Config) (*Controller, error) {
 		return nil, fmt.Errorf("failed to create event log: %w", err)
 	}
 
-	// For testing only! Remove this once the project is stable.
-	// TODO(jbd): Remove this before the release.
-	if os.Getenv("AX_TEST_AGENTS") == "1" {
-		if err := registry.RegisterLocal(config.LocalAgentConfig{
-			ID: "docker-build",
-			Name: "Docker build",
-			Agent: testagent.DockerBuild(),
-			Description: "Allows building OCI or Docker images from code. Provided with code, it automatically figures out how to build an image and pushes it to the registry.",
-		}); err != nil {
-			return nil, err
-		}
-		if err := registry.RegisterLocal(config.LocalAgentConfig{
-			ID: "kubernetes-deploy",
-			Name: "Production Kubernetes deploy",
-			Agent: testagent.KubernetesDeploy(),
-			Description: "Deploys the provided context to the production regions to Kubernetes clusters.",
-		}); err != nil {
-			return nil, err
-		}
-	}
+
 
 	return &Controller{
 		registry:       registry,
