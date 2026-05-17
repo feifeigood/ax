@@ -29,14 +29,14 @@ import (
 	"github.com/google/ax/proto"
 )
 
-// ATEAgent manages execution in a SubstrATE actor.
-type ATEAgent struct {
+// SubstrateAgent manages execution in a SubstrATE actor.
+type SubstrateAgent struct {
 	ateClient *ate.Client
-	config    ATEAgentConfig
+	config    SubstrateAgentConfig
 }
 
-// ATEAgentConfig configures an ATE agent client.
-type ATEAgentConfig struct {
+// SubstrateAgentConfig configures an ATE agent client.
+type SubstrateAgentConfig struct {
 	ID        string
 	Namespace string
 	Template  string
@@ -46,8 +46,8 @@ type ATEAgentConfig struct {
 	Headers   auth.Headers
 }
 
-// NewATEAgent creates a new ATE agent client.
-func NewATEAgent(endpoint string, config ATEAgentConfig) (*ATEAgent, error) {
+// NewSubstrateAgent creates a new ATE agent client.
+func NewSubstrateAgent(endpoint string, config SubstrateAgentConfig) (*SubstrateAgent, error) {
 	if config.Port == 0 {
 		config.Port = 8494 // Default port
 	}
@@ -55,14 +55,14 @@ func NewATEAgent(endpoint string, config ATEAgentConfig) (*ATEAgent, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create ATE client: %w", err)
 	}
-	return &ATEAgent{
+	return &SubstrateAgent{
 		ateClient: client,
 		config:    config,
 	}, nil
 }
 
 // Connect handles processing of input content by creating an actor and delegating to RemoteAgent.
-func (a *ATEAgent) Connect(ctx context.Context, conversationID string, execID string, start *proto.AgentStart, e agent.Executor, o agent.OutputHandler) error {
+func (a *SubstrateAgent) Connect(ctx context.Context, conversationID string, execID string, start *proto.AgentStart, e agent.Executor, o agent.OutputHandler) error {
 	// 1. Create Actor
 	resp, err := a.ateClient.CreateActor(ctx, execID)
 	if err != nil {
@@ -120,7 +120,7 @@ func (a *ATEAgent) Connect(ctx context.Context, conversationID string, execID st
 }
 
 // Close gracefully shuts down the ATE agent connection.
-func (a *ATEAgent) Close() error {
+func (a *SubstrateAgent) Close() error {
 	if a.ateClient != nil {
 		return a.ateClient.Close()
 	}

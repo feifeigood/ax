@@ -37,8 +37,8 @@ type Config struct {
 // RegistryConfig allows registring agents.
 type RegistryConfig struct {
 	RemoteAgents []RemoteAgentConfig `yaml:"remote_agents,omitempty"`
-	ColabAgents  []ColabAgentConfig  `yaml:"colab_agents,omitempty"`
-	ATEAgents    []ATEAgentConfig    `yaml:"ate_agents,omitempty"`
+	ColabAgents     []ColabAgentConfig     `yaml:"colab_agents,omitempty"`
+	SubstrateAgents []SubstrateAgentConfig `yaml:"substrate_agents,omitempty"`
 }
 
 // ATEConfig configures the ATE integration.
@@ -111,8 +111,8 @@ type GeminiConfig struct {
 	Tools        []string      `json:"tools,omitempty" yaml:"tools,omitempty"`
 }
 
-// ATEAgentConfig allows registering a new agent with an ATE actor template.
-type ATEAgentConfig struct {
+// SubstrateAgentConfig allows registering a new agent with an ATE actor template.
+type SubstrateAgentConfig struct {
 	ID          string            `yaml:"id"`                 // Unique agent identifier
 	Name        string            `yaml:"name"`               // Human-readable name
 	Description string            `yaml:"description"`        // Description of agent capabilities

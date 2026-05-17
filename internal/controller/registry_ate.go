@@ -26,7 +26,7 @@ import (
 )
 
 // RegisterATE registers an ATE agent by creating an ATE agent client.
-func (r *Registry) RegisterATE(ctx context.Context, ateTarget string, cfg config.ATEAgentConfig) error {
+func (r *Registry) RegisterATE(ctx context.Context, ateTarget string, cfg config.SubstrateAgentConfig) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -39,7 +39,7 @@ func (r *Registry) RegisterATE(ctx context.Context, ateTarget string, cfg config
 	}
 
 	// Create ATE agent client
-	ateAgent, err := expagent.NewATEAgent(ateTarget, expagent.ATEAgentConfig{
+	substrateAgent, err := expagent.NewSubstrateAgent(ateTarget, expagent.SubstrateAgentConfig{
 		ID:        cfg.ID,
 		Namespace: cfg.Namespace,
 		Template:  cfg.Template,
@@ -52,7 +52,7 @@ func (r *Registry) RegisterATE(ctx context.Context, ateTarget string, cfg config
 		return fmt.Errorf("failed to create ATE agent: %w", err)
 	}
 
-	r.agents[cfg.ID] = ateAgent
+	r.agents[cfg.ID] = substrateAgent
 	r.agentInfo[cfg.ID] = &agent.AgentInfo{
 		ID:          cfg.ID,
 		Name:        cfg.Name,

@@ -24,6 +24,6 @@ import (
 )
 
 // RegisterATE returns an error stating that ATE support is not compiled in.
-func (r *Registry) RegisterATE(ctx context.Context, ateTarget string, cfg config.ATEAgentConfig) error {
+func (r *Registry) RegisterATE(ctx context.Context, ateTarget string, cfg config.SubstrateAgentConfig) error {
 	return fmt.Errorf("ATE support not compiled in; rebuild with -tags ate")
 }
