@@ -29,6 +29,7 @@ Built-in consistency and resumability features:
 ## Overview
 
 ```mermaid
+%%{init: {"flowchart": {"diagramPadding": 80}}}%%
 graph LR
     Client
     Router["Router"]
