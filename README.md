@@ -387,12 +387,14 @@ If you are implementing an AX-native remote agent, see `AgentService` in `proto/
 ## What AX is NOT?
 * A managed service. AX is self-hosted and not a managed service.
   We aim to make it easy for users to deploy and operate it on
-  their clusters.
+  their Kubernetes clusters.
 * An agentic framework. AX is agnostic of the framework used to build agents.
   We are working with other framework authors (e.g., [ADK](examples/adk_agent))
   to provide easy integration with them.
-* A specific harness like a coding agent. We allow bringing any
-  harness as an agent.
+* A specific harness like a specific coding agent, e.g. Antigravity.
+  AX provides the serving layer around harnesses and is agnostic of the
+  harness implementation. Soon, we will allow users to bring their own
+  harnesses.
 * A model specific controller. AX is agnostic of the models used.
 
 ## Acknowledgements
