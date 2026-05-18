@@ -397,6 +397,16 @@ If you are implementing an AX-native remote agent, see `AgentService` in `proto/
   harnesses.
 * A model specific controller. AX is agnostic of the models used.
 
+## Contributing
+
+Please refer to the [CONTRIBUTING.md](CONTRIBUTING.md) guide for instructions
+on how to contribute to this project.
+
+We are in the middle of a major refactor for AX, so we're holding off on
+accepting new contributions until the core stabilize.
+However, in the meantime, we encourage you to file bugs and
+send feature requests.
+
 ## Acknowledgements
 
 We thank Google DeepMind for their earlier work in distributed harnesses which
