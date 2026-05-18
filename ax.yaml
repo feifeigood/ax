@@ -30,12 +30,6 @@ planner:
     timeout: "60s"
     # skills_dir: "./examples/skills"
 
-  # The Antigravity planner uses an external Python sidecar. See README for instructions.
-  antigravity:
-    endpoint: "http://localhost:8085/plan"
-    model: "MODEL_PLACEHOLDER_M18"
-    skills_dir: "./examples/skills"
-
 # Remote agents configuration (optional)
 # List of remote or sandbox agents to register on startup.
 registry:
