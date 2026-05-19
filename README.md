@@ -244,7 +244,7 @@ eventlog:
 
 planner:
   gemini:
-    model: "gemini-3-flash-preview"
+    model: "gemini-3.5-flash"
     timeout: "60s"
     skills_dir: "./examples/skills"
 

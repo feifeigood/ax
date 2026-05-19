@@ -9,7 +9,7 @@ To enable skills with a custom directory, you can set the `skills_dir` in your `
 ```yaml
 planner:
   gemini:
-    model: "gemini-3-flash-preview"
+    model: "gemini-3.5-flash"
     timeout: "60s"
     skills_dir: "./examples/skills"
 ```

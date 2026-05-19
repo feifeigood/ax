@@ -22,7 +22,7 @@ eventlog:
 planner:
   type: "gemini"
   gemini:
-    model: "gemini-3-flash-preview"
+    model: "gemini-3.5-flash"
     timeout: "60s"
 
 registry:

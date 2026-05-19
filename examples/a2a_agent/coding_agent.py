@@ -440,7 +440,7 @@ async def serve(
 
     adk_agent = Agent(
         name="coding_agent",
-        model="gemini-3-flash-preview",
+        model="gemini-3.5-flash",
         instruction="""You are a Python coding assistant.
 
 When the user asks you to write Python code:

@@ -58,7 +58,7 @@ func (s *server) Connect(stream grpc.BidiStreamingServer[proto.AgentMessage, pro
 	for {
 		model := os.Getenv("AX_GEMINI_MODEL")
 		if model == "" {
-			model = "gemini-3-flash-preview"
+			model = "gemini-3.5-flash"
 		}
 		resp, err := s.genaiClient.Models.GenerateContent(stream.Context(), model, contents, &genai.GenerateContentConfig{
 			SystemInstruction: genai.Text("You are DockerAgent, an agent specialized in writing Dockerfiles. Use the docker-writer skill to fulfill requests. Keep responses concise.")[0],

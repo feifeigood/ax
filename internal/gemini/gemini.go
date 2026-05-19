@@ -45,7 +45,7 @@ func NewGeminiAgent() *GeminiAgent {
 func (a *GeminiAgent) config(start *proto.AgentStart) (*config.GeminiConfig, error) {
 	if len(start.AgentConfig) == 0 {
 		return &config.GeminiConfig{
-			Model:   "gemini-3-flash-preview",
+			Model:   "gemini-3.5-flash",
 			Timeout: 30 * time.Second,
 		}, nil
 	}

@@ -48,7 +48,7 @@ def get_weather(city: str) -> dict:
 
 root_agent = Agent(
     name="weather_agent",
-    model="gemini-3-flash-preview",
+    model="gemini-3.5-flash",
     description=(
         "Agent to answer questions about the weather in a city."
     ),

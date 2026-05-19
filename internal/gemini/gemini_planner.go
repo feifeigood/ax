@@ -79,7 +79,7 @@ func NewGeminiPlannerAgent(ctx context.Context, registry AgentRegistry, cfg Gemi
 	if cfg.GeminiConfig.Model == "" {
 		cfg.GeminiConfig.Model = os.Getenv("AX_GEMINI_MODEL")
 		if cfg.GeminiConfig.Model == "" {
-			cfg.GeminiConfig.Model = "gemini-3-flash-preview"
+			cfg.GeminiConfig.Model = "gemini-3.5-flash"
 		}
 	}
 

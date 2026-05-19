@@ -80,7 +80,7 @@ type GeminiPlannerConfig struct {
 
 func (c *GeminiPlannerConfig) setDefaults() {
 	if c.Model == "" {
-		c.Model = "gemini-3-flash-preview"
+		c.Model = "gemini-3.5-flash"
 	}
 	if c.Timeout == "" {
 		c.Timeout = "30s"
