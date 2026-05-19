@@ -17,7 +17,7 @@ kind: Namespace
 metadata:
   name: ax
 ---
-apiVersion: ate.gke.io/v1alpha1
+apiVersion: ate.dev/v1alpha1
 kind: WorkerPool
 metadata:
   name: ax-workerpool
@@ -26,7 +26,7 @@ spec:
   replicas: 5
   ateomImage: ko://github.com/ai-on-gke/SubstrATE/cmd/servers/ateom-gvisor
 ---
-apiVersion: ate.gke.io/v1alpha1
+apiVersion: ate.dev/v1alpha1
 kind: ActorTemplate
 metadata:
   name: ax-template
@@ -35,8 +35,13 @@ spec:
   workerPoolRef:
     name: ax-workerpool
     namespace: ax
-  runscVersion: "a45961a9bb9a3f2dfbb8a9740563315c977a10f7"
-  runscURL: "gs://${BUCKET_NAME}/binaries/runsc-a45961a9bb9a3f2dfbb8a9740563315c977a10f7"
+  runsc:
+    amd64:
+      url: "gs://gvisor/releases/nightly/2026-05-19/x86_64/runsc"
+      sha256Hash: "a397be1abc2420d26bce6c70e6e2ff96c73aaaab929756c56f5e2089ea842b63"
+    arm64:
+      url: "gs://gvisor/releases/nightly/2026-05-19/aarch64/runsc"
+      sha256Hash: "1ba2366ae2efceba166046f51a4104f9261c9cb72c6db8f5b3fe2dc57dea86b9"
   pauseImage: "gcr.io/gke-release/pause@sha256:bcbd57ba5653580ec647b16d8163cdd1112df3609129b01f912a8032e48265da"
   containers:
     - name: "ax"
@@ -202,13 +207,13 @@ spec:
       - name: axepp
         image: ko://github.com/google/ax/cmd/axepp
         args:
-          - "--grpc-server-cred-bundle=/run/servicedns.podcert.gke.io/credential-bundle.pem"          
+          - "--grpc-server-cred-bundle=/run/servicedns.podcert.ate.dev/credential-bundle.pem"          
         ports:
         - containerPort: 50051
           name: grpc
         volumeMounts:
         - name: "servicedns"
-          mountPath: "/run/servicedns.podcert.gke.io"
+          mountPath: "/run/servicedns.podcert.ate.dev"
       volumes:
       - name: envoy-config
         configMap:
@@ -217,6 +222,6 @@ spec:
         projected:
           sources:
           - podCertificate:
-              signerName: servicedns.podcert.gke.io/identity
+              signerName: servicedns.podcert.ate.dev/identity
               keyType: ECDSAP256
               credentialBundlePath: credential-bundle.pem
