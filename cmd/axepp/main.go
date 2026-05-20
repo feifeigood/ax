@@ -30,7 +30,7 @@ import (
 	"net"
 	"os"
 
-	"github.com/ai-on-gke/SubstrATE/proto/ateapipb"
+	"github.com/agent-substrate/substrate/proto/ateapipb"
 	corepb "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	authv3 "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 	"github.com/google/ax/proto"

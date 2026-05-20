@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ai-on-gke/SubstrATE/proto/ateapipb"
+	"github.com/agent-substrate/substrate/proto/ateapipb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )

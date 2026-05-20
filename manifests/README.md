@@ -4,7 +4,7 @@ This directory contains Kubernetes manifests and configurations to deploy
 and verify the AX on Kubernetes using Agent Substrate.
 
 The target Kubernetes cluster is assumed to have
-[Agent Substrate](https://github.com/ai-on-gke/SubstrATE) installed.
+[Agent Substrate](https://github.com/agent-substrate/substrate) installed.
 
 ---
 

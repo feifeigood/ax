@@ -4,15 +4,12 @@ go 1.26.1
 
 require (
 	github.com/a2aproject/a2a-go/v2 v2.2.0
-	github.com/ai-on-gke/SubstrATE v0.0.0-00010101000000-000000000000
+	github.com/agent-substrate/substrate v0.0.0
 	github.com/charmbracelet/huh v0.8.0
 	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834
 	github.com/envoyproxy/go-control-plane/envoy v1.37.0
 	github.com/google/uuid v1.6.0
-	github.com/hashicorp/go-reap v0.0.0-20260220095743-4e27870b4f51
 	github.com/spf13/cobra v1.10.2
-	github.com/vishvananda/netlink v1.3.1
-	github.com/vishvananda/netns v0.0.5
 	golang.org/x/sync v0.20.0
 	google.golang.org/genai v1.43.0
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260406210006-6f92a3bedf2d
@@ -81,5 +78,3 @@ require (
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
 )
-
-replace github.com/ai-on-gke/SubstrATE => ../SubstrATE
