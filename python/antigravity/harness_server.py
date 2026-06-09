@@ -15,7 +15,7 @@
 # NOTE ON ARCHITECTURE:
 # This is a generic, reusable gRPC server that does not define tools or personas. 
 # Instead, it dynamically imports any agent configuration file (defaulting to examples/antigravity_agent/agent.py) 
-# passed via the --agent_file CLI argument, then hosts it over the AX AgentService protocol.
+# passed via the --agent_file CLI argument, then hosts it over the AX HarnessService protocol.
 
 import argparse
 
@@ -93,33 +93,48 @@ def hydrate_ax_history_to_steps(historical_messages) -> list[Step]:
         steps.append(step)
     return steps
 
-class AntigravityAgentServiceServicer(ax_pb2_grpc.AgentServiceServicer):
-    """Implements the standard ax.AgentService protocol over gRPC."""
+class AntigravityHarnessServiceServicer(ax_pb2_grpc.HarnessServiceServicer):
+    """Implements the ax.HarnessService protocol over gRPC."""
 
-    async def Connect(self, request: ax_pb2.AgentRequest, context):
-        print(f"[gRPC] Connect turn requested. conv_id={request.conversation_id}, exec_id={request.exec_id}")
+    async def Connect(self, request_iterator, context):
+        # Each HarnessRequest{start} drives one stateless turn; the stream stays
+        # open across turns until the client half-closes.
+        async for request in request_iterator:
+            if request.WhichOneof("type") != "start":
+                continue  # cancel frames not handled yet
+            async for response in self._run_turn(request):
+                yield response
+
+    async def _run_turn(self, request):
+        print(f"[gRPC] Connect turn requested. conv_id={request.conversation_id}")
         
         # 1. Retrieve and check messages
         ax_messages = request.start.messages
         if not ax_messages:
-            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
-            context.set_details("No messages found in start payload")
+            yield ax_pb2.HarnessResponse(
+                conversation_id=request.conversation_id,
+                end=ax_pb2.HarnessEnd(state=ax_pb2.STATE_FAILED, error_message="No messages found in start payload")
+            )
             return
             
         historical_messages = ax_messages[:-1]
         latest_message = ax_messages[-1]
         
         if latest_message.content.WhichOneof('type') != 'text':
-            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
-            context.set_details("Latest message must contain text content")
+            yield ax_pb2.HarnessResponse(
+                conversation_id=request.conversation_id,
+                end=ax_pb2.HarnessEnd(state=ax_pb2.STATE_FAILED, error_message="Latest message must contain text content")
+            )
             return
         latest_query_text = latest_message.content.text.text
         
         # 2. Initialize the Antigravity Agent session
         global loaded_config
         if not loaded_config:
-            context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details("Agent config is not loaded on the server")
+            yield ax_pb2.HarnessResponse(
+                conversation_id=request.conversation_id,
+                end=ax_pb2.HarnessEnd(state=ax_pb2.STATE_FAILED, error_message="Agent config is not loaded on the server")
+            )
             return
             
         try:
@@ -141,10 +156,9 @@ class AntigravityAgentServiceServicer(ax_pb2_grpc.AgentServiceServicer):
                             role="assistant",
                             content=content_pb2.Content(text=content_pb2.TextContent(text=chunk.text))
                         )
-                        yield ax_pb2.AgentResponse(
+                        yield ax_pb2.HarnessResponse(
                             conversation_id=request.conversation_id,
-                            exec_id=request.exec_id,
-                            outputs=ax_pb2.AgentOutputs(messages=[msg])
+                            outputs=ax_pb2.HarnessOutputs(messages=[msg])
                         )
                     elif isinstance(chunk, Thought):
                         summary = [
@@ -154,10 +168,9 @@ class AntigravityAgentServiceServicer(ax_pb2_grpc.AgentServiceServicer):
                             role="model",
                             content=content_pb2.Content(thought=content_pb2.ThoughtContent(summary=summary))
                         )
-                        yield ax_pb2.AgentResponse(
+                        yield ax_pb2.HarnessResponse(
                             conversation_id=request.conversation_id,
-                            exec_id=request.exec_id,
-                            outputs=ax_pb2.AgentOutputs(messages=[msg])
+                            outputs=ax_pb2.HarnessOutputs(messages=[msg])
                         )
                     elif isinstance(chunk, ToolCall):
                         struct_args = Struct()
@@ -174,33 +187,29 @@ class AntigravityAgentServiceServicer(ax_pb2_grpc.AgentServiceServicer):
                                 function_call=func_call
                             ))
                         )
-                        yield ax_pb2.AgentResponse(
+                        yield ax_pb2.HarnessResponse(
                             conversation_id=request.conversation_id,
-                            exec_id=request.exec_id,
-                            outputs=ax_pb2.AgentOutputs(messages=[msg])
+                            outputs=ax_pb2.HarnessOutputs(messages=[msg])
                         )
                         
             # Yield completion end frame
-            yield ax_pb2.AgentResponse(
+            yield ax_pb2.HarnessResponse(
                 conversation_id=request.conversation_id,
-                exec_id=request.exec_id,
-                end=ax_pb2.AgentEnd()
+                end=ax_pb2.HarnessEnd(state=ax_pb2.STATE_COMPLETED)
             )
             print("[gRPC] Turn completed successfully.")
             
         except Exception as e:
             logging.exception("Error inside Connect servicer execution")
-            context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(f"Agent execution terminated due to error. ({str(e)})")
+            yield ax_pb2.HarnessResponse(
+                conversation_id=request.conversation_id,
+                end=ax_pb2.HarnessEnd(state=ax_pb2.STATE_FAILED, error_message=f"Agent execution terminated due to error. ({str(e)})")
+            )
             return
-
-    async def HealthCheck(self, request: ax_pb2.HealthCheckRequest, context):
-        """Simple health-probe responder."""
-        return ax_pb2.HealthCheckResponse(healthy=True, message="Antigravity gRPC harness active")
 
 async def serve(host: str, port: int):
     server = grpc.aio.server()
-    ax_pb2_grpc.add_AgentServiceServicer_to_server(AntigravityAgentServiceServicer(), server)
+    ax_pb2_grpc.add_HarnessServiceServicer_to_server(AntigravityHarnessServiceServicer(), server)
     
     listen_addr = f"{host}:{port}"
     server.add_insecure_port(listen_addr)
