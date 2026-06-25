@@ -323,6 +323,23 @@ def test_grpc_connect_programmatic_credentials(monkeypatch):
     asyncio.run(_run())
 
 
+def test_enhance_config_from_env(monkeypatch, tmp_path):
+    from python.antigravity.harness_server import enhance_config_from_env
+    from google.antigravity import LocalAgentConfig
+    import os
+    
+    # Create a mock skills dir
+    skills_dir = tmp_path / "skills"
+    skills_dir.mkdir()
+    
+    cfg = LocalAgentConfig(system_instructions="test")
+    
+    # Test: Using SKILLS_DIR env var
+    monkeypatch.setenv("SKILLS_DIR", str(skills_dir))
+    enhance_config_from_env(cfg)
+    assert str(skills_dir) in cfg.skills_paths
+
+
 def test_grpc_connect_buffering(mock_config, monkeypatch):
     async def _run():
         server = grpc.aio.server()
