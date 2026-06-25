@@ -10,6 +10,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/spf13/cobra v1.10.2
+	golang.org/x/oauth2 v0.36.0
 	golang.org/x/sync v0.20.0
 	google.golang.org/genai v1.43.0
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260406210006-6f92a3bedf2d
