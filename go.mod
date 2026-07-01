@@ -3,6 +3,8 @@ module github.com/google/ax
 go 1.26.3
 
 require (
+	charm.land/bubbles/v2 v2.0.0
+	charm.land/bubbletea/v2 v2.0.2
 	charm.land/huh/v2 v2.0.3
 	charm.land/lipgloss/v2 v2.0.3
 	cloud.google.com/go/compute/metadata v0.9.0
@@ -23,8 +25,6 @@ require (
 )
 
 require (
-	charm.land/bubbles/v2 v2.0.0 // indirect
-	charm.land/bubbletea/v2 v2.0.2 // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect
 	github.com/catppuccin/go v0.3.0 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
