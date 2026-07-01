@@ -27,6 +27,10 @@ import grpc
 from grpc_health.v1 import health, health_pb2, health_pb2_grpc
 from google.protobuf.struct_pb2 import Struct
 
+
+
+
+
 from python.proto import ax_pb2
 from python.proto import ax_pb2_grpc
 from python.proto import content_pb2
@@ -188,6 +192,7 @@ class AntigravityHarnessServiceServicer(ax_pb2_grpc.HarnessServiceServicer):
         async for request in request_iterator:
             if request.WhichOneof("type") != "start":
                 continue  # cancel frames not handled yet
+            
             async for response in self._run_turn(request):
                 yield response
 
