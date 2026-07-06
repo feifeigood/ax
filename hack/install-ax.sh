@@ -73,6 +73,7 @@ function usage() {
   echo "Options:"
   echo "  --deploy-ax-server                    Build images and deploy AX server and components"
   echo "  --delete-ax-server                    Delete AX server and components, preserving the event-log database"
+  echo "  --deploy-postgres                     With --deploy-ax-server: also deploy a bundled Postgres for testing (default: connect to an existing Postgres via AX_EVENTLOG_DSN)"
   echo "  -h, --help                            Show this help message"
 }
 
@@ -196,6 +197,11 @@ deploy_ax_server() {
     echo "Error: AX_SNAPSHOTS_BUCKET environment variable must be set" >&2
     exit 1
   fi
+  # The default (external Postgres) path needs a DSN; fail fast before building.
+  if [[ "${DEPLOY_POSTGRES}" != "true" && -z "${AX_EVENTLOG_DSN:-}" ]]; then
+    echo "Error: AX_EVENTLOG_DSN must be set to your Postgres DSN, or pass --deploy-postgres to deploy a bundled test Postgres." >&2
+    exit 1
+  fi
 
   echo "Using GCS Bucket: ${AX_SNAPSHOTS_BUCKET}"
 
@@ -204,24 +210,36 @@ deploy_ax_server() {
   ax_image=$(build_ax_image)
   ateom_image=$(build_ateom_image)
 
-  # Resolve a stable Postgres password for the event log.
-  local pg_password="${POSTGRES_PASSWORD:-}"
-  local existing_pw
-  existing_pw="$(run_kubectl -n ax get secret ax-eventlog-postgres -o go-template='{{.data.password | base64decode}}' 2>/dev/null || true)"
-  if [[ -n "${existing_pw}" ]]; then
-    pg_password="${existing_pw}"
-  elif [[ -z "${pg_password}" ]]; then
-    pg_password="$(openssl rand -hex 16)"
+  # Resolve the event-log Postgres DSN. By default ax-server connects to an
+  # existing Postgres via AX_EVENTLOG_DSN; --deploy-postgres creates a bundled
+  # Postgres in-cluster (for testing) and derives the DSN from it.
+  local pg_dsn pg_password=""
+  if [[ "${DEPLOY_POSTGRES}" == "true" ]]; then
+    # Reuse the existing bundled-Postgres password if present, else POSTGRES_PASSWORD,
+    # else generate one.
+    local existing_pw
+    existing_pw="$(run_kubectl -n ax get secret ax-eventlog-postgres -o go-template='{{.data.password | base64decode}}' 2>/dev/null || true)"
+    if [[ -n "${existing_pw}" ]]; then
+      pg_password="${existing_pw}"
+    else
+      pg_password="${POSTGRES_PASSWORD:-$(openssl rand -hex 16)}"
+    fi
+    pg_dsn="postgres://axuser:${pg_password}@ax-eventlog-postgres.ax.svc:5432/axeventlog?sslmode=disable"
+  else
+    pg_dsn="${AX_EVENTLOG_DSN}"
+    echo "Using existing Postgres via AX_EVENTLOG_DSN." >&2
   fi
 
-  # Render the manifest and apply it.
-  if ! sed -e "s|\${GEMINI_API_KEY}|${GEMINI_API_KEY}|g" \
-      -e "s|\${AX_SNAPSHOTS_BUCKET}|${AX_SNAPSHOTS_BUCKET}|g" \
-      -e "s|\${AX_IMAGE}|${ax_image}|g" \
-      -e "s|\${ATEOM_IMAGE}|${ateom_image}|g" \
-      -e "s|\${POSTGRES_PASSWORD}|${pg_password}|g" \
-      manifests/ax-deployment.yaml \
-      | run_kubectl apply -f -; then
+  # Common substitutions applied to every rendered manifest.
+  local render_sed=(
+    -e "s|\${GEMINI_API_KEY}|${GEMINI_API_KEY}|g"
+    -e "s|\${AX_SNAPSHOTS_BUCKET}|${AX_SNAPSHOTS_BUCKET}|g"
+    -e "s|\${AX_IMAGE}|${ax_image}|g"
+    -e "s|\${ATEOM_IMAGE}|${ateom_image}|g"
+  )
+
+  # Render and apply the core manifest (namespace, harnesses, ax-server, ConfigMap).
+  if ! sed "${render_sed[@]}" manifests/ax-deployment.yaml | run_kubectl apply -f -; then
     echo >&2
     echo "Error: cluster rejected the manifest. An \"unknown field\" error usually means the" >&2
     echo "cluster's substrate is incompatible with AX's go.mod pin — see" >&2
@@ -229,11 +247,24 @@ deploy_ax_server() {
     exit 1
   fi
 
-  # Wait for the event-log Postgres to be ready before ax-server relies on it.
-  log_step "wait for statefulset/ax-eventlog-postgres to be ready"
-  wait_with_spinner "waiting for postgres (timeout ${AX_WAIT_TIMEOUT:-5m})" \
-    run_kubectl -n ax rollout status statefulset/ax-eventlog-postgres \
-    --timeout="${AX_WAIT_TIMEOUT:-5m}"
+  # Create/update the event-log Secret with the DSN (and, for the bundled Postgres,
+  # its password). ax-server reads AX_EVENTLOG_DSN from this Secret's dsn key.
+  local secret_args=(--from-literal=dsn="${pg_dsn}")
+  if [[ "${DEPLOY_POSTGRES}" == "true" ]]; then
+    secret_args+=(--from-literal=password="${pg_password}")
+  fi
+  run_kubectl -n ax create secret generic ax-eventlog-postgres "${secret_args[@]}" \
+    --dry-run=client -o yaml | run_kubectl apply -f -
+
+  # With --deploy-postgres, create the bundled Postgres and wait for it to be
+  # ready before ax-server relies on it.
+  if [[ "${DEPLOY_POSTGRES}" == "true" ]]; then
+    run_kubectl apply -f manifests/ax-postgres.yaml
+    log_step "wait for statefulset/ax-eventlog-postgres to be ready"
+    wait_with_spinner "waiting for postgres (timeout ${AX_WAIT_TIMEOUT:-5m})" \
+      run_kubectl -n ax rollout status statefulset/ax-eventlog-postgres \
+      --timeout="${AX_WAIT_TIMEOUT:-5m}"
+  fi
 
   # Wait for the antigravity ActorTemplate's golden snapshot to be ready.
   log_step "wait for actortemplate/ax-harness-template to be Ready"
@@ -265,12 +296,20 @@ if [ "$#" -eq 0 ]; then
   exit 1
 fi
 
+# Event-log Postgres: by default ax-server connects to an existing Postgres via
+# the AX_EVENTLOG_DSN env var. --deploy-postgres additionally creates a bundled
+# Postgres in-cluster (for testing on Substrate).
+DEPLOY_POSTGRES=false
+
 # If -h or --help appears anywhere in the command line, print the usage and exit.
 for arg in "$@"; do
   case "$arg" in
     -h|--help)
       usage
       exit 0
+      ;;
+    --deploy-postgres)
+      DEPLOY_POSTGRES=true
       ;;
   esac
 done
@@ -279,6 +318,7 @@ while [[ "$#" -gt 0 ]]; do
   case $1 in
     --deploy-ax-server) deploy_ax_server ;;
     --delete-ax-server) delete_ax_server ;;
+    --deploy-postgres) ;; # resolved in the pre-scan above
     *)
       echo "Error: unknown option: $1" >&2
       echo ""
