@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package harness
+package antigravityinteractions
 
 import (
 	"context"
@@ -24,6 +24,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/google/ax/internal/harness/harnesstest"
 	"golang.org/x/oauth2"
 )
 
@@ -89,14 +90,14 @@ func (f *fakeInteractions) recorded() []interactionRequest {
 func newTestHarness(t *testing.T, fake *fakeInteractions, stateDir string) *AntigravityInteractionsHarness {
 	t.Helper()
 	t.Setenv(envCloudProject, "test-project")
-	h, err := NewAntigravityInteractionsHarness(AntigravityInteractionsConfig{
+	h, err := New(AntigravityInteractionsConfig{
 		Agent:       "test-agent",
 		StateDir:    stateDir,
 		HTTPClient:  &http.Client{Transport: fake},
 		TokenSource: oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "fake-token"}),
 	})
 	if err != nil {
-		t.Fatalf("NewAntigravityInteractionsHarness: %v", err)
+		t.Fatalf("New: %v", err)
 	}
 	return h
 }
@@ -110,10 +111,10 @@ func runOneTurn(t *testing.T, h *AntigravityInteractionsHarness, conversationID,
 	if err != nil {
 		t.Fatalf("Start(%q): %v", conversationID, err)
 	}
-	if err := exec.Queue(ctx, userText(prompt)); err != nil {
+	if err := exec.Queue(ctx, harnesstest.UserText(prompt)); err != nil {
 		t.Fatalf("Queue: %v", err)
 	}
-	if err := exec.Run(ctx, &mockHandler{}); err != nil {
+	if err := exec.Run(ctx, &harnesstest.MockHandler{}); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	if err := exec.Close(ctx); err != nil {
@@ -155,13 +156,13 @@ func TestResumeAcrossRestart(t *testing.T) {
 // StateDir: resume-cursor persistence is required.
 func TestNewRequiresStateDir(t *testing.T) {
 	t.Setenv(envCloudProject, "test-project")
-	_, err := NewAntigravityInteractionsHarness(AntigravityInteractionsConfig{
+	_, err := New(AntigravityInteractionsConfig{
 		Agent:       "test-agent",
 		StateDir:    "", // missing
 		TokenSource: oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "fake-token"}),
 	})
 	if err == nil {
-		t.Fatal("NewAntigravityInteractionsHarness with empty StateDir: got nil error, want error")
+		t.Fatal("New with empty StateDir: got nil error, want error")
 	}
 }
 
