@@ -25,10 +25,12 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"syscall"
 	"time"
 
+	"github.com/google/ax/internal/harness/antigravityinteractions"
 	"github.com/google/ax/internal/pythonsidecar"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
@@ -114,6 +116,34 @@ func runHarness(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("antigravity harness server exited: %w", err)
 	}
 	return nil
+}
+
+func runAntigravityInteractionsHarness(ctx context.Context, systemInstructions string) error {
+	if err := setHarnessWorkDir(); err != nil {
+		return err
+	}
+	stateDir, err := harnessStateDir()
+	if err != nil {
+		return err
+	}
+	cfg := antigravityinteractions.AntigravityInteractionsConfig{
+		SystemInstruction: systemInstructions,
+		StateDir:          stateDir,
+	}
+	return antigravityinteractions.Serve(ctx, cfg, harnessHost, harnessPort, harnessReadyzPort)
+}
+
+// harnessStateDir returns the directory for persisting resume cursors: a
+// dedicated "~/.ax/cursors" under the user's home directory. It lives OUTSIDE the
+// agent's working directory on purpose -- the working directory is the agent's
+// operating surface (it reads and edits files there, including hidden ones), so
+// AX's internal state is kept separate to avoid the agent seeing or clobbering it.
+func harnessStateDir() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("resolving home directory for resume-cursor state: %w", err)
+	}
+	return filepath.Join(home, ".ax", "cursors"), nil
 }
 
 // serveReadyz serves the HTTP /readyz endpoint on readyzPort that substrate's
