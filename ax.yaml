@@ -27,6 +27,7 @@ eventlog:
 harnesses:
   antigravity:
     default: true
+  antigravity-interactions: {}
 
 telemetry:
   otlp:

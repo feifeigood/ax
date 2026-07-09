@@ -49,6 +49,34 @@ func TestNewControllerFromConfig_BuiltinSubstrate(t *testing.T) {
 	c.Close()
 }
 
+func TestNewControllerFromConfig_InteractionsSubstrate(t *testing.T) {
+	t.Setenv("AX_SUBSTRATE", "1")
+
+	cfg := &config.Config{
+		EventLog: config.EventLogConfig{
+			SQLiteConfig: config.SQLiteConfig{
+				Filename: filepath.Join(t.TempDir(), "log.sqlite"),
+			},
+		},
+		Harnesses: config.HarnessesConfig{
+			Antigravity: config.AntigravityHarnessConfig{Default: true},
+		},
+	}
+
+	c, err := NewControllerFromConfig(context.Background(), cfg)
+	if err != nil {
+		t.Fatalf("NewControllerFromConfig: %v", err)
+	}
+	if c == nil {
+		t.Fatal("expected non-nil controller")
+	}
+	defer c.Close()
+
+	if _, err := c.Registry().Harness(config.AntigravityInteractionsHarnessID); err != nil {
+		t.Errorf("interactions harness not registered in substrate mode: %v", err)
+	}
+}
+
 func TestNewControllerFromConfig_CustomHarnessRequiresSubstrateMode(t *testing.T) {
 	t.Setenv("AX_SUBSTRATE", "")
 
