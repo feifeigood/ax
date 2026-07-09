@@ -21,7 +21,9 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
 	"os/exec"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -33,8 +35,6 @@ type Config struct {
 	Module string
 	// Args contains any additional arguments to pass to the module. (Optional)
 	Args []string
-	// Stdin redirects the sidecar's standard input. (Optional)
-	Stdin io.Reader
 	// Stdout redirects the sidecar's standard output. (Optional)
 	Stdout io.Writer
 	// Stderr redirects the sidecar's standard error. (Optional)
@@ -44,10 +44,7 @@ type Config struct {
 	ReadyFunc func(ctx context.Context) error
 }
 
-// TODO: AntigravityHarness should use pythonsidecar.
 // TODO: Use /var/ax_agy_harness_service for communication instead of TCP.
-// TODO: Use go:embed to embed python/ directory into the ax binary.
-// TODO: Add a Setup method to extract embedded assets, pip install, etc.
 
 // Sidecar manages the lifecycle of the underlying Python process.
 type Sidecar struct {
@@ -71,7 +68,7 @@ func New(cfg Config) *Sidecar {
 // Start launches the Python process and monitors its lifecycle in the background.
 // If ReadyFunc is configured, Start blocks until the server is ready or the context expires.
 // If the process fails to start or become ready, an error is returned immediately.
-func (s *Sidecar) Start(ctx context.Context) error {
+func (s *Sidecar) Start(ctx context.Context, pythonPath string) error {
 	s.mu.Lock()
 	if s.running {
 		s.mu.Unlock()
@@ -83,15 +80,32 @@ func (s *Sidecar) Start(ctx context.Context) error {
 		return fmt.Errorf("Module cannot be empty")
 	}
 
-	// Prepare arguments: python3 -u -m module [args...]
+	// Prepare arguments: python -u -m module [args...]
 	// -u forces unbuffered stdout/stderr so logs stream to Go instantly
 	fullArgs := append([]string{"-u", "-m", s.cfg.Module}, s.cfg.Args...)
 
 	cmd := exec.CommandContext(ctx, "python3", fullArgs...)
-
-	if s.cfg.Stdin != nil {
-		cmd.Stdin = s.cfg.Stdin
+	if pythonPath != "" {
+		env := append([]string(nil), os.Environ()...)
+		var found bool
+		for i, kv := range env {
+			if strings.HasPrefix(kv, "PYTHONPATH=") {
+				existing := strings.TrimPrefix(kv, "PYTHONPATH=")
+				if existing != "" {
+					env[i] = "PYTHONPATH=" + pythonPath + string(os.PathListSeparator) + existing
+				} else {
+					env[i] = "PYTHONPATH=" + pythonPath
+				}
+				found = true
+				break
+			}
+		}
+		if !found {
+			env = append(env, "PYTHONPATH="+pythonPath)
+		}
+		cmd.Env = env
 	}
+
 	if s.cfg.Stdout != nil {
 		cmd.Stdout = s.cfg.Stdout
 	}

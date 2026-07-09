@@ -87,14 +87,13 @@ func runHarness(cmd *cobra.Command, args []string) error {
 			"--host", harnessHost,
 			"--port", strconv.Itoa(harnessPort),
 		},
-		Stdin:     os.Stdin,
 		Stdout:    os.Stdout,
 		Stderr:    os.Stderr,
 		ReadyFunc: pythonsidecar.TCPReady(net.JoinHostPort("127.0.0.1", strconv.Itoa(harnessPort))),
 	}
 
 	sidecar := pythonsidecar.New(cfg)
-	if err := sidecar.Start(cmd.Context()); err != nil {
+	if err := sidecar.Start(cmd.Context(), ""); err != nil {
 		return fmt.Errorf("failed to start antigravity harness server: %w", err)
 	}
 	log.Printf("forked antigravity harness server (pid %d) on %s:%d", sidecar.Pid(), harnessHost, harnessPort)

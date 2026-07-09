@@ -32,6 +32,7 @@ import (
 	"github.com/google/ax/internal/harness"
 	"github.com/google/ax/internal/pythonsidecar"
 	"github.com/google/ax/proto"
+	"github.com/google/ax/python"
 	"github.com/google/uuid"
 )
 
@@ -66,13 +67,16 @@ func New(ctx context.Context, address string, autoStart bool) (*AntigravityHarne
 			"--host", host,
 			"--port", port,
 		},
-		Stdin:     os.Stdin,
-		Stdout:    os.Stdout,
-		Stderr:    os.Stderr,
 		ReadyFunc: pythonsidecar.TCPReady(address),
 	}
 	sidecar := pythonsidecar.New(cfg)
-	if err := sidecar.Start(ctx); err != nil {
+	path, err := pythonsidecar.Setup(ctx, pythonsidecar.SetupOptions{
+		FS: python.FS,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to setup antigravity harness server assets: %w", err)
+	}
+	if err := sidecar.Start(ctx, path); err != nil {
 		return nil, fmt.Errorf("failed to start antigravity harness server: %w", err)
 	}
 	h.sidecar = sidecar
