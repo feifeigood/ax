@@ -133,3 +133,4 @@ data:
     harnesses:
       antigravity:
         default: true
+      antigravity-interactions: {}
