@@ -44,7 +44,6 @@ type MockControlServer struct {
 	mu           sync.Mutex
 	createCalls  []string
 	resumeCalls  []string
-	pauseCalls   []string
 	suspendCalls []string
 
 	CreateErr      error  // returned from CreateActor when non-nil
@@ -83,13 +82,6 @@ func (f *MockControlServer) SuspendActor(_ context.Context, req *ateapipb.Suspen
 	return &ateapipb.SuspendActorResponse{}, nil
 }
 
-func (f *MockControlServer) PauseActor(_ context.Context, req *ateapipb.PauseActorRequest) (*ateapipb.PauseActorResponse, error) {
-	f.mu.Lock()
-	f.pauseCalls = append(f.pauseCalls, req.GetActorRef().GetName())
-	f.mu.Unlock()
-	return &ateapipb.PauseActorResponse{}, nil
-}
-
 // Calls returns copies of the recorded call lists.
 func (f *MockControlServer) Calls() (create, resume, suspend []string) {
 	f.mu.Lock()
@@ -97,13 +89,6 @@ func (f *MockControlServer) Calls() (create, resume, suspend []string) {
 	return append([]string(nil), f.createCalls...),
 		append([]string(nil), f.resumeCalls...),
 		append([]string(nil), f.suspendCalls...)
-}
-
-// PauseCalls returns a copy of the recorded PauseActor calls.
-func (f *MockControlServer) PauseCalls() []string {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	return append([]string(nil), f.pauseCalls...)
 }
 
 // mockHarnessServer is an in-process proto.HarnessServiceServer standing in for
