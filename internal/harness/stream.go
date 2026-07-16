@@ -22,11 +22,19 @@ import (
 	"github.com/google/ax/proto"
 )
 
+// terminalMetadataHandler is an internal, optional completion capability. It
+// keeps Handler unchanged while allowing the controller to retain opaque
+// metadata from harnesses that provide it.
+type terminalMetadataHandler interface {
+	OnCompleteWithMetadata(ctx context.Context, execID string, metadata []byte) error
+}
+
 // DrainStream reads from the harness gRPC stream until io.EOF, dispatching messages
 // to the handler, and returns the final execution status.
 func DrainStream(ctx context.Context, stream proto.HarnessService_ConnectClient, execID string, handler Handler) error {
 	var endState proto.State
 	var endErr error
+	var harnessMetadata []byte
 	hasEnd := false
 
 	for {
@@ -48,6 +56,7 @@ func DrainStream(ctx context.Context, stream proto.HarnessService_ConnectClient,
 		case *proto.HarnessResponse_End:
 			hasEnd = true
 			endState = payload.End.GetState()
+			harnessMetadata = payload.End.GetHarnessMetadata()
 			if endState == proto.State_STATE_FAILED {
 				if errDetail := payload.End.GetError(); errDetail != nil {
 					endErr = fmt.Errorf("harness failed: [%d] %s", errDetail.GetCode(), errDetail.GetDescription())
@@ -63,6 +72,11 @@ func DrainStream(ctx context.Context, stream proto.HarnessService_ConnectClient,
 	}
 	if endState == proto.State_STATE_FAILED {
 		return endErr
+	}
+	if len(harnessMetadata) > 0 {
+		if metadataHandler, ok := handler.(terminalMetadataHandler); ok {
+			return metadataHandler.OnCompleteWithMetadata(ctx, execID, harnessMetadata)
+		}
 	}
 	return handler.OnComplete(ctx, execID)
 }

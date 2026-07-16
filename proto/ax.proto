@@ -41,6 +41,8 @@ message ConversationEvent {
   google.protobuf.Struct harness_config = 5;
   repeated Message messages = 6;
   State state = 7;
+  // Opaque metadata produced by the harness for this terminal event.
+  bytes harness_metadata = 8;
 }
 
 message HarnessStart {
@@ -79,6 +81,8 @@ message HarnessEnd {
   State state = 1;
   // Optional error details.
   Error error = 2;
+  // Opaque metadata associated with this completed turn.
+  bytes harness_metadata = 3;
 }
 
 message HarnessResponse {
@@ -128,6 +132,8 @@ message ExecRequest {
 message ExecResponse {
   repeated Message outputs = 1; // Output content
   int32 seq = 2;                // Seq of the outputs
+  // Opaque metadata associated with the terminal event at seq.
+  bytes harness_metadata = 3;
 }
 
 service ExecutionService {
