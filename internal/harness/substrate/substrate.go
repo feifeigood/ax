@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
 	"sync"
 	"time"
 
@@ -47,16 +48,42 @@ var _ harness.Execution = (*substrateExecution)(nil)
 // created/resumed actor's harness to become reachable and ready.
 const healthCheckTimeout = 60 * time.Second
 
+const defaultWarmIdleTimeout = 30 * time.Second
+
+type idleMode uint8
+
+const (
+	idleModeImmediateSuspend idleMode = iota
+	idleModeWarmThenSuspend
+)
+
+type warmActorState struct {
+	generation uint64
+	workerAddr string
+	inTurn     bool
+	timer      *time.Timer
+	suspending chan struct{}
+}
+
 // SubstrateHarness manages execution in a SubstrATE sandboxed actor over gRPC HarnessService.
 type SubstrateHarness struct {
 	harnessID string
 	ateClient *ate.Client
 	port      int
 	dialOpts  []grpc.DialOption
+
+	idleMode    idleMode
+	idleTimeout time.Duration
+	idleMu      sync.Mutex
+	warmActors  map[string]*warmActorState
 }
 
 // New creates a new SubstrateHarness.
 func New(harnessID string, endpoint string, namespace string, template string, port int, opts ...grpc.DialOption) (*SubstrateHarness, error) {
+	idleMode, idleTimeout, err := idlePolicyFromEnv()
+	if err != nil {
+		return nil, err
+	}
 	if port == 0 {
 		port = 50053 // Default HarnessService port
 	}
@@ -76,40 +103,80 @@ func New(harnessID string, endpoint string, namespace string, template string, p
 	}
 	opts = append(opts, grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
 	return &SubstrateHarness{
-		harnessID: harnessID,
-		ateClient: client,
-		port:      port,
-		dialOpts:  opts,
+		harnessID:   harnessID,
+		ateClient:   client,
+		port:        port,
+		dialOpts:    opts,
+		idleMode:    idleMode,
+		idleTimeout: idleTimeout,
 	}, nil
 }
 
+func idlePolicyFromEnv() (idleMode, time.Duration, error) {
+	modeValue := os.Getenv("AX_SUBSTRATE_IDLE_MODE")
+	switch modeValue {
+	case "", "immediate-suspend":
+		return idleModeImmediateSuspend, 0, nil
+	case "warm-then-suspend":
+		timeoutValue := os.Getenv("AX_SUBSTRATE_IDLE_TIMEOUT")
+		if timeoutValue == "" {
+			return idleModeWarmThenSuspend, defaultWarmIdleTimeout, nil
+		}
+		timeout, err := time.ParseDuration(timeoutValue)
+		if err != nil {
+			return idleModeImmediateSuspend, 0, fmt.Errorf("invalid AX_SUBSTRATE_IDLE_TIMEOUT %q: %w", timeoutValue, err)
+		}
+		if timeout <= 0 {
+			return idleModeImmediateSuspend, 0, fmt.Errorf("AX_SUBSTRATE_IDLE_TIMEOUT must be positive")
+		}
+		return idleModeWarmThenSuspend, timeout, nil
+	default:
+		return idleModeImmediateSuspend, 0, fmt.Errorf("invalid AX_SUBSTRATE_IDLE_MODE %q", modeValue)
+	}
+}
+
 // Start implements Harness interface. It creates/resumes the target actor.
-func (h *SubstrateHarness) Start(ctx context.Context, conversationID string, harnessConfig []byte) (harness.Execution, error) {
+func (h *SubstrateHarness) Start(ctx context.Context, conversationID string, harnessConfig []byte) (execution harness.Execution, err error) {
 	if conversationID == "" {
 		return nil, errors.New("SubstrateHarness needs valid conversationID")
 	}
 
-	// CreateActor is idempotent here: on follow-up turns the actor was created
-	// (and suspended) on a previous turn, so AlreadyExists is expected and fine.
-	if _, err := h.ateClient.CreateActor(ctx, conversationID); err != nil && status.Code(err) != codes.AlreadyExists {
-		return nil, fmt.Errorf("failed to create substrate actor %s: %w", conversationID, err)
+	workerAddr, reusedWarmActor, err := h.beginWarmTurn(ctx, conversationID)
+	if err != nil {
+		return nil, err
+	}
+	if h.idleMode == idleModeWarmThenSuspend {
+		defer func() {
+			if err != nil {
+				h.abortWarmTurn(conversationID)
+			}
+		}()
 	}
 
-	// Resume the actor so it is scheduled onto a worker and gets a routable IP.
-	resumeResp, err := h.ateClient.ResumeActor(ctx, conversationID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to resume substrate actor %s: %w", conversationID, err)
-	}
-	actor := resumeResp.Actor
-	if actor == nil {
-		return nil, fmt.Errorf("received nil actor in response for %s", conversationID)
-	}
-	if actor.AteomPodIp == "" {
-		return nil, fmt.Errorf("actor %s has no active worker IP address", conversationID)
+	if !reusedWarmActor {
+		// CreateActor is idempotent here: on follow-up turns the actor was created
+		// (and suspended) on a previous turn, so AlreadyExists is expected and fine.
+		if _, err := h.ateClient.CreateActor(ctx, conversationID); err != nil && status.Code(err) != codes.AlreadyExists {
+			return nil, fmt.Errorf("failed to create substrate actor %s: %w", conversationID, err)
+		}
+
+		// Resume the actor so it is scheduled onto a worker and gets a routable IP.
+		resumeResp, err := h.ateClient.ResumeActor(ctx, conversationID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resume substrate actor %s: %w", conversationID, err)
+		}
+		actor := resumeResp.Actor
+		if actor == nil {
+			return nil, fmt.Errorf("received nil actor in response for %s", conversationID)
+		}
+		if actor.AteomPodIp == "" {
+			return nil, fmt.Errorf("actor %s has no active worker IP address", conversationID)
+		}
+		workerAddr = fmt.Sprintf("%s:%d", actor.AteomPodIp, h.port)
+		h.rememberWarmActor(conversationID, workerAddr)
 	}
 
 	// Establish connection to the actor's worker IP
-	workerAddr := fmt.Sprintf("%s:%d", actor.AteomPodIp, h.port)
 	conn, err := grpc.NewClient(workerAddr, h.dialOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to dial remote harness service at %s: %w", workerAddr, err)
@@ -130,6 +197,84 @@ func (h *SubstrateHarness) Start(ctx context.Context, conversationID string, har
 		client:         proto.NewHarnessServiceClient(conn),
 		harnessConfig:  harnessConfig,
 	}, nil
+}
+
+func (h *SubstrateHarness) beginWarmTurn(ctx context.Context, conversationID string) (string, bool, error) {
+	if h.idleMode != idleModeWarmThenSuspend {
+		return "", false, nil
+	}
+
+	for {
+		h.idleMu.Lock()
+		if h.warmActors == nil {
+			h.warmActors = make(map[string]*warmActorState)
+		}
+		state := h.warmActors[conversationID]
+		if state == nil {
+			state = &warmActorState{inTurn: true}
+			h.warmActors[conversationID] = state
+			h.idleMu.Unlock()
+			return "", false, nil
+		}
+		if state.suspending != nil {
+			done := state.suspending
+			h.idleMu.Unlock()
+			select {
+			case <-ctx.Done():
+				return "", false, ctx.Err()
+			case <-done:
+				continue
+			}
+		}
+		if state.inTurn {
+			h.idleMu.Unlock()
+			return "", false, fmt.Errorf("substrate actor %s already has an active turn", conversationID)
+		}
+
+		state.generation++
+		if state.timer != nil {
+			state.timer.Stop()
+			state.timer = nil
+		}
+		state.inTurn = true
+		workerAddr := state.workerAddr
+		h.idleMu.Unlock()
+		return workerAddr, workerAddr != "", nil
+	}
+}
+
+func (h *SubstrateHarness) rememberWarmActor(conversationID, workerAddr string) {
+	if h.idleMode != idleModeWarmThenSuspend {
+		return
+	}
+	h.idleMu.Lock()
+	defer h.idleMu.Unlock()
+	state := h.warmActors[conversationID]
+	if state != nil {
+		state.workerAddr = workerAddr
+	}
+}
+
+func (h *SubstrateHarness) abortWarmTurn(conversationID string) {
+	if h.idleMode != idleModeWarmThenSuspend {
+		return
+	}
+	h.idleMu.Lock()
+	defer h.idleMu.Unlock()
+	state := h.warmActors[conversationID]
+	if state == nil {
+		return
+	}
+	state.inTurn = false
+	if state.workerAddr == "" {
+		delete(h.warmActors, conversationID)
+		return
+	}
+	state.generation++
+	generation := state.generation
+	state.timer = time.AfterFunc(h.idleTimeout, func() {
+		h.suspendWarmActor(conversationID, "", generation)
+	})
 }
 
 // waitForHealthy blocks until the harness behind conn reports SERVING via the
@@ -233,24 +378,68 @@ func (e *substrateExecution) Run(ctx context.Context, handler harness.Handler) e
 }
 
 func (e *substrateExecution) Close(ctx context.Context) error {
-	// Close connection
 	if e.conn != nil {
-		e.conn.Close()
+		_ = e.conn.Close()
+	}
+	if e.harness.idleMode == idleModeWarmThenSuspend {
+		e.harness.scheduleWarmSuspend(e.conversationID, e.execID)
+		return nil
 	}
 
+	e.harness.suspendActor(ctx, e.conversationID, e.execID)
+	return nil
+}
+
+func (h *SubstrateHarness) scheduleWarmSuspend(conversationID, execID string) {
+	h.idleMu.Lock()
+	defer h.idleMu.Unlock()
+	state := h.warmActors[conversationID]
+	if state == nil {
+		return
+	}
+	state.inTurn = false
+	state.generation++
+	generation := state.generation
+	state.timer = time.AfterFunc(h.idleTimeout, func() {
+		h.suspendWarmActor(conversationID, execID, generation)
+	})
+}
+
+func (h *SubstrateHarness) suspendWarmActor(conversationID, execID string, generation uint64) {
+	h.idleMu.Lock()
+	state := h.warmActors[conversationID]
+	if state == nil || state.generation != generation || state.inTurn {
+		h.idleMu.Unlock()
+		return
+	}
+	state.timer = nil
+	done := make(chan struct{})
+	state.suspending = done
+	h.idleMu.Unlock()
+
+	h.suspendActor(context.Background(), conversationID, execID)
+
+	h.idleMu.Lock()
+	state = h.warmActors[conversationID]
+	if state != nil && state.suspending == done {
+		delete(h.warmActors, conversationID)
+	}
+	close(done)
+	h.idleMu.Unlock()
+}
+
+func (h *SubstrateHarness) suspendActor(ctx context.Context, conversationID, execID string) {
 	// Suspend actor to return resource to standard standby pool
 	slog.InfoContext(ctx, "Suspending SubstrATE actor",
-		slog.String("conversation_id", e.conversationID),
-		slog.String("exec_id", e.execID),
+		slog.String("conversation_id", conversationID),
+		slog.String("exec_id", execID),
 	)
 	suspendCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if _, err := e.harness.ateClient.SuspendActor(suspendCtx, e.conversationID); err != nil {
+	if _, err := h.ateClient.SuspendActor(suspendCtx, conversationID); err != nil {
 		slog.ErrorContext(ctx, "Failed to suspend SubstrATE actor",
-			slog.String("conversation_id", e.conversationID),
+			slog.String("conversation_id", conversationID),
 			slog.Any("error", err),
 		)
 	}
-
-	return nil
 }

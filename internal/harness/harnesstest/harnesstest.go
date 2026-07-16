@@ -36,7 +36,7 @@ import (
 
 // mockControlServer is an in-process ateapipb.ControlServer that records the
 // actor lifecycle calls SubstrateHarness makes and lets tests steer the
-// CreateActor/ResumeActor responses. Only the three RPCs SubstrateHarness uses
+// CreateActor/ResumeActor responses. Only the lifecycle RPCs SubstrateHarness uses
 // are implemented; the rest come from the embedded Unimplemented server.
 type MockControlServer struct {
 	ateapipb.UnimplementedControlServer
@@ -109,8 +109,11 @@ type MockHarnessServer struct {
 	ErrCode int32
 	// ErrMessage is the error text used by FailConnect/FailFrame.
 	ErrMessage string
+	// HarnessMetadata is attached to the completed HarnessEnd frame.
+	HarnessMetadata []byte
 
 	mu               sync.Mutex
+	connectCalls     int
 	gotConvID        string
 	gotHarnessID     string
 	gotHarnessConfig []byte
@@ -118,6 +121,9 @@ type MockHarnessServer struct {
 }
 
 func (s *MockHarnessServer) Connect(stream proto.HarnessService_ConnectServer) error {
+	s.mu.Lock()
+	s.connectCalls++
+	s.mu.Unlock()
 	if s.FailConnect {
 		return status.Error(codes.Internal, s.ErrMessage)
 	}
@@ -174,8 +180,18 @@ func (s *MockHarnessServer) Connect(stream proto.HarnessService_ConnectServer) e
 	}
 	return stream.Send(&proto.HarnessResponse{
 		ConversationId: convID,
-		Type:           &proto.HarnessResponse_End{End: &proto.HarnessEnd{State: proto.State_STATE_COMPLETED}},
+		Type: &proto.HarnessResponse_End{End: &proto.HarnessEnd{
+			State:           proto.State_STATE_COMPLETED,
+			HarnessMetadata: s.HarnessMetadata,
+		}},
 	})
+}
+
+// ConnectCalls returns how many per-turn HarnessService streams were opened.
+func (s *MockHarnessServer) ConnectCalls() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.connectCalls
 }
 
 // Received returns a copy of the start frame the server received.

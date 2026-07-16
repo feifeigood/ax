@@ -15,6 +15,7 @@
 package controller
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"strings"
@@ -25,6 +26,10 @@ import (
 	"github.com/google/ax/internal/harness"
 	"github.com/google/ax/proto"
 )
+
+type metadataCompleter interface {
+	OnCompleteWithMetadata(ctx context.Context, execID string, metadata []byte) error
+}
 
 type fakeHarness struct{}
 
@@ -169,6 +174,113 @@ func TestController2_ExecHelloWorld(t *testing.T) {
 		t.Errorf("expected third event state to be COMPLETED, got %v", events[2].State)
 	}
 
+}
+
+func TestController2_ExecPersistsAndStreamsTerminalHarnessMetadata(t *testing.T) {
+	ctx := context.Background()
+	const conversationID = "metadata-conversation"
+	wantMetadata := []byte("agentfleet-metadata-fixture")
+
+	log := &eventlogtest.MemoryEventLog{}
+	reg := NewRegistry()
+	h := &testHarness{
+		startFunc: func(context.Context, string) (harness.Execution, error) {
+			return &testExecution{
+				id: "metadata-exec",
+				runFunc: func(ctx context.Context, execID string, handler harness.Handler) error {
+					completer, ok := handler.(metadataCompleter)
+					if !ok {
+						return fmt.Errorf("handler does not support terminal metadata")
+					}
+					return completer.OnCompleteWithMetadata(ctx, execID, wantMetadata)
+				},
+			}, nil
+		},
+	}
+	if err := reg.RegisterHarness("metadata", h); err != nil {
+		t.Fatal(err)
+	}
+
+	c, err := New(ctx, Config{
+		Registry:        reg,
+		EventLogBuilder: func() (eventlog.EventLog, error) { return log, nil },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+
+	var responses []*proto.ExecResponse
+	err = c.Exec(ctx, &proto.ExecRequest{
+		ConversationId: conversationID,
+		HarnessId:      "metadata",
+		Inputs:         []*proto.Message{{Role: "user"}},
+	}, func(resp *proto.ExecResponse) error {
+		responses = append(responses, resp)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("Exec: %v", err)
+	}
+	if len(responses) != 1 {
+		t.Fatalf("responses = %d, want 1 terminal metadata response", len(responses))
+	}
+	if !bytes.Equal(responses[0].GetHarnessMetadata(), wantMetadata) {
+		t.Fatalf("response metadata = %q, want %q", responses[0].GetHarnessMetadata(), wantMetadata)
+	}
+	if len(responses[0].GetOutputs()) != 0 {
+		t.Fatalf("terminal metadata response has %d outputs, want 0", len(responses[0].GetOutputs()))
+	}
+
+	events, err := log.Events(ctx, conversationID)
+	if err != nil {
+		t.Fatalf("Events: %v", err)
+	}
+	if len(events) != 2 {
+		t.Fatalf("events = %d, want input plus terminal event", len(events))
+	}
+	terminal := events[1]
+	if terminal.GetState() != proto.State_STATE_COMPLETED {
+		t.Fatalf("terminal state = %v, want COMPLETED", terminal.GetState())
+	}
+	if terminal.GetConversationId() != conversationID || terminal.GetExecId() != "metadata-exec" {
+		t.Fatalf("terminal identity = (%q, %q), want (%q, %q)", terminal.GetConversationId(), terminal.GetExecId(), conversationID, "metadata-exec")
+	}
+	if !bytes.Equal(terminal.GetHarnessMetadata(), wantMetadata) {
+		t.Fatalf("event metadata = %q, want %q", terminal.GetHarnessMetadata(), wantMetadata)
+	}
+	if responses[0].GetSeq() != terminal.GetSeq() {
+		t.Fatalf("response seq = %d, terminal event seq = %d", responses[0].GetSeq(), terminal.GetSeq())
+	}
+}
+
+func TestHarnessHandlerWithoutMetadataPreservesLegacyEmptyExecID(t *testing.T) {
+	ctx := context.Background()
+	log := &eventlogtest.MemoryEventLog{}
+	handler := &harnessHandler{logger: newLogger(log, "legacy-conversation", "legacy-harness")}
+
+	if err := handler.OnMessage(ctx, "runtime-exec", &proto.Message{Role: "assistant"}); err != nil {
+		t.Fatalf("OnMessage: %v", err)
+	}
+	if err := handler.OnComplete(ctx, "runtime-exec"); err != nil {
+		t.Fatalf("OnComplete: %v", err)
+	}
+
+	events, err := log.Events(ctx, "legacy-conversation")
+	if err != nil {
+		t.Fatalf("Events: %v", err)
+	}
+	if len(events) != 2 {
+		t.Fatalf("events = %d, want streamed message plus completion", len(events))
+	}
+	for i, event := range events {
+		if event.GetExecId() != "" {
+			t.Errorf("event[%d].exec_id = %q, want legacy empty value", i, event.GetExecId())
+		}
+		if len(event.GetHarnessMetadata()) != 0 {
+			t.Errorf("event[%d].harness_metadata = %q, want empty", i, event.GetHarnessMetadata())
+		}
+	}
 }
 
 func TestController2_ExecWithAgentID(t *testing.T) {
@@ -459,6 +571,9 @@ func TestController2_ExecResumptionFlow(t *testing.T) {
 		var execs []*testExecution
 		h := &testHarness{
 			startFunc: func(ctx context.Context, conversationID string) (harness.Execution, error) {
+				if len(execs) > 0 && execs[len(execs)-1].closeCalls == 0 {
+					return nil, fmt.Errorf("previous execution was not closed before the next start")
+				}
 				exec := &testExecution{
 					id: fmt.Sprintf("exec-%d", len(execs)+1),
 					runFunc: func(ctx context.Context, execID string, handler harness.Handler) error {
