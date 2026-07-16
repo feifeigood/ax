@@ -250,6 +250,35 @@ func TestController2_ExecPersistsAndStreamsTerminalHarnessMetadata(t *testing.T)
 	}
 }
 
+func TestHarnessHandlerWithoutMetadataPreservesLegacyEmptyExecID(t *testing.T) {
+	ctx := context.Background()
+	log := &eventlogtest.MemoryEventLog{}
+	handler := &harnessHandler{logger: newLogger(log, "legacy-conversation", "legacy-harness")}
+
+	if err := handler.OnMessage(ctx, "runtime-exec", &proto.Message{Role: "assistant"}); err != nil {
+		t.Fatalf("OnMessage: %v", err)
+	}
+	if err := handler.OnComplete(ctx, "runtime-exec"); err != nil {
+		t.Fatalf("OnComplete: %v", err)
+	}
+
+	events, err := log.Events(ctx, "legacy-conversation")
+	if err != nil {
+		t.Fatalf("Events: %v", err)
+	}
+	if len(events) != 2 {
+		t.Fatalf("events = %d, want streamed message plus completion", len(events))
+	}
+	for i, event := range events {
+		if event.GetExecId() != "" {
+			t.Errorf("event[%d].exec_id = %q, want legacy empty value", i, event.GetExecId())
+		}
+		if len(event.GetHarnessMetadata()) != 0 {
+			t.Errorf("event[%d].harness_metadata = %q, want empty", i, event.GetHarnessMetadata())
+		}
+	}
+}
+
 func TestController2_ExecWithAgentID(t *testing.T) {
 	ctx := context.Background()
 	cid := "test-conversation-id"

@@ -134,7 +134,6 @@ type harnessHandler struct {
 }
 
 func (a *harnessHandler) OnMessage(ctx context.Context, execID string, msg *proto.Message) error {
-	a.logger.execID = execID
 	// Log every response received from the harness
 	// TODO(anj): The harness should send the full input sent to get this particular response.
 	seq, err := a.logger.LogOutputs(ctx, []*proto.Message{msg}, proto.State_STATE_PENDING, nil)
@@ -165,7 +164,11 @@ func (a *harnessHandler) OnCompleteWithMetadata(ctx context.Context, execID stri
 }
 
 func (a *harnessHandler) complete(ctx context.Context, execID string, metadata []byte) error {
-	a.logger.execID = execID
+	if len(metadata) > 0 {
+		previousExecID := a.logger.execID
+		a.logger.execID = execID
+		defer func() { a.logger.execID = previousExecID }()
+	}
 	// Mark the execution turn as completed in the conversation log
 	seq, err := a.logger.LogOutputs(ctx, nil, proto.State_STATE_COMPLETED, metadata)
 	if err != nil {
