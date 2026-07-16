@@ -124,6 +124,45 @@ func TestWaitForHealthy_ServerDown(t *testing.T) {
 	}
 }
 
+func TestNewReadsWarmIdlePolicyFromEnvironment(t *testing.T) {
+	t.Setenv("AX_SUBSTRATE_IDLE_MODE", "warm-then-suspend")
+	t.Setenv("AX_SUBSTRATE_IDLE_TIMEOUT", "750ms")
+
+	h, err := New("antigravity", "127.0.0.1:1", "ax", "antigravity-template", 50053)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	t.Cleanup(func() { _ = h.ateClient.Close() })
+	if h.idleMode != idleModeWarmThenSuspend {
+		t.Fatalf("idle mode = %v, want warm-then-suspend", h.idleMode)
+	}
+	if h.idleTimeout != 750*time.Millisecond {
+		t.Fatalf("idle timeout = %v, want 750ms", h.idleTimeout)
+	}
+}
+
+func TestNewDefaultsToImmediateSuspend(t *testing.T) {
+	t.Setenv("AX_SUBSTRATE_IDLE_MODE", "")
+	t.Setenv("AX_SUBSTRATE_IDLE_TIMEOUT", "")
+
+	h, err := New("antigravity", "127.0.0.1:1", "ax", "antigravity-template", 50053)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	t.Cleanup(func() { _ = h.ateClient.Close() })
+	if h.idleMode != idleModeImmediateSuspend || h.idleTimeout != 0 {
+		t.Fatalf("idle policy = (%v, %v), want immediate-suspend", h.idleMode, h.idleTimeout)
+	}
+}
+
+func TestNewRejectsInvalidIdlePolicy(t *testing.T) {
+	t.Setenv("AX_SUBSTRATE_IDLE_MODE", "keep-forever")
+
+	if _, err := New("antigravity", "127.0.0.1:1", "ax", "antigravity-template", 50053); err == nil {
+		t.Fatal("New accepted an invalid AX_SUBSTRATE_IDLE_MODE")
+	}
+}
+
 // newTestSubstrateHarness builds a SubstrateHarness wired to the mock control
 // server and the mock harness server. It constructs the struct directly (rather
 // than via NewSubstrateHarness) so the control client can use insecure
@@ -210,6 +249,171 @@ func TestSubstrateHarness_EndToEnd(t *testing.T) {
 	}
 	if _, _, suspend = ctrl.Calls(); !slices.Equal(suspend, want) {
 		t.Errorf("suspend=%v, want %v", suspend, want)
+	}
+}
+
+func TestSubstrateHarness_WarmThenSuspendReusesActorUntilIdle(t *testing.T) {
+	ctrl := &harnesstest.MockControlServer{ResumeIP: "127.0.0.1"}
+	srv := &harnesstest.MockHarnessServer{}
+	h := newTestSubstrateHarness(t, harnesstest.StartControlServer(t, ctrl), harnesstest.StartHarnessServer(t, srv))
+	h.idleMode = idleModeWarmThenSuspend
+	h.idleTimeout = 200 * time.Millisecond
+
+	runTurn := func(input string) {
+		t.Helper()
+		ctx := context.Background()
+		exec, err := h.Start(ctx, "conv-warm", substrateHarnessConfig)
+		if err != nil {
+			t.Fatalf("Start(%q): %v", input, err)
+		}
+		if err := exec.Queue(ctx, harnesstest.UserText(input)); err != nil {
+			t.Fatalf("Queue(%q): %v", input, err)
+		}
+		if err := exec.Run(ctx, &harnesstest.MockHandler{}); err != nil {
+			t.Fatalf("Run(%q): %v", input, err)
+		}
+		if err := exec.Close(ctx); err != nil {
+			t.Fatalf("Close(%q): %v", input, err)
+		}
+	}
+
+	runTurn("one")
+	runTurn("two")
+
+	create, resume, suspend := ctrl.Calls()
+	if !slices.Equal(create, []string{"conv-warm"}) {
+		t.Fatalf("create=%v, want one actor creation", create)
+	}
+	if !slices.Equal(resume, []string{"conv-warm"}) {
+		t.Fatalf("resume=%v, want one cold resume", resume)
+	}
+	if len(suspend) != 0 {
+		t.Fatalf("suspend called before the final idle timeout: %v", suspend)
+	}
+	if got := srv.ConnectCalls(); got != 2 {
+		t.Fatalf("HarnessService Connect calls = %d, want one fresh stream per turn", got)
+	}
+
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		_, _, suspend = ctrl.Calls()
+		if slices.Equal(suspend, []string{"conv-warm"}) {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("suspend=%v, want one call after idle timeout", suspend)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func TestSubstrateHarness_StaleWarmTimerCannotSuspendActiveTurn(t *testing.T) {
+	ctrl := &harnesstest.MockControlServer{ResumeIP: "127.0.0.1"}
+	srv := &harnesstest.MockHarnessServer{}
+	h := newTestSubstrateHarness(t, harnesstest.StartControlServer(t, ctrl), harnesstest.StartHarnessServer(t, srv))
+	h.idleMode = idleModeWarmThenSuspend
+	h.idleTimeout = 100 * time.Millisecond
+
+	ctx := context.Background()
+	first, err := h.Start(ctx, "conv-generation", substrateHarnessConfig)
+	if err != nil {
+		t.Fatalf("first Start: %v", err)
+	}
+	if err := first.Run(ctx, &harnesstest.MockHandler{}); err != nil {
+		t.Fatalf("first Run: %v", err)
+	}
+	if err := first.Close(ctx); err != nil {
+		t.Fatalf("first Close: %v", err)
+	}
+
+	second, err := h.Start(ctx, "conv-generation", substrateHarnessConfig)
+	if err != nil {
+		t.Fatalf("second Start: %v", err)
+	}
+	time.Sleep(2 * h.idleTimeout)
+	if _, _, suspend := ctrl.Calls(); len(suspend) != 0 {
+		t.Fatalf("stale timer suspended an active turn: %v", suspend)
+	}
+	if err := second.Run(ctx, &harnesstest.MockHandler{}); err != nil {
+		t.Fatalf("second Run: %v", err)
+	}
+	if err := second.Close(ctx); err != nil {
+		t.Fatalf("second Close: %v", err)
+	}
+
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		_, _, suspend := ctrl.Calls()
+		if slices.Equal(suspend, []string{"conv-generation"}) {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("suspend=%v, want one call after the active turn closed", suspend)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func TestSubstrateHarness_WarmStartFailureStillSchedulesSuspend(t *testing.T) {
+	ctrl := &harnesstest.MockControlServer{ResumeIP: "127.0.0.1"}
+	h := newTestSubstrateHarness(t, harnesstest.StartControlServer(t, ctrl), "127.0.0.1:1")
+	h.idleMode = idleModeWarmThenSuspend
+	h.idleTimeout = 20 * time.Millisecond
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	if _, err := h.Start(ctx, "conv-start-failure", substrateHarnessConfig); err == nil {
+		t.Fatal("Start unexpectedly succeeded against an unavailable harness")
+	}
+
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		_, _, suspend := ctrl.Calls()
+		if slices.Equal(suspend, []string{"conv-start-failure"}) {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("suspend=%v, want failed warm Start to retain idle cleanup", suspend)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func TestSubstrateHarness_PauseResumeUsesFreshTurnConnections(t *testing.T) {
+	ctrl := &harnesstest.MockControlServer{ResumeIP: "127.0.0.1"}
+	srv := &harnesstest.MockHarnessServer{}
+	h := newTestSubstrateHarness(t, harnesstest.StartControlServer(t, ctrl), harnesstest.StartHarnessServer(t, srv))
+	h.idleMode = idleModePauseResume
+
+	for _, input := range []string{"one", "two"} {
+		ctx := context.Background()
+		exec, err := h.Start(ctx, "conv-pause", substrateHarnessConfig)
+		if err != nil {
+			t.Fatalf("Start(%q): %v", input, err)
+		}
+		if err := exec.Queue(ctx, harnesstest.UserText(input)); err != nil {
+			t.Fatalf("Queue(%q): %v", input, err)
+		}
+		if err := exec.Run(ctx, &harnesstest.MockHandler{}); err != nil {
+			t.Fatalf("Run(%q): %v", input, err)
+		}
+		if err := exec.Close(ctx); err != nil {
+			t.Fatalf("Close(%q): %v", input, err)
+		}
+	}
+
+	if got := ctrl.PauseCalls(); !slices.Equal(got, []string{"conv-pause", "conv-pause"}) {
+		t.Fatalf("pause=%v, want one pause per turn", got)
+	}
+	_, resume, suspend := ctrl.Calls()
+	if !slices.Equal(resume, []string{"conv-pause", "conv-pause"}) {
+		t.Fatalf("resume=%v, want one resume per turn", resume)
+	}
+	if len(suspend) != 0 {
+		t.Fatalf("suspend=%v, want pause-only lifecycle", suspend)
+	}
+	if got := srv.ConnectCalls(); got != 2 {
+		t.Fatalf("HarnessService Connect calls = %d, want one fresh stream per turn", got)
 	}
 }
 

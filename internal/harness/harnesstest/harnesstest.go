@@ -36,7 +36,7 @@ import (
 
 // mockControlServer is an in-process ateapipb.ControlServer that records the
 // actor lifecycle calls SubstrateHarness makes and lets tests steer the
-// CreateActor/ResumeActor responses. Only the three RPCs SubstrateHarness uses
+// CreateActor/ResumeActor responses. Only the lifecycle RPCs SubstrateHarness uses
 // are implemented; the rest come from the embedded Unimplemented server.
 type MockControlServer struct {
 	ateapipb.UnimplementedControlServer
@@ -44,6 +44,7 @@ type MockControlServer struct {
 	mu           sync.Mutex
 	createCalls  []string
 	resumeCalls  []string
+	pauseCalls   []string
 	suspendCalls []string
 
 	CreateErr      error  // returned from CreateActor when non-nil
@@ -82,6 +83,13 @@ func (f *MockControlServer) SuspendActor(_ context.Context, req *ateapipb.Suspen
 	return &ateapipb.SuspendActorResponse{}, nil
 }
 
+func (f *MockControlServer) PauseActor(_ context.Context, req *ateapipb.PauseActorRequest) (*ateapipb.PauseActorResponse, error) {
+	f.mu.Lock()
+	f.pauseCalls = append(f.pauseCalls, req.GetActorRef().GetName())
+	f.mu.Unlock()
+	return &ateapipb.PauseActorResponse{}, nil
+}
+
 // Calls returns copies of the recorded call lists.
 func (f *MockControlServer) Calls() (create, resume, suspend []string) {
 	f.mu.Lock()
@@ -89,6 +97,13 @@ func (f *MockControlServer) Calls() (create, resume, suspend []string) {
 	return append([]string(nil), f.createCalls...),
 		append([]string(nil), f.resumeCalls...),
 		append([]string(nil), f.suspendCalls...)
+}
+
+// PauseCalls returns a copy of the recorded PauseActor calls.
+func (f *MockControlServer) PauseCalls() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.pauseCalls...)
 }
 
 // mockHarnessServer is an in-process proto.HarnessServiceServer standing in for
@@ -113,6 +128,7 @@ type MockHarnessServer struct {
 	HarnessMetadata []byte
 
 	mu               sync.Mutex
+	connectCalls     int
 	gotConvID        string
 	gotHarnessID     string
 	gotHarnessConfig []byte
@@ -120,6 +136,9 @@ type MockHarnessServer struct {
 }
 
 func (s *MockHarnessServer) Connect(stream proto.HarnessService_ConnectServer) error {
+	s.mu.Lock()
+	s.connectCalls++
+	s.mu.Unlock()
 	if s.FailConnect {
 		return status.Error(codes.Internal, s.ErrMessage)
 	}
@@ -181,6 +200,13 @@ func (s *MockHarnessServer) Connect(stream proto.HarnessService_ConnectServer) e
 			HarnessMetadata: s.HarnessMetadata,
 		}},
 	})
+}
+
+// ConnectCalls returns how many per-turn HarnessService streams were opened.
+func (s *MockHarnessServer) ConnectCalls() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.connectCalls
 }
 
 // Received returns a copy of the start frame the server received.
