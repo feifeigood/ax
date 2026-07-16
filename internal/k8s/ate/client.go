@@ -88,6 +88,18 @@ func (c *Client) ResumeActor(ctx context.Context, id string) (*ateapipb.ResumeAc
 	return resp, nil
 }
 
+// PauseActor pauses the actor while keeping its snapshot on the current node.
+func (c *Client) PauseActor(ctx context.Context, id string) (*ateapipb.PauseActorResponse, error) {
+	client := ateapipb.NewControlClient(c.conn)
+	resp, err := client.PauseActor(ctx, &ateapipb.PauseActorRequest{
+		ActorRef: &ateapipb.ActorRef{Atespace: c.namespace, Name: id},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error when calling Control.PauseActor: %w", err)
+	}
+	return resp, nil
+}
+
 // SuspendActor suspends the actor.
 func (c *Client) SuspendActor(ctx context.Context, id string) (*ateapipb.SuspendActorResponse, error) {
 	client := ateapipb.NewControlClient(c.conn)
