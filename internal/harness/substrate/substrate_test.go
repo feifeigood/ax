@@ -289,8 +289,8 @@ func TestSubstrateHarness_WarmThenSuspendReusesActorUntilIdle(t *testing.T) {
 	if !slices.Equal(create, []string{"conv-warm"}) {
 		t.Fatalf("create=%v, want one actor creation", create)
 	}
-	if !slices.Equal(resume, []string{"conv-warm"}) {
-		t.Fatalf("resume=%v, want one cold resume", resume)
+	if !slices.Equal(resume, []string{"conv-warm", "conv-warm"}) {
+		t.Fatalf("resume=%v, want one authoritative resume check per turn", resume)
 	}
 	if len(suspend) != 0 {
 		t.Fatalf("suspend called before the final idle timeout: %v", suspend)
@@ -460,14 +460,11 @@ func TestSubstrateHarness_HarnessFailedFrame(t *testing.T) {
 	}
 }
 
-// startStoppableHarnessServer mirrors harnesstest.StartHarnessServer but also
-// returns a stop function so tests can kill the worker out from under a warm
-// actor.
-func startStoppableHarnessServer(t *testing.T, srv *harnesstest.MockHarnessServer) (string, func()) {
+func startStoppableHarnessServerOn(t *testing.T, srv *harnesstest.MockHarnessServer, listenAddr string) (string, func()) {
 	t.Helper()
-	lis, err := net.Listen("tcp", "127.0.0.1:0")
+	lis, err := net.Listen("tcp4", listenAddr)
 	if err != nil {
-		t.Fatalf("failed to listen: %v", err)
+		t.Fatalf("failed to listen on %s: %v", listenAddr, err)
 	}
 	s := grpc.NewServer()
 	proto.RegisterHarnessServiceServer(s, srv)
@@ -479,18 +476,83 @@ func startStoppableHarnessServer(t *testing.T, srv *harnesstest.MockHarnessServe
 	return lis.Addr().String(), s.Stop
 }
 
-// A warm actor can die out-of-band (worker OOM, node drain, external suspend).
-// The cached worker address must then be treated as a hint, not truth: Start
-// probes it briefly, drops it, and falls back to a full cold resume instead of
-// failing the conversation until the idle timer clears the entry.
-func TestSubstrateHarness_WarmReuseFallsBackToColdResumeWhenActorUnreachable(t *testing.T) {
+func TestSubstrateHarness_UnreachableWarmActorIsSuspendedBeforeColdResume(t *testing.T) {
+	srvA := &harnesstest.MockHarnessServer{}
+	addrA, stopA := startStoppableHarnessServerOn(t, srvA, "127.0.0.1:0")
+	srvB := &harnesstest.MockHarnessServer{}
+	addrB := harnesstest.StartHarnessServer(t, srvB)
+
+	ctrl := &harnesstest.MockControlServer{
+		ResumeIPs: []string{"127.0.0.10", "127.0.0.10", "127.0.0.11", "127.0.0.11"},
+	}
+	h := newTestSubstrateHarness(t, harnesstest.StartControlServer(t, ctrl), addrA)
+	h.idleMode = idleModeWarmThenSuspend
+	h.idleTimeout = time.Minute
+	h.warmProbeTimeout = 100 * time.Millisecond
+	h.dialOpts = []grpc.DialOption{
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithContextDialer(func(ctx context.Context, target string) (net.Conn, error) {
+			host, _, err := net.SplitHostPort(target)
+			if err != nil {
+				return nil, err
+			}
+			actualAddr := map[string]string{"127.0.0.10": addrA, "127.0.0.11": addrB}[host]
+			return (&net.Dialer{}).DialContext(ctx, "tcp", actualAddr)
+		}),
+	}
+
+	runTurn := func(input string) {
+		t.Helper()
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		exec, err := h.Start(ctx, "conv-restart", substrateHarnessConfig)
+		if err != nil {
+			t.Fatalf("Start(%q): %v", input, err)
+		}
+		if err := exec.Queue(ctx, harnesstest.UserText(input)); err != nil {
+			t.Fatalf("Queue(%q): %v", input, err)
+		}
+		if err := exec.Run(ctx, &harnesstest.MockHandler{}); err != nil {
+			t.Fatalf("Run(%q): %v", input, err)
+		}
+		if err := exec.Close(ctx); err != nil {
+			t.Fatalf("Close(%q): %v", input, err)
+		}
+	}
+
+	runTurn("one")
+	stopA()
+	runTurn("two")
+	runTurn("three")
+
+	create, resume, suspend := ctrl.Calls()
+	if !slices.Equal(create, []string{"conv-restart", "conv-restart"}) {
+		t.Fatalf("create=%v, want initial create plus cold recovery", create)
+	}
+	if !slices.Equal(resume, []string{"conv-restart", "conv-restart", "conv-restart", "conv-restart"}) {
+		t.Fatalf("resume=%v, want authoritative checks plus cold recovery", resume)
+	}
+	if !slices.Equal(suspend, []string{"conv-restart"}) {
+		t.Fatalf("suspend=%v, want one reset before cold recovery", suspend)
+	}
+	if got := srvA.ConnectCalls(); got != 1 {
+		t.Fatalf("first worker Connect calls = %d, want 1", got)
+	}
+	if got := srvB.ConnectCalls(); got != 2 {
+		t.Fatalf("replacement worker Connect calls = %d, want 2", got)
+	}
+}
+
+// A cached worker address can still be healthy after its IP has been reassigned
+// to another actor. Warm reuse must resolve the current worker through ATE before
+// connecting instead of treating generic gRPC health as proof of actor identity.
+func TestSubstrateHarness_WarmReuseUsesAuthoritativeWorkerAddress(t *testing.T) {
 	ctrl := &harnesstest.MockControlServer{ResumeIP: "127.0.0.1"}
 	srvA := &harnesstest.MockHarnessServer{}
-	addrA, stopA := startStoppableHarnessServer(t, srvA)
+	addrA := harnesstest.StartHarnessServer(t, srvA)
 	h := newTestSubstrateHarness(t, harnesstest.StartControlServer(t, ctrl), addrA)
 	h.idleMode = idleModeWarmThenSuspend
 	h.idleTimeout = time.Minute // must not fire during the test
-	h.warmProbeTimeout = 150 * time.Millisecond
 
 	runTurn := func(input string) {
 		t.Helper()
@@ -513,9 +575,8 @@ func TestSubstrateHarness_WarmReuseFallsBackToColdResumeWhenActorUnreachable(t *
 
 	runTurn("one")
 
-	// The worker dies during the warm window; its replacement serves on a
-	// different address.
-	stopA()
+	// ATE now reports a different worker while the cached endpoint remains
+	// healthy. Changing the test port models the authoritative worker address.
 	srvB := &harnesstest.MockHarnessServer{}
 	addrB := harnesstest.StartHarnessServer(t, srvB)
 	_, portStr, err := net.SplitHostPort(addrB)
@@ -528,22 +589,71 @@ func TestSubstrateHarness_WarmReuseFallsBackToColdResumeWhenActorUnreachable(t *
 
 	runTurn("two")
 
+	if got := srvA.ConnectCalls(); got != 1 {
+		t.Fatalf("cached worker Connect calls = %d, want no reuse after ATE moved the actor", got)
+	}
 	if got := srvB.ConnectCalls(); got != 1 {
-		t.Fatalf("replacement worker Connect calls = %d, want 1", got)
+		t.Fatalf("authoritative worker Connect calls = %d, want 1", got)
 	}
 	wantResumes := []string{"conv-fallback", "conv-fallback"}
 	if _, resume, _ := ctrl.Calls(); !slices.Equal(resume, wantResumes) {
-		t.Fatalf("resume=%v, want a second cold resume after the stale warm address failed", resume)
+		t.Fatalf("resume=%v, want one authoritative resume check per turn", resume)
 	}
 
-	// The refreshed address is cached: the next turn reuses the replacement
-	// worker without another resume.
+	// Every warm turn revalidates ownership; it does not trust the refreshed
+	// address across turns.
 	runTurn("three")
+	wantResumes = append(wantResumes, "conv-fallback")
 	if _, resume, _ := ctrl.Calls(); !slices.Equal(resume, wantResumes) {
-		t.Fatalf("resume=%v, want warm reuse of the replacement worker", resume)
+		t.Fatalf("resume=%v, want one authoritative resume check per turn", resume)
 	}
 	if got := srvB.ConnectCalls(); got != 2 {
-		t.Fatalf("replacement worker Connect calls = %d, want 2", got)
+		t.Fatalf("authoritative worker Connect calls = %d, want 2", got)
+	}
+}
+
+func TestSubstrateHarness_FailedWarmResetRetainsIdleCleanup(t *testing.T) {
+	ctrl := &harnesstest.MockControlServer{
+		ResumeIP:   "127.0.0.1",
+		SuspendErr: status.Error(codes.Unavailable, "control unavailable"),
+	}
+	ctrlAddr := harnesstest.StartControlServer(t, ctrl)
+
+	// Reserve and release a port so the authoritative worker address is known
+	// to be unreachable.
+	lis, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("failed to reserve port: %v", err)
+	}
+	deadAddr := lis.Addr().String()
+	if err := lis.Close(); err != nil {
+		t.Fatalf("failed to release port: %v", err)
+	}
+
+	h := newTestSubstrateHarness(t, ctrlAddr, deadAddr)
+	h.idleMode = idleModeWarmThenSuspend
+	h.idleTimeout = 20 * time.Millisecond
+	h.warmProbeTimeout = 50 * time.Millisecond
+	h.warmActors = map[string]*warmActorState{
+		"conv-reset-failure": {workerAddr: deadAddr},
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if _, err := h.Start(ctx, "conv-reset-failure", substrateHarnessConfig); err == nil {
+		t.Fatal("Start unexpectedly succeeded against an unreachable warm actor")
+	}
+
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		_, _, suspend := ctrl.Calls()
+		if len(suspend) >= 2 {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("suspend=%v, want failed reset plus idle cleanup retry", suspend)
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
 }
 
