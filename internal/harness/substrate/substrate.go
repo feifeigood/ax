@@ -50,6 +50,11 @@ const healthCheckTimeout = 60 * time.Second
 
 const defaultWarmIdleTimeout = 30 * time.Second
 
+// defaultWarmProbeTimeout bounds the health probe against a reused warm
+// address: the actor was serving moments ago, so unreachability within this
+// window means it is gone and the cold resume path should take over.
+const defaultWarmProbeTimeout = 5 * time.Second
+
 type idleMode uint8
 
 const (
@@ -72,10 +77,11 @@ type SubstrateHarness struct {
 	port      int
 	dialOpts  []grpc.DialOption
 
-	idleMode    idleMode
-	idleTimeout time.Duration
-	idleMu      sync.Mutex
-	warmActors  map[string]*warmActorState
+	idleMode         idleMode
+	idleTimeout      time.Duration
+	warmProbeTimeout time.Duration
+	idleMu           sync.Mutex
+	warmActors       map[string]*warmActorState
 }
 
 // New creates a new SubstrateHarness.
@@ -103,12 +109,13 @@ func New(harnessID string, endpoint string, namespace string, template string, p
 	}
 	opts = append(opts, grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
 	return &SubstrateHarness{
-		harnessID:   harnessID,
-		ateClient:   client,
-		port:        port,
-		dialOpts:    opts,
-		idleMode:    idleMode,
-		idleTimeout: idleTimeout,
+		harnessID:        harnessID,
+		ateClient:        client,
+		port:             port,
+		dialOpts:         opts,
+		idleMode:         idleMode,
+		idleTimeout:      idleTimeout,
+		warmProbeTimeout: defaultWarmProbeTimeout,
 	}, nil
 }
 
@@ -153,38 +160,59 @@ func (h *SubstrateHarness) Start(ctx context.Context, conversationID string, har
 		}()
 	}
 
-	if !reusedWarmActor {
-		// CreateActor is idempotent here: on follow-up turns the actor was created
-		// (and suspended) on a previous turn, so AlreadyExists is expected and fine.
-		if _, err := h.ateClient.CreateActor(ctx, conversationID); err != nil && status.Code(err) != codes.AlreadyExists {
-			return nil, fmt.Errorf("failed to create substrate actor %s: %w", conversationID, err)
+	if reusedWarmActor {
+		// The cached address is a hint, not truth: the actor may have died or
+		// moved while warm (worker OOM, node drain, external suspend). Probe it
+		// briefly and fall back to a full cold resume instead of failing the
+		// conversation.
+		exec, probeErr := h.connect(ctx, conversationID, harnessConfig, workerAddr, h.probeTimeout())
+		if probeErr == nil {
+			return exec, nil
 		}
-
-		// Resume the actor so it is scheduled onto a worker and gets a routable IP.
-		resumeResp, err := h.ateClient.ResumeActor(ctx, conversationID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to resume substrate actor %s: %w", conversationID, err)
+		if ctx.Err() != nil {
+			return nil, probeErr
 		}
-		actor := resumeResp.Actor
-		if actor == nil {
-			return nil, fmt.Errorf("received nil actor in response for %s", conversationID)
-		}
-		if actor.AteomPodIp == "" {
-			return nil, fmt.Errorf("actor %s has no active worker IP address", conversationID)
-		}
-		workerAddr = fmt.Sprintf("%s:%d", actor.AteomPodIp, h.port)
-		h.rememberWarmActor(conversationID, workerAddr)
+		slog.WarnContext(ctx, "Warm SubstrATE actor unreachable; falling back to cold resume",
+			slog.String("conversation_id", conversationID),
+			slog.String("worker_addr", workerAddr),
+			slog.Any("error", probeErr),
+		)
+		h.forgetWarmAddr(conversationID)
 	}
 
-	// Establish connection to the actor's worker IP
+	// CreateActor is idempotent here: on follow-up turns the actor was created
+	// (and suspended) on a previous turn, so AlreadyExists is expected and fine.
+	if _, err := h.ateClient.CreateActor(ctx, conversationID); err != nil && status.Code(err) != codes.AlreadyExists {
+		return nil, fmt.Errorf("failed to create substrate actor %s: %w", conversationID, err)
+	}
+
+	// Resume the actor so it is scheduled onto a worker and gets a routable IP.
+	resumeResp, err := h.ateClient.ResumeActor(ctx, conversationID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resume substrate actor %s: %w", conversationID, err)
+	}
+	actor := resumeResp.Actor
+	if actor == nil {
+		return nil, fmt.Errorf("received nil actor in response for %s", conversationID)
+	}
+	if actor.AteomPodIp == "" {
+		return nil, fmt.Errorf("actor %s has no active worker IP address", conversationID)
+	}
+	workerAddr = fmt.Sprintf("%s:%d", actor.AteomPodIp, h.port)
+	h.rememberWarmActor(conversationID, workerAddr)
+
+	return h.connect(ctx, conversationID, harnessConfig, workerAddr, healthCheckTimeout)
+}
+
+// connect dials the actor's worker address and waits for the harness to be
+// reachable and ready before handing back the execution.
+func (h *SubstrateHarness) connect(ctx context.Context, conversationID string, harnessConfig []byte, workerAddr string, healthTimeout time.Duration) (harness.Execution, error) {
 	conn, err := grpc.NewClient(workerAddr, h.dialOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to dial remote harness service at %s: %w", workerAddr, err)
 	}
 
-	// Wait for the harness to be reachable and ready before handing back the
-	// execution.
-	if err := waitForHealthy(ctx, conn, healthCheckTimeout); err != nil {
+	if err := waitForHealthy(ctx, conn, healthTimeout); err != nil {
 		conn.Close()
 		return nil, fmt.Errorf("harness for %s not ready at %s: %w", conversationID, workerAddr, err)
 	}
@@ -197,6 +225,24 @@ func (h *SubstrateHarness) Start(ctx context.Context, conversationID string, har
 		client:         proto.NewHarnessServiceClient(conn),
 		harnessConfig:  harnessConfig,
 	}, nil
+}
+
+func (h *SubstrateHarness) probeTimeout() time.Duration {
+	if h.warmProbeTimeout > 0 {
+		return h.warmProbeTimeout
+	}
+	return defaultWarmProbeTimeout
+}
+
+// forgetWarmAddr drops the cached worker address for an in-turn conversation
+// after a failed reuse probe, so the cold path re-resolves it and a failed
+// turn deletes the entry instead of re-arming a timer around a dead address.
+func (h *SubstrateHarness) forgetWarmAddr(conversationID string) {
+	h.idleMu.Lock()
+	defer h.idleMu.Unlock()
+	if state := h.warmActors[conversationID]; state != nil {
+		state.workerAddr = ""
+	}
 }
 
 func (h *SubstrateHarness) beginWarmTurn(ctx context.Context, conversationID string) (string, bool, error) {
@@ -265,6 +311,13 @@ func (h *SubstrateHarness) abortWarmTurn(conversationID string) {
 	if state == nil {
 		return
 	}
+	h.endWarmTurnLocked(state, conversationID, "")
+}
+
+// endWarmTurnLocked marks the conversation's turn ended and either drops the
+// entry (no usable worker address) or arms the idle suspend timer. The caller
+// must hold idleMu.
+func (h *SubstrateHarness) endWarmTurnLocked(state *warmActorState, conversationID, execID string) {
 	state.inTurn = false
 	if state.workerAddr == "" {
 		delete(h.warmActors, conversationID)
@@ -273,7 +326,7 @@ func (h *SubstrateHarness) abortWarmTurn(conversationID string) {
 	state.generation++
 	generation := state.generation
 	state.timer = time.AfterFunc(h.idleTimeout, func() {
-		h.suspendWarmActor(conversationID, "", generation)
+		h.suspendWarmActor(conversationID, execID, generation)
 	})
 }
 
@@ -377,6 +430,14 @@ func (e *substrateExecution) Run(ctx context.Context, handler harness.Handler) e
 	return harness.DrainStream(ctx, stream, e.execID, handler)
 }
 
+// CloseBeforeNextStart implements the controller's optional eager-close
+// capability. Warm mode tracks a per-conversation turn slot, so this execution
+// must be closed before another Start for the same conversation; immediate
+// mode keeps upstream's deferred-close semantics.
+func (e *substrateExecution) CloseBeforeNextStart() bool {
+	return e.harness.idleMode == idleModeWarmThenSuspend
+}
+
 func (e *substrateExecution) Close(ctx context.Context) error {
 	if e.conn != nil {
 		_ = e.conn.Close()
@@ -397,12 +458,7 @@ func (h *SubstrateHarness) scheduleWarmSuspend(conversationID, execID string) {
 	if state == nil {
 		return
 	}
-	state.inTurn = false
-	state.generation++
-	generation := state.generation
-	state.timer = time.AfterFunc(h.idleTimeout, func() {
-		h.suspendWarmActor(conversationID, execID, generation)
-	})
+	h.endWarmTurnLocked(state, conversationID, execID)
 }
 
 func (h *SubstrateHarness) suspendWarmActor(conversationID, execID string, generation uint64) {
