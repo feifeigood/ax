@@ -156,10 +156,14 @@ func TestNewDefaultsToImmediateSuspend(t *testing.T) {
 }
 
 func TestNewRejectsInvalidIdlePolicy(t *testing.T) {
-	t.Setenv("AX_SUBSTRATE_IDLE_MODE", "keep-forever")
+	for _, mode := range []string{"keep-forever", "pause-resume"} {
+		t.Run(mode, func(t *testing.T) {
+			t.Setenv("AX_SUBSTRATE_IDLE_MODE", mode)
 
-	if _, err := New("antigravity", "127.0.0.1:1", "ax", "antigravity-template", 50053); err == nil {
-		t.Fatal("New accepted an invalid AX_SUBSTRATE_IDLE_MODE")
+			if _, err := New("antigravity", "127.0.0.1:1", "ax", "antigravity-template", 50053); err == nil {
+				t.Fatalf("New accepted invalid AX_SUBSTRATE_IDLE_MODE %q", mode)
+			}
+		})
 	}
 }
 
@@ -376,44 +380,6 @@ func TestSubstrateHarness_WarmStartFailureStillSchedulesSuspend(t *testing.T) {
 			t.Fatalf("suspend=%v, want failed warm Start to retain idle cleanup", suspend)
 		}
 		time.Sleep(10 * time.Millisecond)
-	}
-}
-
-func TestSubstrateHarness_PauseResumeUsesFreshTurnConnections(t *testing.T) {
-	ctrl := &harnesstest.MockControlServer{ResumeIP: "127.0.0.1"}
-	srv := &harnesstest.MockHarnessServer{}
-	h := newTestSubstrateHarness(t, harnesstest.StartControlServer(t, ctrl), harnesstest.StartHarnessServer(t, srv))
-	h.idleMode = idleModePauseResume
-
-	for _, input := range []string{"one", "two"} {
-		ctx := context.Background()
-		exec, err := h.Start(ctx, "conv-pause", substrateHarnessConfig)
-		if err != nil {
-			t.Fatalf("Start(%q): %v", input, err)
-		}
-		if err := exec.Queue(ctx, harnesstest.UserText(input)); err != nil {
-			t.Fatalf("Queue(%q): %v", input, err)
-		}
-		if err := exec.Run(ctx, &harnesstest.MockHandler{}); err != nil {
-			t.Fatalf("Run(%q): %v", input, err)
-		}
-		if err := exec.Close(ctx); err != nil {
-			t.Fatalf("Close(%q): %v", input, err)
-		}
-	}
-
-	if got := ctrl.PauseCalls(); !slices.Equal(got, []string{"conv-pause", "conv-pause"}) {
-		t.Fatalf("pause=%v, want one pause per turn", got)
-	}
-	_, resume, suspend := ctrl.Calls()
-	if !slices.Equal(resume, []string{"conv-pause", "conv-pause"}) {
-		t.Fatalf("resume=%v, want one resume per turn", resume)
-	}
-	if len(suspend) != 0 {
-		t.Fatalf("suspend=%v, want pause-only lifecycle", suspend)
-	}
-	if got := srv.ConnectCalls(); got != 2 {
-		t.Fatalf("HarnessService Connect calls = %d, want one fresh stream per turn", got)
 	}
 }
 

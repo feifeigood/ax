@@ -55,7 +55,6 @@ type idleMode uint8
 const (
 	idleModeImmediateSuspend idleMode = iota
 	idleModeWarmThenSuspend
-	idleModePauseResume
 )
 
 type warmActorState struct {
@@ -118,8 +117,6 @@ func idlePolicyFromEnv() (idleMode, time.Duration, error) {
 	switch modeValue {
 	case "", "immediate-suspend":
 		return idleModeImmediateSuspend, 0, nil
-	case "pause-resume":
-		return idleModePauseResume, 0, nil
 	case "warm-then-suspend":
 		timeoutValue := os.Getenv("AX_SUBSTRATE_IDLE_TIMEOUT")
 		if timeoutValue == "" {
@@ -388,28 +385,9 @@ func (e *substrateExecution) Close(ctx context.Context) error {
 		e.harness.scheduleWarmSuspend(e.conversationID, e.execID)
 		return nil
 	}
-	if e.harness.idleMode == idleModePauseResume {
-		e.harness.pauseActor(ctx, e.conversationID, e.execID)
-		return nil
-	}
 
 	e.harness.suspendActor(ctx, e.conversationID, e.execID)
 	return nil
-}
-
-func (h *SubstrateHarness) pauseActor(ctx context.Context, conversationID, execID string) {
-	slog.InfoContext(ctx, "Pausing SubstrATE actor",
-		slog.String("conversation_id", conversationID),
-		slog.String("exec_id", execID),
-	)
-	pauseCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	if _, err := h.ateClient.PauseActor(pauseCtx, conversationID); err != nil {
-		slog.ErrorContext(ctx, "Failed to pause SubstrATE actor",
-			slog.String("conversation_id", conversationID),
-			slog.Any("error", err),
-		)
-	}
 }
 
 func (h *SubstrateHarness) scheduleWarmSuspend(conversationID, execID string) {
