@@ -269,9 +269,15 @@ func (h *SubstrateHarness) abortWarmTurn(conversationID string) {
 		return
 	}
 	state.inTurn = false
-	if state.workerAddr == "" && state.timer == nil && state.suspending == nil {
+	if state.workerAddr == "" {
 		delete(h.warmActors, conversationID)
+		return
 	}
+	state.generation++
+	generation := state.generation
+	state.timer = time.AfterFunc(h.idleTimeout, func() {
+		h.suspendWarmActor(conversationID, "", generation)
+	})
 }
 
 // waitForHealthy blocks until the harness behind conn reports SERVING via the

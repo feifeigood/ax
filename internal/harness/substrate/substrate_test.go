@@ -354,6 +354,31 @@ func TestSubstrateHarness_StaleWarmTimerCannotSuspendActiveTurn(t *testing.T) {
 	}
 }
 
+func TestSubstrateHarness_WarmStartFailureStillSchedulesSuspend(t *testing.T) {
+	ctrl := &harnesstest.MockControlServer{ResumeIP: "127.0.0.1"}
+	h := newTestSubstrateHarness(t, harnesstest.StartControlServer(t, ctrl), "127.0.0.1:1")
+	h.idleMode = idleModeWarmThenSuspend
+	h.idleTimeout = 20 * time.Millisecond
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	if _, err := h.Start(ctx, "conv-start-failure", substrateHarnessConfig); err == nil {
+		t.Fatal("Start unexpectedly succeeded against an unavailable harness")
+	}
+
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		_, _, suspend := ctrl.Calls()
+		if slices.Equal(suspend, []string{"conv-start-failure"}) {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("suspend=%v, want failed warm Start to retain idle cleanup", suspend)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
 func TestSubstrateHarness_PauseResumeUsesFreshTurnConnections(t *testing.T) {
 	ctrl := &harnesstest.MockControlServer{ResumeIP: "127.0.0.1"}
 	srv := &harnesstest.MockHarnessServer{}
