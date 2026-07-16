@@ -571,6 +571,9 @@ func TestController2_ExecResumptionFlow(t *testing.T) {
 		var execs []*testExecution
 		h := &testHarness{
 			startFunc: func(ctx context.Context, conversationID string) (harness.Execution, error) {
+				if len(execs) > 0 && execs[len(execs)-1].closeCalls == 0 {
+					return nil, fmt.Errorf("previous execution was not closed before the next start")
+				}
 				exec := &testExecution{
 					id: fmt.Sprintf("exec-%d", len(execs)+1),
 					runFunc: func(ctx context.Context, execID string, handler harness.Handler) error {

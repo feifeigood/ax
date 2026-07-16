@@ -113,10 +113,10 @@ func (d *Controller) Exec(ctx context.Context, req *proto.ExecRequest, handler E
 		if err != nil {
 			return fmt.Errorf("failed to start harness session: %w", err)
 		}
-		defer exec.Close(ctx)
-
-		if err := exec.Run(ctx, hhandler); err != nil {
-			return fmt.Errorf("harness execution failed: %w", err)
+		runErr := exec.Run(ctx, hhandler)
+		_ = exec.Close(ctx)
+		if runErr != nil {
+			return fmt.Errorf("harness execution failed: %w", runErr)
 		}
 	}
 
