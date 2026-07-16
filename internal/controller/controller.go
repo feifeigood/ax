@@ -134,9 +134,10 @@ type harnessHandler struct {
 }
 
 func (a *harnessHandler) OnMessage(ctx context.Context, execID string, msg *proto.Message) error {
+	a.logger.execID = execID
 	// Log every response received from the harness
 	// TODO(anj): The harness should send the full input sent to get this particular response.
-	seq, err := a.logger.LogOutputs(ctx, []*proto.Message{msg}, proto.State_STATE_PENDING)
+	seq, err := a.logger.LogOutputs(ctx, []*proto.Message{msg}, proto.State_STATE_PENDING, nil)
 	if err != nil {
 		slog.WarnContext(ctx, "Failed to log streamed message to event log",
 			slog.String("conversation_id", a.logger.conversationID),
@@ -154,14 +155,36 @@ func (a *harnessHandler) OnMessage(ctx context.Context, execID string, msg *prot
 }
 
 func (a *harnessHandler) OnComplete(ctx context.Context, execID string) error {
+	return a.complete(ctx, execID, nil)
+}
+
+// OnCompleteWithMetadata retains opaque metadata on the existing terminal
+// event without expanding harness.Handler.
+func (a *harnessHandler) OnCompleteWithMetadata(ctx context.Context, execID string, metadata []byte) error {
+	return a.complete(ctx, execID, metadata)
+}
+
+func (a *harnessHandler) complete(ctx context.Context, execID string, metadata []byte) error {
+	a.logger.execID = execID
 	// Mark the execution turn as completed in the conversation log
-	if _, err := a.logger.LogOutputs(ctx, nil, proto.State_STATE_COMPLETED); err != nil {
+	seq, err := a.logger.LogOutputs(ctx, nil, proto.State_STATE_COMPLETED, metadata)
+	if err != nil {
 		slog.WarnContext(ctx, "Failed to log completion event to event log",
 			slog.String("conversation_id", a.logger.conversationID),
 			slog.Any("error", err),
 		)
+		if len(metadata) > 0 {
+			return fmt.Errorf("failed to persist terminal harness metadata: %w", err)
+		}
+		return nil
 	}
-	return nil
+	if len(metadata) == 0 || a.execHandler == nil {
+		return nil
+	}
+	return a.execHandler(&proto.ExecResponse{
+		Seq:             seq,
+		HarnessMetadata: metadata,
+	})
 }
 
 // Delete deletes all events for a specific conversation ID.
@@ -251,12 +274,13 @@ func (l *logger) LogInputs(ctx context.Context, inputs []*proto.Message, harness
 	return l.el.Append(ctx, ev)
 }
 
-func (l *logger) LogOutputs(ctx context.Context, outputs []*proto.Message, state proto.State) (int32, error) {
+func (l *logger) LogOutputs(ctx context.Context, outputs []*proto.Message, state proto.State, harnessMetadata []byte) (int32, error) {
 	ev := &proto.ConversationEvent{
-		ConversationId: l.conversationID,
-		ExecId:         l.execID,
-		Messages:       outputs,
-		State:          state,
+		ConversationId:  l.conversationID,
+		ExecId:          l.execID,
+		Messages:        outputs,
+		State:           state,
+		HarnessMetadata: harnessMetadata,
 	}
 	return l.el.Append(ctx, ev)
 }

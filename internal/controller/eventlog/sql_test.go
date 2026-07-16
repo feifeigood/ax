@@ -15,6 +15,7 @@
 package eventlog
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"path/filepath"
@@ -44,7 +45,8 @@ func testEventLog(t *testing.T, newLog func(t *testing.T) EventLog) {
 
 		// 1. Conversation log.
 		cev1 := &proto.ConversationEvent{ConversationId: conv, Seq: 1, ExecId: task1}
-		cev2 := &proto.ConversationEvent{ConversationId: conv, Seq: 2, ExecId: task2}
+		metadata := []byte("agentfleet-metadata-fixture")
+		cev2 := &proto.ConversationEvent{ConversationId: conv, Seq: 2, ExecId: task2, HarnessMetadata: metadata}
 		if _, err := log.Append(ctx, cev1); err != nil {
 			t.Fatalf("failed to append cev1: %v", err)
 		}
@@ -65,7 +67,9 @@ func testEventLog(t *testing.T, newLog func(t *testing.T) EventLog) {
 		if cEvents[0].ExecId != task1 || cEvents[1].ExecId != task2 {
 			t.Errorf("conversation events mismatch: %q, %q", cEvents[0].ExecId, cEvents[1].ExecId)
 		}
-
+		if !bytes.Equal(cEvents[1].GetHarnessMetadata(), metadata) {
+			t.Errorf("metadata = %q, want %q", cEvents[1].GetHarnessMetadata(), metadata)
+		}
 
 	})
 
@@ -103,7 +107,6 @@ func testEventLog(t *testing.T, newLog func(t *testing.T) EventLog) {
 		if _, err := log.Append(ctx, &proto.ConversationEvent{ConversationId: conv2, Seq: 1, ExecId: task3}); err != nil {
 			t.Fatalf("append: %v", err)
 		}
-
 
 		if err := log.DeleteAll(ctx, conv1); err != nil {
 			t.Fatalf("failed to delete events: %v", err)
