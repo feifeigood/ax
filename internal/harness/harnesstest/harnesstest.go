@@ -46,9 +46,11 @@ type MockControlServer struct {
 	resumeCalls  []string
 	suspendCalls []string
 
-	CreateErr      error  // returned from CreateActor when non-nil
-	ResumeIP       string // AteomPodIp returned from ResumeActor
-	ResumeNilActor bool   // when true, ResumeActor returns a nil Actor
+	CreateErr      error    // returned from CreateActor when non-nil
+	ResumeIP       string   // AteomPodIp returned from ResumeActor
+	ResumeIPs      []string // per-call AteomPodIp values; overrides ResumeIP when set
+	ResumeNilActor bool     // when true, ResumeActor returns a nil Actor
+	SuspendErr     error    // returned from SuspendActor when non-nil
 }
 
 func (f *MockControlServer) CreateAtespace(_ context.Context, req *ateapipb.CreateAtespaceRequest) (*ateapipb.CreateAtespaceResponse, error) {
@@ -68,17 +70,25 @@ func (f *MockControlServer) CreateActor(_ context.Context, req *ateapipb.CreateA
 func (f *MockControlServer) ResumeActor(_ context.Context, req *ateapipb.ResumeActorRequest) (*ateapipb.ResumeActorResponse, error) {
 	f.mu.Lock()
 	f.resumeCalls = append(f.resumeCalls, req.GetActorRef().GetName())
+	resumeIP := f.ResumeIP
+	if len(f.ResumeIPs) > 0 {
+		index := min(len(f.resumeCalls)-1, len(f.ResumeIPs)-1)
+		resumeIP = f.ResumeIPs[index]
+	}
 	f.mu.Unlock()
 	if f.ResumeNilActor {
 		return &ateapipb.ResumeActorResponse{}, nil
 	}
-	return &ateapipb.ResumeActorResponse{Actor: &ateapipb.Actor{ActorId: req.GetActorRef().GetName(), AteomPodIp: f.ResumeIP}}, nil
+	return &ateapipb.ResumeActorResponse{Actor: &ateapipb.Actor{ActorId: req.GetActorRef().GetName(), AteomPodIp: resumeIP}}, nil
 }
 
 func (f *MockControlServer) SuspendActor(_ context.Context, req *ateapipb.SuspendActorRequest) (*ateapipb.SuspendActorResponse, error) {
 	f.mu.Lock()
 	f.suspendCalls = append(f.suspendCalls, req.GetActorRef().GetName())
 	f.mu.Unlock()
+	if f.SuspendErr != nil {
+		return nil, f.SuspendErr
+	}
 	return &ateapipb.SuspendActorResponse{}, nil
 }
 

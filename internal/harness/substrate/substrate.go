@@ -161,10 +161,16 @@ func (h *SubstrateHarness) Start(ctx context.Context, conversationID string, har
 	}
 
 	if reusedWarmActor {
-		// The cached address is a hint, not truth: the actor may have died or
-		// moved while warm (worker OOM, node drain, external suspend). Probe it
-		// briefly and fall back to a full cold resume instead of failing the
-		// conversation.
+		// The cached address only proves that this process previously observed a
+		// running actor. Resolve through the authoritative control path before
+		// connecting because a worker IP can be reassigned while the actor is warm.
+		cachedWorkerAddr := workerAddr
+		workerAddr, err = h.resumeWorkerAddr(ctx, conversationID)
+		if err != nil {
+			return nil, err
+		}
+		h.rememberWarmActor(conversationID, workerAddr)
+
 		exec, probeErr := h.connect(ctx, conversationID, harnessConfig, workerAddr, h.probeTimeout())
 		if probeErr == nil {
 			return exec, nil
@@ -172,11 +178,21 @@ func (h *SubstrateHarness) Start(ctx context.Context, conversationID string, har
 		if ctx.Err() != nil {
 			return nil, probeErr
 		}
-		slog.WarnContext(ctx, "Warm SubstrATE actor unreachable; falling back to cold resume",
+		slog.WarnContext(ctx, "Warm SubstrATE actor unreachable; restarting before cold resume",
 			slog.String("conversation_id", conversationID),
 			slog.String("worker_addr", workerAddr),
+			slog.String("cached_worker_addr", cachedWorkerAddr),
 			slog.Any("error", probeErr),
 		)
+		// ResumeActor is a no-op for an actor already marked RUNNING. Suspend it
+		// first so the cold path below performs a real restore. Keep the cached
+		// address until this succeeds so a failed reset still gets idle cleanup.
+		resetCtx, cancelReset := context.WithTimeout(ctx, 10*time.Second)
+		_, suspendErr := h.ateClient.SuspendActor(resetCtx, conversationID)
+		cancelReset()
+		if suspendErr != nil {
+			return nil, fmt.Errorf("failed to reset unreachable substrate actor %s after %v: %w", conversationID, probeErr, suspendErr)
+		}
 		h.forgetWarmAddr(conversationID)
 	}
 
@@ -187,21 +203,34 @@ func (h *SubstrateHarness) Start(ctx context.Context, conversationID string, har
 	}
 
 	// Resume the actor so it is scheduled onto a worker and gets a routable IP.
-	resumeResp, err := h.ateClient.ResumeActor(ctx, conversationID)
+	workerAddr, err = h.resumeWorkerAddr(ctx, conversationID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to resume substrate actor %s: %w", conversationID, err)
+		return nil, err
 	}
-	actor := resumeResp.Actor
-	if actor == nil {
-		return nil, fmt.Errorf("received nil actor in response for %s", conversationID)
-	}
-	if actor.AteomPodIp == "" {
-		return nil, fmt.Errorf("actor %s has no active worker IP address", conversationID)
-	}
-	workerAddr = fmt.Sprintf("%s:%d", actor.AteomPodIp, h.port)
 	h.rememberWarmActor(conversationID, workerAddr)
 
 	return h.connect(ctx, conversationID, harnessConfig, workerAddr, healthCheckTimeout)
+}
+
+// resumeWorkerAddr resolves the current actor through ATE and returns its
+// authoritative worker address. ResumeActor is idempotent for RUNNING actors,
+// so warm turns pay only the control-plane check and do not restore the actor.
+func (h *SubstrateHarness) resumeWorkerAddr(ctx context.Context, conversationID string) (string, error) {
+	resumeResp, err := h.ateClient.ResumeActor(ctx, conversationID)
+	if err != nil {
+		return "", fmt.Errorf("failed to resume substrate actor %s: %w", conversationID, err)
+	}
+	actor := resumeResp.GetActor()
+	if actor == nil {
+		return "", fmt.Errorf("received nil actor in response for %s", conversationID)
+	}
+	if actor.GetActorId() != conversationID {
+		return "", fmt.Errorf("received actor %s while resuming %s", actor.GetActorId(), conversationID)
+	}
+	if actor.GetAteomPodIp() == "" {
+		return "", fmt.Errorf("actor %s has no active worker IP address", conversationID)
+	}
+	return fmt.Sprintf("%s:%d", actor.GetAteomPodIp(), h.port), nil
 }
 
 // connect dials the actor's worker address and waits for the harness to be
