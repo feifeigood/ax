@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -425,6 +426,11 @@ func (c *testExecution) Close(ctx context.Context) error {
 	return nil
 }
 
+// eagerTestExecution opts a testExecution in to the eager-close capability.
+type eagerTestExecution struct{ *testExecution }
+
+func (e *eagerTestExecution) CloseBeforeNextStart() bool { return true }
+
 func TestController2_ExecResumptionFlow(t *testing.T) {
 	// Subtest 1: New Execution with Inputs
 	t.Run("NewExecutionWithInputs", func(t *testing.T) {
@@ -568,6 +574,8 @@ func TestController2_ExecResumptionFlow(t *testing.T) {
 
 		reg := NewRegistry()
 
+		// The fake models substrate warm mode: it declares the eager-close
+		// capability and rejects a new Start while a turn is still open.
 		var execs []*testExecution
 		h := &testHarness{
 			startFunc: func(ctx context.Context, conversationID string) (harness.Execution, error) {
@@ -581,7 +589,7 @@ func TestController2_ExecResumptionFlow(t *testing.T) {
 					},
 				}
 				execs = append(execs, exec)
-				return exec, nil
+				return &eagerTestExecution{exec}, nil
 			},
 		}
 		if err := reg.RegisterHarness("test-agent", h); err != nil {
@@ -776,5 +784,172 @@ func TestExec_NewConversationLogsCanonicalDefault(t *testing.T) {
 	}
 	if stored != "harness-a" {
 		t.Errorf("logged harness id = %q, want canonical %q (not empty)", stored, "harness-a")
+	}
+}
+
+// journalExecution records lifecycle events into a shared journal so tests can
+// assert Close ordering across the two executions of a pending-resume Exec.
+type journalExecution struct {
+	name    string
+	journal *[]string
+	runFunc func(ctx context.Context, execID string, handler harness.Handler) error
+}
+
+func (e *journalExecution) ID() string { return e.name }
+
+func (e *journalExecution) Queue(ctx context.Context, msg ...*proto.Message) error { return nil }
+
+func (e *journalExecution) Run(ctx context.Context, handler harness.Handler) error {
+	*e.journal = append(*e.journal, "run:"+e.name)
+	if e.runFunc != nil {
+		return e.runFunc(ctx, e.name, handler)
+	}
+	return handler.OnComplete(ctx, e.name)
+}
+
+func (e *journalExecution) Close(ctx context.Context) error {
+	*e.journal = append(*e.journal, "close:"+e.name)
+	return nil
+}
+
+// eagerJournalExecution additionally opts in to the eager-close capability.
+type eagerJournalExecution struct{ journalExecution }
+
+func (e *eagerJournalExecution) CloseBeforeNextStart() bool { return true }
+
+func seedPendingConversation(t *testing.T, log *eventlogtest.MemoryEventLog, cid string) {
+	t.Helper()
+	_, err := log.Append(context.Background(), &proto.ConversationEvent{
+		ConversationId: cid,
+		HarnessId:      "test-agent",
+		State:          proto.State_STATE_PENDING,
+		Messages: []*proto.Message{
+			{Role: "user", Content: &proto.Content{Type: &proto.Content_Text{Text: &proto.TextContent{Text: "Initial"}}}},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func newJournalController(t *testing.T, log *eventlogtest.MemoryEventLog, start func(ctx context.Context, conversationID string) (harness.Execution, error)) *Controller {
+	t.Helper()
+	reg := NewRegistry()
+	if err := reg.RegisterHarness("test-agent", &testHarness{startFunc: start}); err != nil {
+		t.Fatal(err)
+	}
+	c, err := New(context.Background(), Config{
+		Registry:        reg,
+		EventLogBuilder: func() (eventlog.EventLog, error) { return log, nil },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = c.Close() })
+	return c
+}
+
+// Without the eager-close capability the controller must keep upstream's
+// deferred-close semantics: in the default immediate-suspend substrate mode an
+// inline Close would synchronously suspend and immediately re-resume the actor
+// in the middle of a single Exec call.
+func TestExec_PendingResumeKeepsDeferredCloseWithoutEagerCapability(t *testing.T) {
+	ctx := context.Background()
+	cid := "pending-deferred-close"
+	log := &eventlogtest.MemoryEventLog{}
+	seedPendingConversation(t, log, cid)
+
+	var journal []string
+	starts := 0
+	c := newJournalController(t, log, func(ctx context.Context, conversationID string) (harness.Execution, error) {
+		starts++
+		name := fmt.Sprintf("exec-%d", starts)
+		journal = append(journal, "start:"+name)
+		return &journalExecution{name: name, journal: &journal}, nil
+	})
+
+	err := c.Exec(ctx, &proto.ExecRequest{
+		ConversationId: cid,
+		HarnessId:      "test-agent",
+		Inputs: []*proto.Message{
+			{Role: "user", Content: &proto.Content{Type: &proto.Content_Text{Text: &proto.TextContent{Text: "More"}}}},
+		},
+	}, func(*proto.ExecResponse) error { return nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := []string{"start:exec-1", "run:exec-1", "start:exec-2", "run:exec-2", "close:exec-2", "close:exec-1"}
+	if !slices.Equal(journal, want) {
+		t.Fatalf("journal = %v,\nwant %v (upstream deferred-close semantics)", journal, want)
+	}
+}
+
+// Executions that opt in via CloseBeforeNextStart must be closed before the
+// controller starts the next execution for the same conversation (warm-mode
+// turn-slot bookkeeping).
+func TestExec_PendingResumeClosesEagerlyWithCapability(t *testing.T) {
+	ctx := context.Background()
+	cid := "pending-eager-close"
+	log := &eventlogtest.MemoryEventLog{}
+	seedPendingConversation(t, log, cid)
+
+	var journal []string
+	starts := 0
+	c := newJournalController(t, log, func(ctx context.Context, conversationID string) (harness.Execution, error) {
+		starts++
+		name := fmt.Sprintf("exec-%d", starts)
+		journal = append(journal, "start:"+name)
+		return &eagerJournalExecution{journalExecution{name: name, journal: &journal}}, nil
+	})
+
+	err := c.Exec(ctx, &proto.ExecRequest{
+		ConversationId: cid,
+		HarnessId:      "test-agent",
+		Inputs: []*proto.Message{
+			{Role: "user", Content: &proto.Content{Type: &proto.Content_Text{Text: &proto.TextContent{Text: "More"}}}},
+		},
+	}, func(*proto.ExecResponse) error { return nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := []string{"start:exec-1", "run:exec-1", "close:exec-1", "start:exec-2", "run:exec-2", "close:exec-2"}
+	if !slices.Equal(journal, want) {
+		t.Fatalf("journal = %v,\nwant %v (eager close before the next Start)", journal, want)
+	}
+}
+
+// A panic out of Run must not leak the execution: in warm mode a skipped Close
+// leaves the conversation's turn slot taken forever.
+func TestExec_PendingResumePanicStillClosesExecution(t *testing.T) {
+	ctx := context.Background()
+	cid := "pending-panic-close"
+	log := &eventlogtest.MemoryEventLog{}
+	seedPendingConversation(t, log, cid)
+
+	var journal []string
+	c := newJournalController(t, log, func(ctx context.Context, conversationID string) (harness.Execution, error) {
+		return &eagerJournalExecution{journalExecution{
+			name:    "exec-1",
+			journal: &journal,
+			runFunc: func(ctx context.Context, execID string, handler harness.Handler) error {
+				panic("boom")
+			},
+		}}, nil
+	})
+
+	func() {
+		defer func() {
+			if recover() == nil {
+				t.Fatal("expected the Run panic to propagate")
+			}
+		}()
+		_ = c.Exec(ctx, &proto.ExecRequest{ConversationId: cid, HarnessId: "test-agent"},
+			func(*proto.ExecResponse) error { return nil })
+	}()
+
+	if !slices.Contains(journal, "close:exec-1") {
+		t.Fatalf("journal = %v, want Close to run despite the panic", journal)
 	}
 }

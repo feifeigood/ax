@@ -22,6 +22,7 @@ import (
 	"log/slog"
 
 	"github.com/google/ax/internal/controller/eventlog"
+	"github.com/google/ax/internal/harness"
 	"github.com/google/ax/proto"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -113,8 +114,16 @@ func (d *Controller) Exec(ctx context.Context, req *proto.ExecRequest, handler E
 		if err != nil {
 			return fmt.Errorf("failed to start harness session: %w", err)
 		}
-		runErr := exec.Run(ctx, hhandler)
-		_ = exec.Close(ctx)
+		var runErr error
+		if closeBeforeNextStart(exec) {
+			runErr = func() error {
+				defer exec.Close(ctx)
+				return exec.Run(ctx, hhandler)
+			}()
+		} else {
+			defer exec.Close(ctx)
+			runErr = exec.Run(ctx, hhandler)
+		}
 		if runErr != nil {
 			return fmt.Errorf("harness execution failed: %w", runErr)
 		}
@@ -144,6 +153,19 @@ func (d *Controller) Exec(ctx context.Context, req *proto.ExecRequest, handler E
 	return nil
 }
 
+// eagerCloseExecution is an optional Execution capability. Executions whose
+// harness tracks per-conversation turn state (substrate warm mode) must be
+// closed before the controller starts another execution for the same
+// conversation; everything else keeps upstream's deferred-close semantics.
+type eagerCloseExecution interface {
+	CloseBeforeNextStart() bool
+}
+
+func closeBeforeNextStart(exec harness.Execution) bool {
+	ec, ok := exec.(eagerCloseExecution)
+	return ok && ec.CloseBeforeNextStart()
+}
+
 type harnessHandler struct {
 	logger      *logger
 	execHandler ExecHandler
@@ -152,7 +174,7 @@ type harnessHandler struct {
 func (a *harnessHandler) OnMessage(ctx context.Context, execID string, msg *proto.Message) error {
 	// Log every response received from the harness
 	// TODO(anj): The harness should send the full input sent to get this particular response.
-	seq, err := a.logger.LogOutputs(ctx, []*proto.Message{msg}, proto.State_STATE_PENDING, nil)
+	seq, err := a.logger.LogOutputs(ctx, []*proto.Message{msg}, proto.State_STATE_PENDING, nil, "")
 	if err != nil {
 		slog.WarnContext(ctx, "Failed to log streamed message to event log",
 			slog.String("conversation_id", a.logger.conversationID),
@@ -180,13 +202,14 @@ func (a *harnessHandler) OnCompleteWithMetadata(ctx context.Context, execID stri
 }
 
 func (a *harnessHandler) complete(ctx context.Context, execID string, metadata []byte) error {
+	// Metadata-bearing terminal events are stamped with the stream's execID;
+	// the legacy no-metadata path keeps the logger's (empty) execID unchanged.
+	terminalExecID := ""
 	if len(metadata) > 0 {
-		previousExecID := a.logger.execID
-		a.logger.execID = execID
-		defer func() { a.logger.execID = previousExecID }()
+		terminalExecID = execID
 	}
 	// Mark the execution turn as completed in the conversation log
-	seq, err := a.logger.LogOutputs(ctx, nil, proto.State_STATE_COMPLETED, metadata)
+	seq, err := a.logger.LogOutputs(ctx, nil, proto.State_STATE_COMPLETED, metadata, terminalExecID)
 	if err != nil {
 		slog.WarnContext(ctx, "Failed to log completion event to event log",
 			slog.String("conversation_id", a.logger.conversationID),
@@ -295,10 +318,15 @@ func (l *logger) LogInputs(ctx context.Context, inputs []*proto.Message, harness
 	return l.el.Append(ctx, ev)
 }
 
-func (l *logger) LogOutputs(ctx context.Context, outputs []*proto.Message, state proto.State, harnessMetadata []byte) (int32, error) {
+// LogOutputs appends an output event. A non-empty execID overrides the
+// logger's own (which is never populated today) on the appended event.
+func (l *logger) LogOutputs(ctx context.Context, outputs []*proto.Message, state proto.State, harnessMetadata []byte, execID string) (int32, error) {
+	if execID == "" {
+		execID = l.execID
+	}
 	ev := &proto.ConversationEvent{
 		ConversationId:  l.conversationID,
-		ExecId:          l.execID,
+		ExecId:          execID,
 		Messages:        outputs,
 		State:           state,
 		HarnessMetadata: harnessMetadata,
