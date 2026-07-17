@@ -513,6 +513,71 @@ func (h *SubstrateHarness) suspendWarmActor(conversationID, execID string, gener
 	h.idleMu.Unlock()
 }
 
+// Shutdown drains warm actors awaiting idle suspension so a process exit does
+// not leak them as RUNNING actors. A warm actor sits between turns with a
+// pending idle timer whose only home is this process's memory; if the process
+// dies before the timer fires, the actor is never suspended. Shutdown stops each
+// pending timer and suspends the actor synchronously.
+//
+// Actors with an active turn are left untouched: the turn owns the actor and
+// schedules its own suspension on Close. Callers should therefore invoke
+// Shutdown only after in-flight turns have drained (e.g. after the gRPC server's
+// GracefulStop returns) so no turn re-arms a timer after this drain.
+func (h *SubstrateHarness) Shutdown(ctx context.Context) {
+	if h.idleMode != idleModeWarmThenSuspend {
+		return
+	}
+
+	h.idleMu.Lock()
+	var (
+		drain      []string
+		inProgress []chan struct{}
+	)
+	for conversationID, state := range h.warmActors {
+		switch {
+		case state.inTurn:
+			// An active turn owns the actor; it will suspend on Close.
+			continue
+		case state.suspending != nil:
+			// A fired timer is already suspending this actor; wait for it below.
+			inProgress = append(inProgress, state.suspending)
+		case state.timer != nil:
+			state.timer.Stop()
+			state.timer = nil
+			// Neutralize a timer callback that already fired but is still blocked
+			// on idleMu: the generation bump makes suspendWarmActor a no-op so it
+			// cannot suspend again after we do.
+			state.generation++
+			if state.workerAddr == "" {
+				delete(h.warmActors, conversationID)
+				continue
+			}
+			drain = append(drain, conversationID)
+		default:
+			// No timer and not suspending: nothing deferred to clean up.
+			delete(h.warmActors, conversationID)
+		}
+	}
+	h.idleMu.Unlock()
+
+	for _, conversationID := range drain {
+		h.suspendActor(ctx, conversationID, "")
+		h.idleMu.Lock()
+		delete(h.warmActors, conversationID)
+		h.idleMu.Unlock()
+	}
+
+	// Wait for any timer-driven suspensions already in progress so they are not
+	// cut short by process exit.
+	for _, done := range inProgress {
+		select {
+		case <-ctx.Done():
+			return
+		case <-done:
+		}
+	}
+}
+
 func (h *SubstrateHarness) suspendActor(ctx context.Context, conversationID, execID string) {
 	// Suspend actor to return resource to standard standby pool
 	slog.InfoContext(ctx, "Suspending SubstrATE actor",

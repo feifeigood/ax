@@ -73,7 +73,6 @@ func (s *Server) Exec(req *proto.ExecRequest, stream grpc.ServerStreamingServer[
 	return s.controller.Exec(ctx, req, outputHandler)
 }
 
-
 func (s *Server) DeleteConversation(ctx context.Context, req *proto.DeleteConversationRequest) (*proto.DeleteConversationResponse, error) {
 	slog.InfoContext(ctx, "Deleting conversation...",
 		slog.String("conversation_id", req.ConversationId))
@@ -121,14 +120,19 @@ func (s *Server) Serve(address string, opts ...grpc.ServerOption) error {
 	return nil
 }
 
-// GracefulStop stops the gRPC server gracefully.
+// GracefulStop stops the gRPC server gracefully. The gRPC server is drained
+// first so in-flight turns run to completion before the controller releases
+// resources. This ordering also lets warm harnesses drain correctly: by the
+// time the controller closes, every turn has finished and parked its actor for
+// idle suspension, so the drain suspends those actors instead of racing a turn
+// that would re-arm the idle timer afterward.
 func (s *Server) GracefulStop() {
 	slog.Info("Stopping server gracefully...")
-	if s.controller != nil {
-		s.controller.Close()
-	}
 	if s.grpcServer != nil {
 		s.grpcServer.GracefulStop()
+	}
+	if s.controller != nil {
+		s.controller.Close()
 	}
 }
 

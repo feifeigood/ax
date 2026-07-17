@@ -657,6 +657,98 @@ func TestSubstrateHarness_FailedWarmResetRetainsIdleCleanup(t *testing.T) {
 	}
 }
 
+// A warm actor sits with a pending idle-suspend timer between turns. If the
+// ax-server process exits before that timer fires, the timer dies with the
+// process and the actor is never suspended -- it leaks as a RUNNING actor
+// holding a worker slot. Shutdown must drain those pending timers by suspending
+// the warm actors synchronously.
+func TestSubstrateHarness_ShutdownDrainsWarmActorsAwaitingIdleSuspend(t *testing.T) {
+	ctrl := &harnesstest.MockControlServer{ResumeIP: "127.0.0.1"}
+	srv := &harnesstest.MockHarnessServer{}
+	h := newTestSubstrateHarness(t, harnesstest.StartControlServer(t, ctrl), harnesstest.StartHarnessServer(t, srv))
+	h.idleMode = idleModeWarmThenSuspend
+	h.idleTimeout = time.Hour // must NOT fire on its own during the test
+
+	ctx := context.Background()
+	exec, err := h.Start(ctx, "conv-drain", substrateHarnessConfig)
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	if err := exec.Run(ctx, &harnesstest.MockHandler{}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if err := exec.Close(ctx); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	// The actor is warm now with a one-hour pending timer; nothing suspended yet.
+	if _, _, suspend := ctrl.Calls(); len(suspend) != 0 {
+		t.Fatalf("suspend=%v, want none before shutdown", suspend)
+	}
+
+	h.Shutdown(ctx)
+
+	if _, _, suspend := ctrl.Calls(); !slices.Equal(suspend, []string{"conv-drain"}) {
+		t.Fatalf("suspend=%v, want the warm actor suspended on shutdown", suspend)
+	}
+
+	// The bookkeeping entry is gone, so a lingering timer cannot suspend twice.
+	h.idleMu.Lock()
+	_, present := h.warmActors["conv-drain"]
+	h.idleMu.Unlock()
+	if present {
+		t.Fatalf("warm actor entry still present after shutdown drain")
+	}
+}
+
+// Shutdown must not touch an actor that still has an active turn: the turn owns
+// the actor and will schedule its own suspension on Close.
+func TestSubstrateHarness_ShutdownLeavesActiveTurnAlone(t *testing.T) {
+	ctrl := &harnesstest.MockControlServer{ResumeIP: "127.0.0.1"}
+	srv := &harnesstest.MockHarnessServer{}
+	h := newTestSubstrateHarness(t, harnesstest.StartControlServer(t, ctrl), harnesstest.StartHarnessServer(t, srv))
+	h.idleMode = idleModeWarmThenSuspend
+	h.idleTimeout = time.Hour
+
+	ctx := context.Background()
+	exec, err := h.Start(ctx, "conv-active", substrateHarnessConfig)
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	t.Cleanup(func() { _ = exec.Close(ctx) })
+
+	// Turn is in-flight (Start ran, Close has not). Shutdown must skip it.
+	h.Shutdown(ctx)
+
+	if _, _, suspend := ctrl.Calls(); len(suspend) != 0 {
+		t.Fatalf("suspend=%v, want none while a turn is active", suspend)
+	}
+}
+
+// Shutdown is a no-op in immediate-suspend mode, which never tracks warm actors.
+func TestSubstrateHarness_ShutdownImmediateModeIsNoOp(t *testing.T) {
+	ctrl := &harnesstest.MockControlServer{ResumeIP: "127.0.0.1"}
+	srv := &harnesstest.MockHarnessServer{}
+	h := newTestSubstrateHarness(t, harnesstest.StartControlServer(t, ctrl), harnesstest.StartHarnessServer(t, srv))
+	// idleMode defaults to immediate-suspend.
+
+	ctx := context.Background()
+	exec, err := h.Start(ctx, "conv-immediate", substrateHarnessConfig)
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	if err := exec.Close(ctx); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	// Close already suspended once (immediate mode); Shutdown adds nothing.
+	_, _, before := ctrl.Calls()
+	h.Shutdown(ctx)
+	if _, _, after := ctrl.Calls(); !slices.Equal(after, before) {
+		t.Fatalf("suspend calls changed across Shutdown: before=%v after=%v", before, after)
+	}
+}
+
 // The eager-close capability tells the controller whether an execution must be
 // closed before the next Start for the same conversation. Only warm mode needs
 // that (turn-slot bookkeeping); immediate mode must keep upstream's
