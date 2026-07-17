@@ -27,6 +27,38 @@ func (d *dummyHarness) Start(ctx context.Context, conversationID string, harness
 	return nil, nil
 }
 
+// drainableHarness implements the optional harness.Drainer capability so the
+// registry test can assert that Close drains it.
+type drainableHarness struct {
+	dummyHarness
+	shutdownCalls int
+}
+
+func (d *drainableHarness) Shutdown(ctx context.Context) {
+	d.shutdownCalls++
+}
+
+// Close must invoke Shutdown on every registered harness that implements the
+// Drainer capability so warm actors are suspended before the process exits.
+// Harnesses without the capability are skipped without error.
+func TestRegistry_CloseDrainsDrainerHarnesses(t *testing.T) {
+	r := NewRegistry()
+	drainable := &drainableHarness{}
+	if err := r.RegisterHarness("warm", drainable); err != nil {
+		t.Fatalf("RegisterHarness(warm): %v", err)
+	}
+	if err := r.RegisterHarness("plain", &dummyHarness{}); err != nil {
+		t.Fatalf("RegisterHarness(plain): %v", err)
+	}
+
+	if err := r.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	if drainable.shutdownCalls != 1 {
+		t.Fatalf("Shutdown calls = %d, want 1", drainable.shutdownCalls)
+	}
+}
+
 func TestRegistry_RegisterHarness(t *testing.T) {
 	r := NewRegistry()
 	h := &dummyHarness{}
