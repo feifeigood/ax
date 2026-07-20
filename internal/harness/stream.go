@@ -29,6 +29,13 @@ type terminalMetadataHandler interface {
 	OnCompleteWithMetadata(ctx context.Context, execID string, metadata []byte) error
 }
 
+// failMetadataHandler is the failure counterpart to terminalMetadataHandler:
+// it lets the controller retain opaque metadata (e.g. token usage) collected
+// before a failed execution.
+type failMetadataHandler interface {
+	OnFailWithMetadata(ctx context.Context, execID string, metadata []byte, cause error) error
+}
+
 // DrainStream reads from the harness gRPC stream until io.EOF, dispatching messages
 // to the handler, and returns the final execution status.
 func DrainStream(ctx context.Context, stream proto.HarnessService_ConnectClient, execID string, handler Handler) error {
@@ -71,6 +78,11 @@ func DrainStream(ctx context.Context, stream proto.HarnessService_ConnectClient,
 		return fmt.Errorf("harness stream ended without HarnessEnd frame")
 	}
 	if endState == proto.State_STATE_FAILED {
+		if len(harnessMetadata) > 0 {
+			if fh, ok := handler.(failMetadataHandler); ok {
+				return fh.OnFailWithMetadata(ctx, execID, harnessMetadata, endErr)
+			}
+		}
 		return endErr
 	}
 	if len(harnessMetadata) > 0 {
