@@ -119,7 +119,8 @@ type MockHarnessServer struct {
 	ErrCode int32
 	// ErrMessage is the error text used by FailConnect/FailFrame.
 	ErrMessage string
-	// HarnessMetadata is attached to the completed HarnessEnd frame.
+	// HarnessMetadata is attached to the terminal HarnessEnd frame, whether
+	// COMPLETED or (via FailFrame) FAILED.
 	HarnessMetadata []byte
 
 	mu               sync.Mutex
@@ -167,6 +168,7 @@ func (s *MockHarnessServer) Connect(stream proto.HarnessService_ConnectServer) e
 						Code:        s.ErrCode,
 						Description: s.ErrMessage,
 					},
+					HarnessMetadata: s.HarnessMetadata,
 				},
 			},
 		})

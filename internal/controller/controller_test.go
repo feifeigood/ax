@@ -32,6 +32,10 @@ type metadataCompleter interface {
 	OnCompleteWithMetadata(ctx context.Context, execID string, metadata []byte) error
 }
 
+type failMetadataCompleter interface {
+	OnFailWithMetadata(ctx context.Context, execID string, metadata []byte, cause error) error
+}
+
 type fakeHarness struct{}
 
 func (f *fakeHarness) Start(ctx context.Context, conversationID string, harnessConfig []byte) (harness.Execution, error) {
@@ -246,6 +250,86 @@ func TestController2_ExecPersistsAndStreamsTerminalHarnessMetadata(t *testing.T)
 	}
 	if terminal.GetConversationId() != conversationID || terminal.GetExecId() != "metadata-exec" {
 		t.Fatalf("terminal identity = (%q, %q), want (%q, %q)", terminal.GetConversationId(), terminal.GetExecId(), conversationID, "metadata-exec")
+	}
+	if !bytes.Equal(terminal.GetHarnessMetadata(), wantMetadata) {
+		t.Fatalf("event metadata = %q, want %q", terminal.GetHarnessMetadata(), wantMetadata)
+	}
+	if responses[0].GetSeq() != terminal.GetSeq() {
+		t.Fatalf("response seq = %d, terminal event seq = %d", responses[0].GetSeq(), terminal.GetSeq())
+	}
+}
+
+func TestController2_ExecPersistsAndStreamsFailedTerminalHarnessMetadata(t *testing.T) {
+	ctx := context.Background()
+	const conversationID = "failed-metadata-conversation"
+	wantMetadata := []byte("agentfleet-failed-metadata-fixture")
+	wantCause := fmt.Errorf("harness failed: [13] boom")
+
+	log := &eventlogtest.MemoryEventLog{}
+	reg := NewRegistry()
+	h := &testHarness{
+		startFunc: func(context.Context, string) (harness.Execution, error) {
+			return &testExecution{
+				id: "failed-metadata-exec",
+				runFunc: func(ctx context.Context, execID string, handler harness.Handler) error {
+					completer, ok := handler.(failMetadataCompleter)
+					if !ok {
+						return fmt.Errorf("handler does not support FAILED terminal metadata")
+					}
+					return completer.OnFailWithMetadata(ctx, execID, wantMetadata, wantCause)
+				},
+			}, nil
+		},
+	}
+	if err := reg.RegisterHarness("failed-metadata", h); err != nil {
+		t.Fatal(err)
+	}
+
+	c, err := New(ctx, Config{
+		Registry:        reg,
+		EventLogBuilder: func() (eventlog.EventLog, error) { return log, nil },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+
+	var responses []*proto.ExecResponse
+	err = c.Exec(ctx, &proto.ExecRequest{
+		ConversationId: conversationID,
+		HarnessId:      "failed-metadata",
+		Inputs:         []*proto.Message{{Role: "user"}},
+	}, func(resp *proto.ExecResponse) error {
+		responses = append(responses, resp)
+		return nil
+	})
+	if err == nil || !strings.Contains(err.Error(), wantCause.Error()) {
+		t.Fatalf("Exec error = %v, want it to wrap %v", err, wantCause)
+	}
+
+	if len(responses) != 1 {
+		t.Fatalf("responses = %d, want 1 terminal metadata response", len(responses))
+	}
+	if !bytes.Equal(responses[0].GetHarnessMetadata(), wantMetadata) {
+		t.Fatalf("response metadata = %q, want %q", responses[0].GetHarnessMetadata(), wantMetadata)
+	}
+	if len(responses[0].GetOutputs()) != 0 {
+		t.Fatalf("terminal metadata response has %d outputs, want 0", len(responses[0].GetOutputs()))
+	}
+
+	events, err := log.Events(ctx, conversationID)
+	if err != nil {
+		t.Fatalf("Events: %v", err)
+	}
+	if len(events) != 2 {
+		t.Fatalf("events = %d, want input plus terminal event", len(events))
+	}
+	terminal := events[1]
+	if terminal.GetState() != proto.State_STATE_FAILED {
+		t.Fatalf("terminal state = %v, want FAILED", terminal.GetState())
+	}
+	if terminal.GetConversationId() != conversationID || terminal.GetExecId() != "failed-metadata-exec" {
+		t.Fatalf("terminal identity = (%q, %q), want (%q, %q)", terminal.GetConversationId(), terminal.GetExecId(), conversationID, "failed-metadata-exec")
 	}
 	if !bytes.Equal(terminal.GetHarnessMetadata(), wantMetadata) {
 		t.Fatalf("event metadata = %q, want %q", terminal.GetHarnessMetadata(), wantMetadata)

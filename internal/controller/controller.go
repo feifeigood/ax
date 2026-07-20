@@ -201,6 +201,39 @@ func (a *harnessHandler) OnCompleteWithMetadata(ctx context.Context, execID stri
 	return a.complete(ctx, execID, metadata)
 }
 
+// OnFailWithMetadata persists a terminal FAILED event that still carries the
+// harness's opaque metadata (e.g. token usage collected before the failure),
+// then returns the original cause unchanged so the caller's error path is
+// unaffected by whether the metadata could be persisted.
+func (a *harnessHandler) OnFailWithMetadata(ctx context.Context, execID string, metadata []byte, cause error) error {
+	// Metadata-bearing terminal events are stamped with the stream's execID,
+	// mirroring complete()'s convention for the COMPLETED path.
+	terminalExecID := ""
+	if len(metadata) > 0 {
+		terminalExecID = execID
+	}
+	seq, err := a.logger.LogOutputs(ctx, nil, proto.State_STATE_FAILED, metadata, terminalExecID)
+	if err != nil {
+		slog.WarnContext(ctx, "Failed to log FAILED terminal metadata",
+			slog.String("conversation_id", a.logger.conversationID),
+			slog.Any("error", err),
+		)
+		return cause
+	}
+	if a.execHandler != nil {
+		if err := a.execHandler(&proto.ExecResponse{
+			Seq:             seq,
+			HarnessMetadata: metadata,
+		}); err != nil {
+			slog.WarnContext(ctx, "Failed to stream FAILED terminal metadata to exec handler",
+				slog.String("conversation_id", a.logger.conversationID),
+				slog.Any("error", err),
+			)
+		}
+	}
+	return cause
+}
+
 func (a *harnessHandler) complete(ctx context.Context, execID string, metadata []byte) error {
 	// Metadata-bearing terminal events are stamped with the stream's execID;
 	// the legacy no-metadata path keeps the logger's (empty) execID unchanged.
