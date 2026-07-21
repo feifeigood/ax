@@ -340,6 +340,15 @@ func (l *logger) LogInputs(ctx context.Context, inputs []*proto.Message, harness
 			cfg = nil
 		}
 	}
+	if cfg != nil {
+		// agentfleet #223: actor_token is a reserved, transport-only key in the
+		// pushed harness_config — a per-conversation bearer credential the harness
+		// extracts before use. It must never reach the durable conversation log.
+		// Strip it from the human-readable copy only; the live bytes handed to
+		// h.Start are untouched, so delivery is unaffected. Everything else in the
+		// config remains fully logged for audit.
+		delete(cfg.Fields, "actor_token")
+	}
 	ev := &proto.ConversationEvent{
 		ConversationId: l.conversationID,
 		ExecId:         l.execID,
