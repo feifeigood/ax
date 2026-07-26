@@ -22,11 +22,11 @@ import (
 // WorkspaceSystemInstruction builds a system-instruction snippet that orients
 // the agent about its working directory.
 //
-// This complements the harness making the working directory authoritative for
-// execution (the process is chdir'd to AX_HARNESS_WORKDIR, and the interactions
-// executor re-applies it per turn): the chdir guarantees commands run in the
-// right place, while this tells the agent so it emits sensible paths (relative
-// to the workspace, not the process root "/"). Returns "" when workDir is empty.
+// This complements the executor making WorkDir authoritative (see
+// AntigravityInteractionsConfig.WorkDir): the executor guarantees commands run
+// in the right place, while this tells the agent so it emits sensible paths
+// (relative to the workspace, not the process root "/"). Returns "" when
+// workDir is empty.
 func WorkspaceSystemInstruction(workDir string) string {
 	if strings.TrimSpace(workDir) == "" {
 		return ""

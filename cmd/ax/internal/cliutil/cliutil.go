@@ -131,18 +131,23 @@ func NewControllerFromConfig(ctx context.Context, cfg *Config) (*controller.Cont
 		if sErr != nil {
 			return nil, fmt.Errorf("antigravity-interactions harness: %w", sErr)
 		}
+		// WorkDir is the agent's working directory, authoritative for built-in env
+		// tools (see AntigravityInteractionsConfig.WorkDir). Mirrors the substrate
+		// path (cmd/ax harness): sourced from AX_HARNESS_WORKDIR, empty falls back
+		// to the process cwd.
+		workDir := os.Getenv("AX_HARNESS_WORKDIR")
 		// skillsPointer was built once, up front, from the top-level skills
 		// config (see above). Append it, plus the workspace pointer, to any
-		// configured system instruction. The workspace pointer tells the agent
-		// its working directory (AX_HARNESS_WORKDIR) so it emits sensible paths.
+		// configured system instruction.
 		systemInstruction := antigravityinteractions.JoinSystemInstruction(
 			antigravityinteractions.JoinSystemInstruction(aiCfg.SystemInstruction, skillsPointer),
-			antigravityinteractions.WorkspaceSystemInstruction(os.Getenv("AX_HARNESS_WORKDIR")),
+			antigravityinteractions.WorkspaceSystemInstruction(workDir),
 		)
 		antigravityInteractionsHarness, err = antigravityinteractions.New(antigravityinteractions.AntigravityInteractionsConfig{
 			Agent:             agent,
 			SystemInstruction: systemInstruction,
 			StateDir:          stateDir,
+			WorkDir:           workDir,
 		})
 	} else {
 		antigravityInteractionsHarness, err = substrate.New(config.AntigravityInteractionsHarnessID, "", "", config.AntigravityInteractionsTemplate, 80)

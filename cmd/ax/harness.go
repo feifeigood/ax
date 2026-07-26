@@ -180,16 +180,16 @@ func runAntigravityInteractionsHarness(ctx context.Context) error {
 		return err
 	}
 
-	// The process was chdir'd to AX_HARNESS_WORKDIR by setHarnessWorkDir (and the
-	// interactions executor re-applies it per turn). Tell the agent so it emits
-	// paths relative to the workspace rather than the process root "/".
+	// WorkDir is the agent's working directory. It is authoritative for built-in
+	// env tools (see AntigravityInteractionsConfig.WorkDir) so their execution
+	// does not depend on the process cwd. Empty falls back to the process cwd.
+	workDir := os.Getenv("AX_HARNESS_WORKDIR")
+
 	cfg := antigravityinteractions.AntigravityInteractionsConfig{
-		Agent:    agent,
-		StateDir: stateDir,
-		SystemInstruction: antigravityinteractions.JoinSystemInstruction(
-			hc.SystemInstruction,
-			antigravityinteractions.WorkspaceSystemInstruction(os.Getenv("AX_HARNESS_WORKDIR")),
-		),
+		Agent:             agent,
+		StateDir:          stateDir,
+		WorkDir:           workDir,
+		SystemInstruction: antigravityinteractions.JoinSystemInstruction(hc.SystemInstruction, antigravityinteractions.WorkspaceSystemInstruction(workDir)),
 	}
 	return antigravityinteractions.Serve(ctx, cfg, harnessHost, harnessPort, harnessReadyzPort)
 }
