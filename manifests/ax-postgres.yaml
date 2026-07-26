@@ -15,7 +15,7 @@
 # ---------------------------------------------------------------------------
 # Event log storage (PostgreSQL)
 #
-# Applied by hack/install-ax.sh only when --deploy-postgres is passed. By default
+# Applied by manifests/install-ax.sh only when --deploy-postgres is passed. By default
 # ax-server connects to an existing Postgres via AX_EVENTLOG_DSN and these
 # resources are not deployed. The ax-eventlog-postgres Secret (holding the
 # password used below and the DSN) is created by install-ax.sh.

@@ -23,6 +23,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -42,6 +43,11 @@ type Config struct {
 	// ReadyFunc is an optional function to check if the server is ready to accept requests.
 	// When provided, Start will poll ReadyFunc until it returns nil or the context expires. (Optional)
 	ReadyFunc func(ctx context.Context) error
+	// KillOrphans when true will attempt to terminate any pre-existing orphan process
+	// listening on Address before starting the sidecar. (Optional)
+	KillOrphans bool
+	// Address is the network host:port address used for orphan process cleanup. (Optional)
+	Address string
 }
 
 // TODO: Use /var/ax_agy_harness_service for communication instead of TCP.
@@ -78,6 +84,18 @@ func (s *Sidecar) Start(ctx context.Context, pythonPath string) error {
 	if s.cfg.Module == "" {
 		s.mu.Unlock()
 		return fmt.Errorf("Module cannot be empty")
+	}
+
+	if s.cfg.ReadyFunc != nil {
+		if err := s.cfg.ReadyFunc(ctx); err == nil {
+			if s.cfg.KillOrphans && s.cfg.Address != "" {
+				_ = killOrphanProcessOnAddr(ctx, s.cfg.Address)
+			}
+			if err := s.cfg.ReadyFunc(ctx); err == nil {
+				s.mu.Unlock()
+				return fmt.Errorf("cannot start sidecar: endpoint %s is already in use by another process", s.cfg.Address)
+			}
+		}
 	}
 
 	// Prepare arguments: python -u -m module [args...]
@@ -266,4 +284,60 @@ func TCPReady(addr string) func(ctx context.Context) error {
 		_ = conn.Close()
 		return nil
 	}
+}
+
+// killOrphanProcessOnAddr attempts to terminate pre-existing processes listening on addr.
+func killOrphanProcessOnAddr(ctx context.Context, addr string) error {
+	_, portStr, err := net.SplitHostPort(addr)
+	if err != nil {
+		return err
+	}
+	port, err := strconv.Atoi(portStr)
+	if err != nil || port <= 0 {
+		return fmt.Errorf("invalid port %q", portStr)
+	}
+
+	out, err := exec.CommandContext(ctx, "lsof", "-ti", fmt.Sprintf("tcp:%d", port)).Output()
+	if err != nil || len(out) == 0 {
+		return nil
+	}
+
+	pidStrs := strings.Fields(string(out))
+	myPid := os.Getpid()
+	for _, pStr := range pidStrs {
+		pid, err := strconv.Atoi(pStr)
+		if err != nil || pid <= 0 || pid == myPid {
+			continue
+		}
+		proc, err := os.FindProcess(pid)
+		if err != nil {
+			continue
+		}
+		_ = proc.Signal(syscall.SIGTERM)
+	}
+
+	deadline := time.Now().Add(1 * time.Second)
+	for time.Now().Before(deadline) {
+		var d net.Dialer
+		conn, err := d.DialContext(ctx, "tcp", addr)
+		if err != nil {
+			return nil
+		}
+		_ = conn.Close()
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	for _, pStr := range pidStrs {
+		pid, err := strconv.Atoi(pStr)
+		if err != nil || pid <= 0 || pid == myPid {
+			continue
+		}
+		proc, err := os.FindProcess(pid)
+		if err != nil {
+			continue
+		}
+		_ = proc.Kill()
+	}
+
+	return nil
 }

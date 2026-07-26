@@ -44,10 +44,11 @@ const (
 
 // Config represents the main configuration for the AX harness server.
 type Config struct {
-	Version   string          `yaml:"version"`
-	Server    ServerConfig    `yaml:"server"`
-	EventLog  EventLogConfig  `yaml:"eventlog"`
-	Harnesses HarnessesConfig `yaml:"harnesses,omitempty"`
+	Version     string                   `yaml:"version"`
+	Server      ServerConfig             `yaml:"server"`
+	EventLog    EventLogConfig           `yaml:"eventlog"`
+	Antigravity AntigravityHarnessConfig `yaml:"antigravity,omitempty"`
+	Registry    RegistryConfig           `yaml:"registry,omitempty"`
 	// Skills sources skills from the Gemini Enterprise Skill Registry into on-disk folders
 	// before the harness starts. It is harness-agnostic: each actor runs exactly
 	// one harness, which consumes the materialized folder(s). Optional; disabled
@@ -88,12 +89,12 @@ type EventLogConfig struct {
 	PostgresConfig PostgresConfig `yaml:"postgres,omitempty"`
 }
 
-// HarnessesConfig groups harnesses to serve by type. There are two categories:
+// RegistryConfig groups harnesses to serve by type. There are two categories:
 //   - Built-in harnesses (e.g. Antigravity, AntigravityInteractions) whose
 //     implementation and container image are provided by AX.
 //   - Custom harnesses on substrate whose implementation and container image are
 //     provided by the user via their own ActorTemplate.
-type HarnessesConfig struct {
+type RegistryConfig struct {
 	Antigravity             AntigravityHarnessConfig             `yaml:"antigravity,omitempty"`
 	AntigravityInteractions AntigravityInteractionsHarnessConfig `yaml:"antigravity-interactions,omitempty"`
 	Substrate               []SubstrateHarnessConfig             `yaml:"substrate,omitempty"`
@@ -284,14 +285,14 @@ func (c *Config) Validate() error {
 	}
 
 	var defaultCount int
-	if c.Harnesses.Antigravity.Default {
+	if c.Antigravity.Default || c.Registry.Antigravity.Default {
 		defaultCount++
 	}
-	if c.Harnesses.AntigravityInteractions.Default {
+	if c.Registry.AntigravityInteractions.Default {
 		defaultCount++
 	}
 
-	for _, sc := range c.Harnesses.Substrate {
+	for _, sc := range c.Registry.Substrate {
 		if sc.ID == "" {
 			return fmt.Errorf("substrate harness id is required")
 		}

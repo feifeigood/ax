@@ -35,7 +35,7 @@ message Message {
 // before the last execution is completed or failed.
 message ConversationEvent {
   string conversation_id = 1;
-  int32 seq = 2;
+  int32 step = 2;
   string exec_id = 3;
   string harness_id = 4;
   google.protobuf.Struct harness_config = 5;
@@ -122,7 +122,7 @@ enum CancelReason {
 message ExecRequest {
   string conversation_id = 1;            // Unique conversation identifier
   repeated Message inputs = 2;           // New inputs
-  int32 last_seq = 3;                    // Last sequence number seen by the client
+  int32 last_step = 3;                   // Last step number seen by the client
 
   string harness_id = 4;                 // Harness ID, empty selects the default harness
   bytes harness_config = 5;              // Per-request harness configuration (opaque JSON), if any
@@ -131,8 +131,8 @@ message ExecRequest {
 // ExecResponse contains the result of an execution.
 message ExecResponse {
   repeated Message outputs = 1; // Output content
-  int32 seq = 2;                // Seq of the outputs
-  // Opaque metadata associated with the terminal event at seq.
+  int32 step = 2;               // Step of the outputs
+  // Opaque metadata associated with the terminal event at step.
   bytes harness_metadata = 3;
 }
 

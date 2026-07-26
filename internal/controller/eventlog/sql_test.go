@@ -44,9 +44,9 @@ func testEventLog(t *testing.T, newLog func(t *testing.T) EventLog) {
 		t.Cleanup(func() { _ = log.DeleteAll(ctx, conv) })
 
 		// 1. Conversation log.
-		cev1 := &proto.ConversationEvent{ConversationId: conv, Seq: 1, ExecId: task1}
+		cev1 := &proto.ConversationEvent{ConversationId: conv, Step: 1, ExecId: task1}
 		metadata := []byte("agentfleet-metadata-fixture")
-		cev2 := &proto.ConversationEvent{ConversationId: conv, Seq: 2, ExecId: task2, HarnessMetadata: metadata}
+		cev2 := &proto.ConversationEvent{ConversationId: conv, Step: 2, ExecId: task2, HarnessMetadata: metadata}
 		if _, err := log.Append(ctx, cev1); err != nil {
 			t.Fatalf("failed to append cev1: %v", err)
 		}
@@ -61,8 +61,8 @@ func testEventLog(t *testing.T, newLog func(t *testing.T) EventLog) {
 		if len(cEvents) != 2 {
 			t.Fatalf("expected 2 conversation events, got %d", len(cEvents))
 		}
-		if cEvents[0].Seq != 1 || cEvents[1].Seq != 2 {
-			t.Errorf("conversation events out of order: %d, %d", cEvents[0].Seq, cEvents[1].Seq)
+		if cEvents[0].Step != 1 || cEvents[1].Step != 2 {
+			t.Errorf("conversation events out of order: %d, %d", cEvents[0].Step, cEvents[1].Step)
 		}
 		if cEvents[0].ExecId != task1 || cEvents[1].ExecId != task2 {
 			t.Errorf("conversation events mismatch: %q, %q", cEvents[0].ExecId, cEvents[1].ExecId)
@@ -101,10 +101,10 @@ func testEventLog(t *testing.T, newLog func(t *testing.T) EventLog) {
 			_ = log.DeleteAll(ctx, conv2)
 		})
 
-		if _, err := log.Append(ctx, &proto.ConversationEvent{ConversationId: conv1, Seq: 1, ExecId: task1}); err != nil {
+		if _, err := log.Append(ctx, &proto.ConversationEvent{ConversationId: conv1, Step: 1, ExecId: task1}); err != nil {
 			t.Fatalf("append: %v", err)
 		}
-		if _, err := log.Append(ctx, &proto.ConversationEvent{ConversationId: conv2, Seq: 1, ExecId: task3}); err != nil {
+		if _, err := log.Append(ctx, &proto.ConversationEvent{ConversationId: conv2, Step: 1, ExecId: task3}); err != nil {
 			t.Fatalf("append: %v", err)
 		}
 
@@ -121,9 +121,9 @@ func testEventLog(t *testing.T, newLog func(t *testing.T) EventLog) {
 
 	})
 
-	// AutoSeq exercises the seq==0 auto-assignment path: appends with Seq unset
+	// AutoStep exercises the step==0 auto-assignment path: appends with Step unset
 	// receive sequential numbers starting at 1.
-	t.Run("AutoSeq", func(t *testing.T) {
+	t.Run("AutoStep", func(t *testing.T) {
 		ctx := context.Background()
 		log := newLog(t)
 
@@ -133,12 +133,12 @@ func testEventLog(t *testing.T, newLog func(t *testing.T) EventLog) {
 
 		const n = 3
 		for i := int32(1); i <= n; i++ {
-			seq, err := log.Append(ctx, &proto.ConversationEvent{ConversationId: conv, ExecId: "t"})
+			step, err := log.Append(ctx, &proto.ConversationEvent{ConversationId: conv, ExecId: "t"})
 			if err != nil {
-				t.Fatalf("auto-seq append failed: %v", err)
+				t.Fatalf("auto-step append failed: %v", err)
 			}
-			if seq != i {
-				t.Errorf("expected seq %d, got %d", i, seq)
+			if step != i {
+				t.Errorf("expected step %d, got %d", i, step)
 			}
 		}
 
@@ -150,8 +150,8 @@ func testEventLog(t *testing.T, newLog func(t *testing.T) EventLog) {
 			t.Fatalf("expected %d events, got %d", n, len(events))
 		}
 		for i, e := range events {
-			if e.Seq != int32(i+1) {
-				t.Errorf("event %d: expected seq %d, got %d", i, i+1, e.Seq)
+			if e.Step != int32(i+1) {
+				t.Errorf("event %d: expected step %d, got %d", i, i+1, e.Step)
 			}
 		}
 	})

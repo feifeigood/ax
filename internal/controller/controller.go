@@ -174,7 +174,7 @@ type harnessHandler struct {
 func (a *harnessHandler) OnMessage(ctx context.Context, execID string, msg *proto.Message) error {
 	// Log every response received from the harness
 	// TODO(anj): The harness should send the full input sent to get this particular response.
-	seq, err := a.logger.LogOutputs(ctx, []*proto.Message{msg}, proto.State_STATE_PENDING, nil, "")
+	step, err := a.logger.LogOutputs(ctx, []*proto.Message{msg}, proto.State_STATE_PENDING, nil, "")
 	if err != nil {
 		slog.WarnContext(ctx, "Failed to log streamed message to event log",
 			slog.String("conversation_id", a.logger.conversationID),
@@ -187,7 +187,7 @@ func (a *harnessHandler) OnMessage(ctx context.Context, execID string, msg *prot
 	}
 	return a.execHandler(&proto.ExecResponse{
 		Outputs: []*proto.Message{msg},
-		Seq:     seq,
+		Step:    step,
 	})
 }
 
@@ -222,7 +222,7 @@ func (a *harnessHandler) OnFailWithMetadata(ctx context.Context, execID string, 
 	}
 	if a.execHandler != nil {
 		if err := a.execHandler(&proto.ExecResponse{
-			Seq:             seq,
+			Step:            seq,
 			HarnessMetadata: metadata,
 		}); err != nil {
 			slog.WarnContext(ctx, "Failed to stream FAILED terminal metadata to exec handler",
@@ -257,7 +257,7 @@ func (a *harnessHandler) complete(ctx context.Context, execID string, metadata [
 		return nil
 	}
 	return a.execHandler(&proto.ExecResponse{
-		Seq:             seq,
+		Step:            seq,
 		HarnessMetadata: metadata,
 	})
 }

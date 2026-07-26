@@ -58,7 +58,9 @@ func NewControllerFromConfig(ctx context.Context, cfg *Config) (*controller.Cont
 
 	// Validate config before local-mode antigravity.New forks the Python
 	// sidecar, so a config error surfaces without spawning a subprocess.
-	if len(cfg.Harnesses.Substrate) > 0 && !substrateMode {
+	// Validate config before local-mode antigravity.New forks the Python
+	// sidecar, so a config error surfaces without spawning a subprocess.
+	if len(cfg.Registry.Substrate) > 0 && !substrateMode {
 		return nil, fmt.Errorf("custom substrate harnesses require AX_SUBSTRATE=1")
 	}
 
@@ -84,7 +86,10 @@ func NewControllerFromConfig(ctx context.Context, cfg *Config) (*controller.Cont
 	// Built-in Antigravity harness.
 	var antigravityHarness harness.Harness
 	if !substrateMode {
-		address := cfg.Harnesses.Antigravity.Endpoint
+		address := cfg.Antigravity.Endpoint
+		if address == "" {
+			address = cfg.Registry.Antigravity.Endpoint
+		}
 		if address == "" {
 			address = "127.0.0.1:50053"
 		}
@@ -108,14 +113,14 @@ func NewControllerFromConfig(ctx context.Context, cfg *Config) (*controller.Cont
 	if err := reg.RegisterHarness(config.AntigravityHarnessID, antigravityHarness); err != nil {
 		return nil, fmt.Errorf("register antigravity harness: %w", err)
 	}
-	if cfg.Harnesses.Antigravity.Default {
+	if cfg.Antigravity.Default || cfg.Registry.Antigravity.Default {
 		defaultHarnessID = config.AntigravityHarnessID
 	}
 
 	// Built-in Antigravity Interactions harness.
 	var antigravityInteractionsHarness harness.Harness
 	if !substrateMode {
-		aiCfg := cfg.Harnesses.AntigravityInteractions
+		aiCfg := cfg.Registry.AntigravityInteractions
 		agent := aiCfg.Agent
 		if agent == "" {
 			agent = antigravityinteractions.DefaultAgent
@@ -148,11 +153,11 @@ func NewControllerFromConfig(ctx context.Context, cfg *Config) (*controller.Cont
 	if err := reg.RegisterHarness(config.AntigravityInteractionsHarnessID, antigravityInteractionsHarness); err != nil {
 		return nil, fmt.Errorf("register antigravity-interactions harness: %w", err)
 	}
-	if cfg.Harnesses.AntigravityInteractions.Default {
+	if cfg.Registry.AntigravityInteractions.Default {
 		defaultHarnessID = config.AntigravityInteractionsHarnessID
 	}
 
-	for _, sc := range cfg.Harnesses.Substrate {
+	for _, sc := range cfg.Registry.Substrate {
 		h, err := sc.NewHarness("")
 		if err != nil {
 			return nil, fmt.Errorf("substrate harness %q: %w", sc.ID, err)
@@ -165,11 +170,14 @@ func NewControllerFromConfig(ctx context.Context, cfg *Config) (*controller.Cont
 		}
 	}
 
+	// Antigravity is the default harness by default if no other harness set Default: true.
+	if defaultHarnessID == "" {
+		defaultHarnessID = config.AntigravityHarnessID
+	}
+
 	// Set the default harness.
-	if defaultHarnessID != "" {
-		if err := reg.SetDefaultHarness(defaultHarnessID); err != nil {
-			return nil, fmt.Errorf("set default harness %q: %w", defaultHarnessID, err)
-		}
+	if err := reg.SetDefaultHarness(defaultHarnessID); err != nil {
+		return nil, fmt.Errorf("set default harness %q: %w", defaultHarnessID, err)
 	}
 
 	return controller.New(ctx, controller.Config{

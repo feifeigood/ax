@@ -322,8 +322,8 @@ func (d *Display) PromptForConfigFile() (string, error) {
 func (d *Display) ShowResumption(id string, server string) {
 	fmt.Fprintln(d.w, d.resumeStyle.Render("To resume the conversation,"))
 	if server != "" {
-		fmt.Fprintln(d.w, d.resumeStyle.Render(fmt.Sprintf("ax exec --conversation %s --server %s", id, server)))
+		fmt.Fprintln(d.w, d.resumeStyle.Render(fmt.Sprintf("ax --conversation %s --server %s", id, server)))
 	} else {
-		fmt.Fprintln(d.w, d.resumeStyle.Render(fmt.Sprintf("ax exec --conversation %s", id)))
+		fmt.Fprintln(d.w, d.resumeStyle.Render(fmt.Sprintf("ax --conversation %s", id)))
 	}
 }

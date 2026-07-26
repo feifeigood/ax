@@ -23,7 +23,7 @@ AX contains a sample `emoji` skill in `examples/skills/emoji`. If you run a task
 Run the following command in your terminal:
 
 ```bash
-ax exec --input "Give me an emoji for happy"
+ax --input "Give me an emoji for happy"
 ```
 
 The planner will:

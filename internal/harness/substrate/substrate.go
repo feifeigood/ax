@@ -35,7 +35,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/google/ax/internal/harness"
-	"github.com/google/ax/internal/k8s/ate"
+	"github.com/google/ax/internal/ate"
 	"github.com/google/ax/proto"
 	"github.com/google/uuid"
 )
@@ -224,8 +224,8 @@ func (h *SubstrateHarness) resumeWorkerAddr(ctx context.Context, conversationID 
 	if actor == nil {
 		return "", fmt.Errorf("received nil actor in response for %s", conversationID)
 	}
-	if actor.GetActorId() != conversationID {
-		return "", fmt.Errorf("received actor %s while resuming %s", actor.GetActorId(), conversationID)
+	if actor.GetMetadata().GetName() != conversationID {
+		return "", fmt.Errorf("received actor %s while resuming %s", actor.GetMetadata().GetName(), conversationID)
 	}
 	if actor.GetAteomPodIp() == "" {
 		return "", fmt.Errorf("actor %s has no active worker IP address", conversationID)

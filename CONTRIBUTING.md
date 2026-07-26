@@ -128,7 +128,7 @@ AX is still under heavy development and the database schema is not yet stable. I
 An example:
 
 ```bash
-ax exec --input "hello"
+ax --input "hello"
 
 Error: error creating controller: failed to create event log: sqlite_eventlog: create index exec_checkpoint_id: SQL logic error: no such column: checkpoint_id (1)
 ```

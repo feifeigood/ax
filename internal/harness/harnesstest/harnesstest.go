@@ -53,23 +53,23 @@ type MockControlServer struct {
 	SuspendErr     error    // returned from SuspendActor when non-nil
 }
 
-func (f *MockControlServer) CreateAtespace(_ context.Context, req *ateapipb.CreateAtespaceRequest) (*ateapipb.CreateAtespaceResponse, error) {
-	return &ateapipb.CreateAtespaceResponse{Atespace: &ateapipb.Atespace{Name: req.GetName()}}, nil
+func (f *MockControlServer) CreateAtespace(_ context.Context, req *ateapipb.CreateAtespaceRequest) (*ateapipb.Atespace, error) {
+	return &ateapipb.Atespace{Metadata: &ateapipb.ResourceMetadata{Name: req.GetAtespace().GetMetadata().GetName()}}, nil
 }
 
-func (f *MockControlServer) CreateActor(_ context.Context, req *ateapipb.CreateActorRequest) (*ateapipb.CreateActorResponse, error) {
+func (f *MockControlServer) CreateActor(_ context.Context, req *ateapipb.CreateActorRequest) (*ateapipb.Actor, error) {
 	f.mu.Lock()
-	f.createCalls = append(f.createCalls, req.GetActorRef().GetName())
+	f.createCalls = append(f.createCalls, req.GetActor().GetMetadata().GetName())
 	f.mu.Unlock()
 	if f.CreateErr != nil {
 		return nil, f.CreateErr
 	}
-	return &ateapipb.CreateActorResponse{Actor: &ateapipb.Actor{ActorId: req.GetActorRef().GetName()}}, nil
+	return &ateapipb.Actor{Metadata: &ateapipb.ResourceMetadata{Name: req.GetActor().GetMetadata().GetName()}}, nil
 }
 
 func (f *MockControlServer) ResumeActor(_ context.Context, req *ateapipb.ResumeActorRequest) (*ateapipb.ResumeActorResponse, error) {
 	f.mu.Lock()
-	f.resumeCalls = append(f.resumeCalls, req.GetActorRef().GetName())
+	f.resumeCalls = append(f.resumeCalls, req.GetActor().GetName())
 	resumeIP := f.ResumeIP
 	if len(f.ResumeIPs) > 0 {
 		index := min(len(f.resumeCalls)-1, len(f.ResumeIPs)-1)
@@ -79,12 +79,12 @@ func (f *MockControlServer) ResumeActor(_ context.Context, req *ateapipb.ResumeA
 	if f.ResumeNilActor {
 		return &ateapipb.ResumeActorResponse{}, nil
 	}
-	return &ateapipb.ResumeActorResponse{Actor: &ateapipb.Actor{ActorId: req.GetActorRef().GetName(), AteomPodIp: resumeIP}}, nil
+	return &ateapipb.ResumeActorResponse{Actor: &ateapipb.Actor{Metadata: &ateapipb.ResourceMetadata{Name: req.GetActor().GetName()}, AteomPodIp: resumeIP}}, nil
 }
 
 func (f *MockControlServer) SuspendActor(_ context.Context, req *ateapipb.SuspendActorRequest) (*ateapipb.SuspendActorResponse, error) {
 	f.mu.Lock()
-	f.suspendCalls = append(f.suspendCalls, req.GetActorRef().GetName())
+	f.suspendCalls = append(f.suspendCalls, req.GetActor().GetName())
 	f.mu.Unlock()
 	if f.SuspendErr != nil {
 		return nil, f.SuspendErr

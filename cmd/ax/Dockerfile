@@ -26,7 +26,7 @@
 #   docker build --platform linux/amd64 --target antigravity -f cmd/ax/Dockerfile -t <ref> . && docker push <ref>
 #   docker build --platform linux/amd64 --target ax -f cmd/ax/Dockerfile -t <ref> . && docker push <ref>
 
-# --- Stage 1: build the ax Go binary (with the harness build tag) -------------
+# --- Stage 1: build the ax Go binary -----------------------------------------
 FROM --platform=$BUILDPLATFORM golang:1.26 AS build
 ARG TARGETOS=linux
 ARG TARGETARCH=amd64

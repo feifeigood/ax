@@ -24,7 +24,7 @@ eventlog:
   postgres:
     dsn: ${AX_EVENTLOG_DSN}
 
-harnesses:
-  antigravity:
-    default: true
+antigravity: {}
+
+registry:
   antigravity-interactions: {}

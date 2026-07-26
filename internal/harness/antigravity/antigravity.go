@@ -84,9 +84,11 @@ func New(ctx context.Context, address, stateDir string, autoStart bool) (*Antigr
 		args = append(args, "--state-dir", stateDir)
 	}
 	cfg := pythonsidecar.Config{
-		Module:    "python.antigravity.harness_server",
-		Args:      args,
-		ReadyFunc: pythonsidecar.TCPReady(address),
+		Module:      "python.antigravity.harness_server",
+		Args:        args,
+		ReadyFunc:   pythonsidecar.TCPReady(address),
+		KillOrphans: true,
+		Address:     address,
 	}
 	sidecar := pythonsidecar.New(cfg)
 	path, err := pythonsidecar.Setup(ctx, pythonsidecar.SetupOptions{
@@ -109,6 +111,14 @@ func New(ctx context.Context, address, stateDir string, autoStart bool) (*Antigr
 		_ = sidecar.Stop()
 	}()
 	return h, nil
+}
+
+// Stop terminates the underlying Python sidecar process if it was started by this harness.
+func (h *AntigravityHarness) Stop() error {
+	if h.sidecar != nil {
+		return h.sidecar.Stop()
+	}
+	return nil
 }
 
 // Start implements Harness.Start.
