@@ -22,6 +22,7 @@ import (
 	"log/slog"
 
 	"github.com/google/ax/internal/controller/eventlog"
+	"github.com/google/ax/internal/harness"
 	"github.com/google/ax/proto"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -113,10 +114,18 @@ func (d *Controller) Exec(ctx context.Context, req *proto.ExecRequest, handler E
 		if err != nil {
 			return fmt.Errorf("failed to start harness session: %w", err)
 		}
-		defer exec.Close(ctx)
-
-		if err := exec.Run(ctx, hhandler); err != nil {
-			return fmt.Errorf("harness execution failed: %w", err)
+		var runErr error
+		if closeBeforeNextStart(exec) {
+			runErr = func() error {
+				defer exec.Close(ctx)
+				return exec.Run(ctx, hhandler)
+			}()
+		} else {
+			defer exec.Close(ctx)
+			runErr = exec.Run(ctx, hhandler)
+		}
+		if runErr != nil {
+			return fmt.Errorf("harness execution failed: %w", runErr)
 		}
 	}
 
@@ -144,6 +153,19 @@ func (d *Controller) Exec(ctx context.Context, req *proto.ExecRequest, handler E
 	return nil
 }
 
+// eagerCloseExecution is an optional Execution capability. Executions whose
+// harness tracks per-conversation turn state (substrate warm mode) must be
+// closed before the controller starts another execution for the same
+// conversation; everything else keeps upstream's deferred-close semantics.
+type eagerCloseExecution interface {
+	CloseBeforeNextStart() bool
+}
+
+func closeBeforeNextStart(exec harness.Execution) bool {
+	ec, ok := exec.(eagerCloseExecution)
+	return ok && ec.CloseBeforeNextStart()
+}
+
 type harnessHandler struct {
 	logger      *logger
 	execHandler ExecHandler
@@ -152,7 +174,7 @@ type harnessHandler struct {
 func (a *harnessHandler) OnMessage(ctx context.Context, execID string, msg *proto.Message) error {
 	// Log every response received from the harness
 	// TODO(anj): The harness should send the full input sent to get this particular response.
-	step, err := a.logger.LogOutputs(ctx, []*proto.Message{msg}, proto.State_STATE_PENDING)
+	step, err := a.logger.LogOutputs(ctx, []*proto.Message{msg}, proto.State_STATE_PENDING, nil, "")
 	if err != nil {
 		slog.WarnContext(ctx, "Failed to log streamed message to event log",
 			slog.String("conversation_id", a.logger.conversationID),
@@ -170,14 +192,74 @@ func (a *harnessHandler) OnMessage(ctx context.Context, execID string, msg *prot
 }
 
 func (a *harnessHandler) OnComplete(ctx context.Context, execID string) error {
+	return a.complete(ctx, execID, nil)
+}
+
+// OnCompleteWithMetadata retains opaque metadata on the existing terminal
+// event without expanding harness.Handler.
+func (a *harnessHandler) OnCompleteWithMetadata(ctx context.Context, execID string, metadata []byte) error {
+	return a.complete(ctx, execID, metadata)
+}
+
+// OnFailWithMetadata persists a terminal FAILED event that still carries the
+// harness's opaque metadata (e.g. token usage collected before the failure),
+// then returns the original cause unchanged so the caller's error path is
+// unaffected by whether the metadata could be persisted.
+func (a *harnessHandler) OnFailWithMetadata(ctx context.Context, execID string, metadata []byte, cause error) error {
+	// Metadata-bearing terminal events are stamped with the stream's execID,
+	// mirroring complete()'s convention for the COMPLETED path.
+	terminalExecID := ""
+	if len(metadata) > 0 {
+		terminalExecID = execID
+	}
+	seq, err := a.logger.LogOutputs(ctx, nil, proto.State_STATE_FAILED, metadata, terminalExecID)
+	if err != nil {
+		slog.WarnContext(ctx, "Failed to log FAILED terminal metadata",
+			slog.String("conversation_id", a.logger.conversationID),
+			slog.Any("error", err),
+		)
+		return cause
+	}
+	if a.execHandler != nil {
+		if err := a.execHandler(&proto.ExecResponse{
+			Step:            seq,
+			HarnessMetadata: metadata,
+		}); err != nil {
+			slog.WarnContext(ctx, "Failed to stream FAILED terminal metadata to exec handler",
+				slog.String("conversation_id", a.logger.conversationID),
+				slog.Any("error", err),
+			)
+		}
+	}
+	return cause
+}
+
+func (a *harnessHandler) complete(ctx context.Context, execID string, metadata []byte) error {
+	// Metadata-bearing terminal events are stamped with the stream's execID;
+	// the legacy no-metadata path keeps the logger's (empty) execID unchanged.
+	terminalExecID := ""
+	if len(metadata) > 0 {
+		terminalExecID = execID
+	}
 	// Mark the execution turn as completed in the conversation log
-	if _, err := a.logger.LogOutputs(ctx, nil, proto.State_STATE_COMPLETED); err != nil {
+	seq, err := a.logger.LogOutputs(ctx, nil, proto.State_STATE_COMPLETED, metadata, terminalExecID)
+	if err != nil {
 		slog.WarnContext(ctx, "Failed to log completion event to event log",
 			slog.String("conversation_id", a.logger.conversationID),
 			slog.Any("error", err),
 		)
+		if len(metadata) > 0 {
+			return fmt.Errorf("failed to persist terminal harness metadata: %w", err)
+		}
+		return nil
 	}
-	return nil
+	if len(metadata) == 0 || a.execHandler == nil {
+		return nil
+	}
+	return a.execHandler(&proto.ExecResponse{
+		Step:            seq,
+		HarnessMetadata: metadata,
+	})
 }
 
 // Delete deletes all events for a specific conversation ID.
@@ -269,12 +351,18 @@ func (l *logger) LogInputs(ctx context.Context, inputs []*proto.Message, harness
 	return l.el.Append(ctx, ev)
 }
 
-func (l *logger) LogOutputs(ctx context.Context, outputs []*proto.Message, state proto.State) (int32, error) {
+// LogOutputs appends an output event. A non-empty execID overrides the
+// logger's own (which is never populated today) on the appended event.
+func (l *logger) LogOutputs(ctx context.Context, outputs []*proto.Message, state proto.State, harnessMetadata []byte, execID string) (int32, error) {
+	if execID == "" {
+		execID = l.execID
+	}
 	ev := &proto.ConversationEvent{
-		ConversationId: l.conversationID,
-		ExecId:         l.execID,
-		Messages:       outputs,
-		State:          state,
+		ConversationId:  l.conversationID,
+		ExecId:          execID,
+		Messages:        outputs,
+		State:           state,
+		HarnessMetadata: harnessMetadata,
 	}
 	return l.el.Append(ctx, ev)
 }

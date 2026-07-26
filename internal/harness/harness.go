@@ -46,6 +46,16 @@ type Harness interface {
 	Start(ctx context.Context, conversationID string, harnessConfig []byte) (Execution, error)
 }
 
+// Drainer is an optional Harness capability. Shutdown releases per-conversation
+// resources that outlive individual turns -- for example warm actors kept
+// running between turns and awaiting a deferred idle suspension -- so they are
+// not leaked when the process exits. Harnesses that hold no such deferred state
+// need not implement it. Callers should invoke Shutdown after in-flight turns
+// have drained so no turn re-arms deferred state after the drain.
+type Drainer interface {
+	Shutdown(ctx context.Context)
+}
+
 // Execution represents an active interactive session with an agent or planner.
 type Execution interface {
 	// Run executes the session and streams events to the provided Handler.

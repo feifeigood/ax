@@ -15,6 +15,7 @@
 package controller
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -73,7 +74,22 @@ func (r *Registry) SetDefaultHarness(id string) error {
 	return nil
 }
 
-// Close releases resources held by the registry.
+// Close releases resources held by the registry. It drains every registered
+// harness that implements the optional harness.Drainer capability so warm
+// actors awaiting deferred idle suspension are suspended rather than leaked on
+// process exit.
 func (r *Registry) Close() error {
+	r.mu.RLock()
+	drainers := make([]harness.Drainer, 0, len(r.harnesses))
+	for _, h := range r.harnesses {
+		if d, ok := h.(harness.Drainer); ok {
+			drainers = append(drainers, d)
+		}
+	}
+	r.mu.RUnlock()
+
+	for _, d := range drainers {
+		d.Shutdown(context.Background())
+	}
 	return nil
 }
