@@ -8,10 +8,6 @@
 > changes prior to a stable release.
 >
 > **Temporary Policy:** We are temporarily pausing the acceptance of external Pull Requests while we stabilize the core architecture. We warmly encourage you to open Issues for feedback and feature requests instead.
->
-> We will announce this project
-> widely soon. If you are interested in collaborating with us,
-> please reach out to **ax-dev@google.com**!
 
 AX, short for Agent Executor, is a distributed harness runtime.
 It dynamically provisions isolated environments from suspendable/resumable
@@ -24,9 +20,8 @@ and execution resumption, even in distributed setups.
 - **Distributed Runtime**: Harnesses, skills, tools, and agents can execute in isolation
 - **Resumption**: Automatic recovery from failures or interruptions
 - **Built-in Harnesses**: Support for frontier harnesses and custom implementations
-- **Auditing & Policy**: All user and agentic calls are coordinated by a common controller, easy to control and audit the overall execution and skill/tool/agent calls
 - **Portability**: Runs anywhere, scales to small and large deployments
-- **Customizability**: Agnostic of harness and model
+- **Customizability**: Bring custom environment, MCP tools, skills, instructions, and more
 
 Built-in consistency and resumability features:
 - **Single-Writer Architecture**: Single controller ensures consistent state management
@@ -49,12 +44,12 @@ graph LR
     subgraph Cluster[" "]
         Server["AX Server<br/>(multi-tenant)"]
         DB[("Event Log"<br/>Storage)]
-        ControlService["Control API"]
+        ControlService["Actor Controller"]
         Actor["AX Harness Server<br/>(stateful session-tenant)"]
     end
 
     SnapshotService["Snapshots"]
-    HarnessService["Harness or model<br/>service"]
+    HarnessService["Models"]
     MCPServer["MCP server"]
 
     Client <-->|resumable stream| Server
@@ -114,13 +109,6 @@ use. For more details on setup and configuration, see the
 Read more about [this new layer](https://cloud.google.com/blog/products/containers-kubernetes/bringing-you-agent-sandbox-on-gke-and-agent-substrate)
 that provides higher density to agentic workloads on Kubernetes.
 
-### Built-in Antigravity harness
-
-Antigravity SDK is a reference harness implementation. Local execution needs
-`python3` and `pip` available on your `PATH`. AX handles the rest: on first
-`ax exec` it starts the harness server as a Python sidecar and installs the
-pinned Antigravity SDK dependencies for you.
-
 ## Authentication
 
 The built-in Antigravity harness supports Google AI Studio and Vertex AI.
@@ -141,126 +129,109 @@ export GOOGLE_CLOUD_LOCATION="us-central1"
 export GOOGLE_GENAI_USE_VERTEXAI=true
 ```
 
-## Quick Start
-
-### Execute
+## Quickstart
 
 The CLI starts the built-in Antigravity harness automatically. No separate harness server setup is required.
 
 ```bash
 # Using the checked-in ax.yaml, which sets Antigravity as the default harness.
-ax exec --input "Can you list this directory?"
+ax --input "Can you list this directory?"
 
-# Using exec with an AX server
-ax exec --input "Can you list this directory?" --server localhost:8494
+# Executing with an AX server
+ax --input "Can you list this directory?" --server localhost:8494
 ```
 
 Conversations can be continued any time:
 
 ```bash
-ax exec \
-  --conversation d85a4b4e-c53b-4c84-b879-f10d905bce40 \
-  --input "Show me the contents of README.md"
+ax --conversation d85a4b4e-c53b-4c84-b879-f10d905bce40 \
+   --input "Show me the contents of README.md"
 ```
 
-If the client gets disconnected, pass the last sequence it saw to
+If the client gets disconnected, pass the last step it saw to
 replay the events it missed. This catches the client up; it does not
 rewind the conversation.
 
-In this example, we catch up a client from sequence number 12:
+In this example, we catch up a client from step number 12:
 
 ```bash
-ax exec \
-  --conversation d85a4b4e-c53b-4c84-b879-f10d905bce40 \
-  --last-seq 12 \
-  --resume
+ax --conversation d85a4b4e-c53b-4c84-b879-f10d905bce40 \
+   --last-step 12 \
+   --resume
 ```
 
 Instead of running the default harness, you can start executing
 any registered harness:
 
 ```bash
-ax exec \
-  --harness antigravity \
-  --input "Can you write me a simple HTTP server in Python?"
+ax --input "Can you write me a simple HTTP server in Python?"
 ```
 
 If anything goes wrong during the execution of a harness,
 you can resume an incomplete execution in a conversation:
 ```bash
-ax exec \
-  --conversation edf98ef5-4bb1-4a9e-a091-3a77e03727e6 \
-  --harness antigravity \
-  --resume
+ax --conversation edf98ef5-4bb1-4a9e-a091-3a77e03727e6 --resume
 ```
 
 
 ## Usage
 
-The `ax` command provides several subcommands:
-
-### Execute
+Execute a new conversation or resume an existing one. If no conversation ID is provided, a new UUID will be generated.
 
 ```bash
-ax exec \
+ax \
     [--input <text>] \
     [--conversation <id>] \
     [--harness <id>] \
-    [--harness-config <file.json>] \
-    [--harness-config-json <json>] \
+    [--config <json>] \
+    [--config-file <file.json>] \
     [--server <address>] \
-    [--config <file>] \
+    [--ax-config <file>] \
     [--resume] \
-    [--last-seq <number>]
+    [--last-step <number>]
 ```
 
-Executes a new harness execution or automatically resumes an existing one. If the conversation ID already exists, the execution will be resumed from its last state.
-
 Options:
-- `--input`: Input message to send to agents (optional if `--resume` is set, otherwise required)
-- `--conversation`: Conversation ID (optional, generates UUID if not provided, or resumes if exists)
-- `--harness`: Harness ID to use (optional, defaults to the default harness)
-- `--harness-config`: Path to a JSON file with per-request harness configuration (optional)
-- `--harness-config-json`: Per-request harness configuration as an inline JSON string (optional, mutually exclusive with `--harness-config`)
-- `--server`: gRPC controller server address (optional. If not provided, runs with a local built-in AX server)
-- `--config`: Path to YAML configuration file (only used with a local built-in AX server, default: "ax.yaml")
-- `--resume`: Resume a conversation without inputs (optional, mutually exclusive with `--input`)
-- `--last-seq`: Last sequence number seen by the client to resume from (optional). The server replays any later events so the client can catch up after a disconnect.
+- `--ax-config`: Path to YAML configuration file (only used with a local built-in AX server) (default "ax.yaml")
+- `--config`: Per-request harness configuration as an inline JSON string (mutually exclusive with `--config-file`)
+- `--config-file`: Path to a JSON file with per-request harness configuration
+- `--conversation`: Conversation ID (optional, generates UUID if not provided)
+- `--harness`: Harness ID (optional, default harness is used if not specified)
+- `--input`: Input message to send (optional)
+- `--last-step`: Last step number seen by the client
+- `--resume`: Resume a conversation without inputs
+- `--server`: gRPC controller server address (if specified, connects to remote server; otherwise runs with a local built-in AX server)
 
 **Examples:**
 
 ```bash
 # Execute a new execution
-ax exec --input "Hello agents!"
+ax --input "Hello agents!"
 
 # Resume an existing execution with new input
-ax exec --conversation a53d4db3-1165-4925-87da-be6c72bbdeb1 --input "Ok, now let's do something else..."
+ax --conversation a53d4db3-1165-4925-87da-be6c72bbdeb1 --input "Ok, now let's do something else..."
 
 # Execute using server mode
-ax exec --server localhost:8494 --input "Hello agents!"
-
-# Execute using a specific harness
-ax exec --harness antigravity --input "Write me a cool Go program!"
+ax --server localhost:8494 --input "Hello agents!"
 
 # Execute with per-request harness config
-ax exec \
-  --harness-config-json '{"system_instructions":"Answer in one sentence.","model":"gemini-3.5-flash"}' \
-  --input "Explain durable execution."
+ax --config '{"system_instructions":"Answer in one sentence.","model":"gemini-3.5-flash"}' \
+   --input "Explain durable execution."
 
-# To keep the same JSON in a file, use `--harness-config` instead:
-ax exec --harness-config antigravity.json --input "Explain durable execution."
+# To keep the same JSON in a file, use `--config-file` instead:
+ax --config-file antigravity.json --input "Explain durable execution."
 ```
 
 ### Serve
+
+Run the AX controller as a gRPC server. Loads configuration from a YAML file (default: ax.yaml).
 
 ```bash
 ax serve [--config <path>]
 ```
 
-Starts the controller as a gRPC server using a YAML configuration file.
-
 Options:
-- `--config`: Path to YAML configuration file (default: "ax.yaml")
+- `--config`: Path to YAML configuration file (default "ax.yaml")
 
 Example configuration file (`ax.yaml`):
 ```yaml
@@ -311,24 +282,17 @@ and making calls to MCP tools when they are configured.
   their Kubernetes clusters.
 * An agentic framework. AX is agnostic of the framework used
   to build agents.
-* A specific harness like a specific coding agent, e.g. Antigravity.
-  AX provides the serving layer around harnesses and is agnostic of the
-  harness implementation. Soon, we will allow users to bring their own
-  harnesses.
-* A model specific controller. AX is agnostic of the models used.
 
 ## Roadmap
 
 Below is an overview of our upcoming features and planned changes:
 
 1. Support for more frontier harnesses besides Antigravity
-1. Support for BYOH (Bring Your Own Harness)
 1. Support for tool call approvals from harnesses
 1. Improvements to resumption protocols
 1. Forking from event log and snapshots
 1. Trajectory exposition
 1. Better telemetry exposition
-1. Integrations for policy, auditing, and more
 
 ## Contributing
 

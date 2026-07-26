@@ -32,7 +32,7 @@ func TestNewControllerFromConfig_BuiltinSubstrate(t *testing.T) {
 				Filename: filepath.Join(t.TempDir(), "log.sqlite"),
 			},
 		},
-		Harnesses: config.HarnessesConfig{
+		Registry: config.RegistryConfig{
 			Antigravity: config.AntigravityHarnessConfig{
 				Default: true,
 			},
@@ -58,7 +58,7 @@ func TestNewControllerFromConfig_InteractionsSubstrate(t *testing.T) {
 				Filename: filepath.Join(t.TempDir(), "log.sqlite"),
 			},
 		},
-		Harnesses: config.HarnessesConfig{
+		Registry: config.RegistryConfig{
 			Antigravity: config.AntigravityHarnessConfig{Default: true},
 		},
 	}
@@ -86,7 +86,7 @@ func TestNewControllerFromConfig_CustomHarnessRequiresSubstrateMode(t *testing.T
 				Filename: filepath.Join(t.TempDir(), "log.sqlite"),
 			},
 		},
-		Harnesses: config.HarnessesConfig{
+		Registry: config.RegistryConfig{
 			Substrate: []config.SubstrateHarnessConfig{
 				{ID: "custom", Namespace: "team-ns", Template: "custom-template"},
 			},
@@ -111,7 +111,7 @@ func TestNewControllerFromConfig_CustomHarnessInSubstrateMode(t *testing.T) {
 				Filename: filepath.Join(t.TempDir(), "log.sqlite"),
 			},
 		},
-		Harnesses: config.HarnessesConfig{
+		Registry: config.RegistryConfig{
 			Substrate: []config.SubstrateHarnessConfig{
 				{ID: "custom", Namespace: "team-ns", Template: "custom-template"},
 			},

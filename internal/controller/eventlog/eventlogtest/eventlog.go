@@ -32,19 +32,19 @@ func (m *MemoryEventLog) Append(_ context.Context, event *proto.ConversationEven
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	seq := event.Seq
-	if seq == 0 {
-		maxSeq := int32(0)
+	step := event.Step
+	if step == 0 {
+		maxStep := int32(0)
 		for _, ev := range m.AllEvents {
-			if ev.ConversationId == event.ConversationId && ev.Seq > maxSeq {
-				maxSeq = ev.Seq
+			if ev.ConversationId == event.ConversationId && ev.Step > maxStep {
+				maxStep = ev.Step
 			}
 		}
-		seq = maxSeq + 1
-		event.Seq = seq
+		step = maxStep + 1
+		event.Step = step
 	}
 	m.AllEvents = append(m.AllEvents, event)
-	return seq, nil
+	return step, nil
 }
 
 func (m *MemoryEventLog) Events(_ context.Context, conversationID string) ([]*proto.ConversationEvent, error) {

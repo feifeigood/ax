@@ -37,17 +37,18 @@ func main() {
 
 var rootCmd = &cobra.Command{
 	Use:   "ax",
-	Short: "AX - Agent eXecutor",
-	Long: `ax provides a server and CLI tools for managing agent orchestrator tasks.
-It provides commands to execute tasks, resume from checkpoints,
-and run the controller server.`,
+	Short: "Execute a conversation or resume an existing one",
+	Long: `Execute a new conversation or resume an existing one.
+If no conversation ID is provided, a new UUID will be generated.`,
+	SilenceUsage: true,
+	RunE:         runExec,
 }
 
 func init() {
+	registerExecFlags(rootCmd)
+
 	rootCmd.AddCommand(execCmd)
 	rootCmd.AddCommand(serveCmd)
-
-	rootCmd.AddCommand(dashboardCmd)
 }
 
 func connect(server string) (*grpc.ClientConn, error) {
@@ -64,7 +65,9 @@ const currentVersion = "v1alpha"
 
 func newConfig(cmd *cobra.Command, configFile string) (*cliutil.Config, error) {
 	cfg, err := cliutil.LoadFromFile(configFile)
-	if errors.Is(err, os.ErrNotExist) && !cmd.Flags().Changed("config") {
+	configFlagChanged := (cmd.Flags().Lookup("ax-config") != nil && cmd.Flags().Changed("ax-config")) ||
+		(cmd.Flags().Lookup("config-file") != nil && cmd.Flags().Changed("config-file"))
+	if errors.Is(err, os.ErrNotExist) && !configFlagChanged {
 		cfg := cliutil.DefaultConfig()
 		cfg.Version = currentVersion
 		return cfg, nil

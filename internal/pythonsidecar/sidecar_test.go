@@ -156,3 +156,67 @@ func TestSidecar_ReadinessFailureOnPrematureExit(t *testing.T) {
 		t.Fatalf("expected IsRunning() to be false")
 	}
 }
+
+func TestSidecar_EndpointAlreadyInUse(t *testing.T) {
+	// Start a dummy TCP listener on a free port
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("failed to listen: %v", err)
+	}
+	defer l.Close()
+	addr := l.Addr().String()
+
+	cfg := pythonsidecar.Config{
+		Module:    "http.server",
+		ReadyFunc: pythonsidecar.TCPReady(addr),
+	}
+
+	s := pythonsidecar.New(cfg)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	err = s.Start(ctx, "")
+	if err == nil {
+		t.Fatalf("expected Start() to fail when endpoint is already in use")
+	}
+	if !strings.Contains(err.Error(), "already in use") {
+		t.Fatalf("expected 'already in use' in error, got: %v", err)
+	}
+}
+
+func TestSidecar_KillOrphans(t *testing.T) {
+	port := getFreePort(t)
+	addr := fmt.Sprintf("127.0.0.1:%d", port)
+
+	// Start a dummy sidecar listening on `port`
+	dummyCfg := pythonsidecar.Config{
+		Module:    "http.server",
+		Args:      []string{strconv.Itoa(port), "--bind", "127.0.0.1"},
+		ReadyFunc: pythonsidecar.TCPReady(addr),
+	}
+	dummySidecar := pythonsidecar.New(dummyCfg)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := dummySidecar.Start(ctx, ""); err != nil {
+		t.Fatalf("failed to start dummy sidecar: %v", err)
+	}
+
+	// Now start a new sidecar with KillOrphans: true on the same addr
+	newCfg := pythonsidecar.Config{
+		Module:      "http.server",
+		Args:        []string{strconv.Itoa(port), "--bind", "127.0.0.1"},
+		ReadyFunc:   pythonsidecar.TCPReady(addr),
+		KillOrphans: true,
+		Address:     addr,
+	}
+	newSidecar := pythonsidecar.New(newCfg)
+	if err := newSidecar.Start(ctx, ""); err != nil {
+		t.Fatalf("Start() with KillOrphans failed: %v", err)
+	}
+	defer newSidecar.Stop()
+
+	if !newSidecar.IsRunning() {
+		t.Fatalf("expected new sidecar to be running")
+	}
+}

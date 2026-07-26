@@ -204,7 +204,7 @@ func (x *Message) GetContent() *Content {
 type ConversationEvent struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	ConversationId string                 `protobuf:"bytes,1,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
-	Seq            int32                  `protobuf:"varint,2,opt,name=seq,proto3" json:"seq,omitempty"`
+	Step           int32                  `protobuf:"varint,2,opt,name=step,proto3" json:"step,omitempty"`
 	ExecId         string                 `protobuf:"bytes,3,opt,name=exec_id,json=execId,proto3" json:"exec_id,omitempty"`
 	HarnessId      string                 `protobuf:"bytes,4,opt,name=harness_id,json=harnessId,proto3" json:"harness_id,omitempty"`
 	HarnessConfig  *structpb.Struct       `protobuf:"bytes,5,opt,name=harness_config,json=harnessConfig,proto3" json:"harness_config,omitempty"`
@@ -253,9 +253,9 @@ func (x *ConversationEvent) GetConversationId() string {
 	return ""
 }
 
-func (x *ConversationEvent) GetSeq() int32 {
+func (x *ConversationEvent) GetStep() int32 {
 	if x != nil {
-		return x.Seq
+		return x.Step
 	}
 	return 0
 }
@@ -754,7 +754,7 @@ type ExecRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	ConversationId string                 `protobuf:"bytes,1,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"` // Unique conversation identifier
 	Inputs         []*Message             `protobuf:"bytes,2,rep,name=inputs,proto3" json:"inputs,omitempty"`                                       // New inputs
-	LastSeq        int32                  `protobuf:"varint,3,opt,name=last_seq,json=lastSeq,proto3" json:"last_seq,omitempty"`                     // Last sequence number seen by the client
+	LastStep       int32                  `protobuf:"varint,3,opt,name=last_step,json=lastStep,proto3" json:"last_step,omitempty"`                  // Last step number seen by the client
 	HarnessId      string                 `protobuf:"bytes,4,opt,name=harness_id,json=harnessId,proto3" json:"harness_id,omitempty"`                // Harness ID, empty selects the default harness
 	HarnessConfig  []byte                 `protobuf:"bytes,5,opt,name=harness_config,json=harnessConfig,proto3" json:"harness_config,omitempty"`    // Per-request harness configuration (opaque JSON), if any
 	unknownFields  protoimpl.UnknownFields
@@ -805,9 +805,9 @@ func (x *ExecRequest) GetInputs() []*Message {
 	return nil
 }
 
-func (x *ExecRequest) GetLastSeq() int32 {
+func (x *ExecRequest) GetLastStep() int32 {
 	if x != nil {
-		return x.LastSeq
+		return x.LastStep
 	}
 	return 0
 }
@@ -830,8 +830,8 @@ func (x *ExecRequest) GetHarnessConfig() []byte {
 type ExecResponse struct {
 	state   protoimpl.MessageState `protogen:"open.v1"`
 	Outputs []*Message             `protobuf:"bytes,1,rep,name=outputs,proto3" json:"outputs,omitempty"` // Output content
-	Seq     int32                  `protobuf:"varint,2,opt,name=seq,proto3" json:"seq,omitempty"`        // Seq of the outputs
-	// Opaque metadata associated with the terminal event at seq.
+	Step    int32                  `protobuf:"varint,2,opt,name=step,proto3" json:"step,omitempty"`      // Step of the outputs
+	// Opaque metadata associated with the terminal event at step.
 	HarnessMetadata []byte `protobuf:"bytes,3,opt,name=harness_metadata,json=harnessMetadata,proto3" json:"harness_metadata,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
@@ -874,9 +874,9 @@ func (x *ExecResponse) GetOutputs() []*Message {
 	return nil
 }
 
-func (x *ExecResponse) GetSeq() int32 {
+func (x *ExecResponse) GetStep() int32 {
 	if x != nil {
-		return x.Seq
+		return x.Step
 	}
 	return 0
 }
@@ -975,10 +975,10 @@ const file_proto_ax_proto_rawDesc = "" +
 	"\x0eproto/ax.proto\x12\x02ax\x1a\x1cgoogle/protobuf/struct.proto\x1a\x13proto/content.proto\"D\n" +
 	"\aMessage\x12\x12\n" +
 	"\x04role\x18\x01 \x01(\tR\x04role\x12%\n" +
-	"\acontent\x18\x02 \x01(\v2\v.ax.ContentR\acontent\"\xbb\x02\n" +
+	"\acontent\x18\x02 \x01(\v2\v.ax.ContentR\acontent\"\xbd\x02\n" +
 	"\x11ConversationEvent\x12'\n" +
-	"\x0fconversation_id\x18\x01 \x01(\tR\x0econversationId\x12\x10\n" +
-	"\x03seq\x18\x02 \x01(\x05R\x03seq\x12\x17\n" +
+	"\x0fconversation_id\x18\x01 \x01(\tR\x0econversationId\x12\x12\n" +
+	"\x04step\x18\x02 \x01(\x05R\x04step\x12\x17\n" +
 	"\aexec_id\x18\x03 \x01(\tR\x06execId\x12\x1d\n" +
 	"\n" +
 	"harness_id\x18\x04 \x01(\tR\tharnessId\x12>\n" +
@@ -1012,17 +1012,17 @@ const file_proto_ax_proto_rawDesc = "" +
 	"\x0fconversation_id\x18\x01 \x01(\tR\x0econversationId\x12.\n" +
 	"\aoutputs\x18\x02 \x01(\v2\x12.ax.HarnessOutputsH\x00R\aoutputs\x12\"\n" +
 	"\x03end\x18\x03 \x01(\v2\x0e.ax.HarnessEndH\x00R\x03endB\x06\n" +
-	"\x04type\"\xbc\x01\n" +
+	"\x04type\"\xbe\x01\n" +
 	"\vExecRequest\x12'\n" +
 	"\x0fconversation_id\x18\x01 \x01(\tR\x0econversationId\x12#\n" +
-	"\x06inputs\x18\x02 \x03(\v2\v.ax.MessageR\x06inputs\x12\x19\n" +
-	"\blast_seq\x18\x03 \x01(\x05R\alastSeq\x12\x1d\n" +
+	"\x06inputs\x18\x02 \x03(\v2\v.ax.MessageR\x06inputs\x12\x1b\n" +
+	"\tlast_step\x18\x03 \x01(\x05R\blastStep\x12\x1d\n" +
 	"\n" +
 	"harness_id\x18\x04 \x01(\tR\tharnessId\x12%\n" +
-	"\x0eharness_config\x18\x05 \x01(\fR\rharnessConfig\"r\n" +
+	"\x0eharness_config\x18\x05 \x01(\fR\rharnessConfig\"t\n" +
 	"\fExecResponse\x12%\n" +
-	"\aoutputs\x18\x01 \x03(\v2\v.ax.MessageR\aoutputs\x12\x10\n" +
-	"\x03seq\x18\x02 \x01(\x05R\x03seq\x12)\n" +
+	"\aoutputs\x18\x01 \x03(\v2\v.ax.MessageR\aoutputs\x12\x12\n" +
+	"\x04step\x18\x02 \x01(\x05R\x04step\x12)\n" +
 	"\x10harness_metadata\x18\x03 \x01(\fR\x0fharnessMetadata\"D\n" +
 	"\x19DeleteConversationRequest\x12'\n" +
 	"\x0fconversation_id\x18\x01 \x01(\tR\x0econversationId\"\x1c\n" +

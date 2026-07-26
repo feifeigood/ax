@@ -33,7 +33,7 @@ type sqlEventLog struct {
 }
 
 // Append serializes the event to JSON and inserts it into the database.
-func (l *sqlEventLog) Append(ctx context.Context, event *proto.ConversationEvent) (seq int32, err error) {
+func (l *sqlEventLog) Append(ctx context.Context, event *proto.ConversationEvent) (step int32, err error) {
 	ctx, endSpan := l.startSpan(ctx, "Append", event.ConversationId)
 	defer func() { endSpan(err) }()
 
@@ -43,12 +43,12 @@ func (l *sqlEventLog) Append(ctx context.Context, event *proto.ConversationEvent
 	}
 	defer tx.Rollback()
 
-	seq = event.Seq
-	if seq == 0 {
-		if err := tx.QueryRowContext(ctx, "SELECT COALESCE(MAX(seq), 0) + 1 FROM conversation_log WHERE conversation_id = $1", event.ConversationId).Scan(&seq); err != nil {
-			return 0, fmt.Errorf("eventlog: compute seq: %w", err)
+	step = event.Step
+	if step == 0 {
+		if err := tx.QueryRowContext(ctx, "SELECT COALESCE(MAX(step), 0) + 1 FROM conversation_log WHERE conversation_id = $1", event.ConversationId).Scan(&step); err != nil {
+			return 0, fmt.Errorf("eventlog: compute step: %w", err)
 		}
-		event.Seq = seq
+		event.Step = step
 	}
 
 	payload, err := marshalOpts.Marshal(event)
@@ -57,8 +57,8 @@ func (l *sqlEventLog) Append(ctx context.Context, event *proto.ConversationEvent
 	}
 
 	if _, err := tx.ExecContext(ctx,
-		"INSERT INTO conversation_log (conversation_id, seq, payload) VALUES ($1, $2, $3)",
-		event.ConversationId, event.Seq, string(payload)); err != nil {
+		"INSERT INTO conversation_log (conversation_id, step, payload) VALUES ($1, $2, $3)",
+		event.ConversationId, event.Step, string(payload)); err != nil {
 		return 0, fmt.Errorf("eventlog: insert conversation: %w", err)
 	}
 
@@ -66,15 +66,15 @@ func (l *sqlEventLog) Append(ctx context.Context, event *proto.ConversationEvent
 		return 0, fmt.Errorf("eventlog: commit: %w", err)
 	}
 
-	return seq, nil
+	return step, nil
 }
 
-// Events retrieves all events from the database for a conversation, ordered by seq.
+// Events retrieves all events from the database for a conversation, ordered by step.
 func (l *sqlEventLog) Events(ctx context.Context, conversationID string) (events []*proto.ConversationEvent, err error) {
 	ctx, endSpan := l.startSpan(ctx, "Events", conversationID)
 	defer func() { endSpan(err) }()
 
-	rows, err := l.db.QueryContext(ctx, "SELECT payload FROM conversation_log WHERE conversation_id = $1 ORDER BY seq", conversationID)
+	rows, err := l.db.QueryContext(ctx, "SELECT payload FROM conversation_log WHERE conversation_id = $1 ORDER BY step", conversationID)
 	if err != nil {
 		return nil, fmt.Errorf("eventlog: query conversation: %w", err)
 	}

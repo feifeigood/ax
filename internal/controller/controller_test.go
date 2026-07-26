@@ -254,8 +254,8 @@ func TestController2_ExecPersistsAndStreamsTerminalHarnessMetadata(t *testing.T)
 	if !bytes.Equal(terminal.GetHarnessMetadata(), wantMetadata) {
 		t.Fatalf("event metadata = %q, want %q", terminal.GetHarnessMetadata(), wantMetadata)
 	}
-	if responses[0].GetSeq() != terminal.GetSeq() {
-		t.Fatalf("response seq = %d, terminal event seq = %d", responses[0].GetSeq(), terminal.GetSeq())
+	if responses[0].GetStep() != terminal.GetStep() {
+		t.Fatalf("response seq = %d, terminal event seq = %d", responses[0].GetStep(), terminal.GetStep())
 	}
 }
 
@@ -334,8 +334,8 @@ func TestController2_ExecPersistsAndStreamsFailedTerminalHarnessMetadata(t *test
 	if !bytes.Equal(terminal.GetHarnessMetadata(), wantMetadata) {
 		t.Fatalf("event metadata = %q, want %q", terminal.GetHarnessMetadata(), wantMetadata)
 	}
-	if responses[0].GetSeq() != terminal.GetSeq() {
-		t.Fatalf("response seq = %d, terminal event seq = %d", responses[0].GetSeq(), terminal.GetSeq())
+	if responses[0].GetStep() != terminal.GetStep() {
+		t.Fatalf("response seq = %d, terminal event seq = %d", responses[0].GetStep(), terminal.GetStep())
 	}
 }
 

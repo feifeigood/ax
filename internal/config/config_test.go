@@ -36,7 +36,7 @@ func TestSubstrateNewHarness(t *testing.T) {
 // validConfig returns a config that passes Validate, that tests can mutate.
 func validConfig() *Config {
 	c := DefaultConfig()
-	c.Harnesses = HarnessesConfig{
+	c.Registry = RegistryConfig{
 		Antigravity: AntigravityHarnessConfig{Default: true},
 		Substrate: []SubstrateHarnessConfig{
 			{ID: "custom", Namespace: "team-ns", Template: "custom-template"},
@@ -53,7 +53,7 @@ func TestValidate_ValidConfig(t *testing.T) {
 
 func TestValidate_CustomIDRequired(t *testing.T) {
 	c := validConfig()
-	c.Harnesses.Substrate[0].ID = ""
+	c.Registry.Substrate[0].ID = ""
 	err := c.Validate()
 	if err == nil || !strings.Contains(err.Error(), "substrate harness id") {
 		t.Fatalf("Validate() = %v, want substrate id error", err)
@@ -62,7 +62,7 @@ func TestValidate_CustomIDRequired(t *testing.T) {
 
 func TestValidate_CustomIDReserved(t *testing.T) {
 	c := validConfig()
-	c.Harnesses.Substrate[0].ID = "antigravity"
+	c.Registry.Substrate[0].ID = "antigravity"
 	err := c.Validate()
 	if err == nil || !strings.Contains(err.Error(), "reserved") {
 		t.Fatalf("Validate() = %v, want reserved id error", err)
@@ -71,7 +71,7 @@ func TestValidate_CustomIDReserved(t *testing.T) {
 
 func TestValidate_CustomNamespaceRequired(t *testing.T) {
 	c := validConfig()
-	c.Harnesses.Substrate[0].Namespace = ""
+	c.Registry.Substrate[0].Namespace = ""
 	err := c.Validate()
 	if err == nil || !strings.Contains(err.Error(), "namespace is required") {
 		t.Fatalf("Validate() = %v, want namespace-required error", err)
@@ -80,7 +80,7 @@ func TestValidate_CustomNamespaceRequired(t *testing.T) {
 
 func TestValidate_CustomNamespaceReserved(t *testing.T) {
 	c := validConfig()
-	c.Harnesses.Substrate[0].Namespace = defaultNamespace
+	c.Registry.Substrate[0].Namespace = defaultNamespace
 	err := c.Validate()
 	if err == nil || !strings.Contains(err.Error(), "reserved") {
 		t.Fatalf("Validate() = %v, want reserved-namespace error", err)
@@ -89,7 +89,7 @@ func TestValidate_CustomNamespaceReserved(t *testing.T) {
 
 func TestValidate_CustomTemplateRequired(t *testing.T) {
 	c := validConfig()
-	c.Harnesses.Substrate[0].Template = ""
+	c.Registry.Substrate[0].Template = ""
 	err := c.Validate()
 	if err == nil || !strings.Contains(err.Error(), "template is required") {
 		t.Fatalf("Validate() = %v, want template-required error", err)
@@ -98,7 +98,7 @@ func TestValidate_CustomTemplateRequired(t *testing.T) {
 
 func TestValidate_MultipleDefaults(t *testing.T) {
 	c := validConfig()
-	c.Harnesses.Substrate[0].Default = true
+	c.Registry.Substrate[0].Default = true
 	err := c.Validate()
 	if err == nil || !strings.Contains(err.Error(), "multiple harnesses marked as default") {
 		t.Fatalf("Validate() = %v, want multiple defaults error", err)
@@ -107,7 +107,7 @@ func TestValidate_MultipleDefaults(t *testing.T) {
 
 func TestValidate_InteractionsIDReserved(t *testing.T) {
 	c := validConfig()
-	c.Harnesses.Substrate[0].ID = "antigravity-interactions"
+	c.Registry.Substrate[0].ID = "antigravity-interactions"
 	err := c.Validate()
 	if err == nil || !strings.Contains(err.Error(), "reserved") {
 		t.Fatalf("Validate() = %v, want reserved id error", err)
@@ -116,7 +116,7 @@ func TestValidate_InteractionsIDReserved(t *testing.T) {
 
 func TestValidate_InteractionsValid(t *testing.T) {
 	c := validConfig()
-	c.Harnesses.AntigravityInteractions = AntigravityInteractionsHarnessConfig{
+	c.Registry.AntigravityInteractions = AntigravityInteractionsHarnessConfig{
 		Agent: "projects/p/locations/global/agents/a",
 	}
 	if err := c.Validate(); err != nil {
@@ -145,18 +145,13 @@ eventlog:
 func TestLoadFromBytes(t *testing.T) {
 	cfg, err := LoadFromBytes([]byte(`
 version: v1alpha
-harnesses:
-  antigravity:
-    default: true
+antigravity: {}
 `))
 	if err != nil {
 		t.Fatalf("LoadFromBytes: %v", err)
 	}
 	if cfg.Version != "v1alpha" {
 		t.Errorf("Version = %q, want %q", cfg.Version, "v1alpha")
-	}
-	if !cfg.Harnesses.Antigravity.Default {
-		t.Error("Harnesses.Antigravity.Default = false, want true")
 	}
 	// setDefaults must run (same as LoadFromFile).
 	if got, want := cfg.Server.Address, ":8494"; got != want {
@@ -166,7 +161,7 @@ harnesses:
 
 // TestLoadFromBytes_Invalid returns an error on malformed YAML.
 func TestLoadFromBytes_Invalid(t *testing.T) {
-	if _, err := LoadFromBytes([]byte("harnesses: [unterminated")); err == nil {
+	if _, err := LoadFromBytes([]byte("registry: [unterminated")); err == nil {
 		t.Fatal("LoadFromBytes(invalid): got nil error, want error")
 	}
 }

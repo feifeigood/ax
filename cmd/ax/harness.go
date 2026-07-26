@@ -111,6 +111,7 @@ func runAntigravityHarness(cmd *cobra.Command) error {
 		return fmt.Errorf("failed to resolve antigravity state dir: %w", err)
 	}
 
+	addr := net.JoinHostPort("127.0.0.1", strconv.Itoa(harnessPort))
 	cfg := pythonsidecar.Config{
 		Module: "python.antigravity.harness_server",
 		Args: []string{
@@ -118,9 +119,11 @@ func runAntigravityHarness(cmd *cobra.Command) error {
 			"--port", strconv.Itoa(harnessPort),
 			"--state-dir", stateDir,
 		},
-		Stdout:    os.Stdout,
-		Stderr:    os.Stderr,
-		ReadyFunc: pythonsidecar.TCPReady(net.JoinHostPort("127.0.0.1", strconv.Itoa(harnessPort))),
+		Stdout:      os.Stdout,
+		Stderr:      os.Stderr,
+		ReadyFunc:   pythonsidecar.TCPReady(addr),
+		KillOrphans: true,
+		Address:     addr,
 	}
 
 	sidecar := pythonsidecar.New(cfg)
@@ -163,7 +166,7 @@ func runAntigravityInteractionsHarness(ctx context.Context) error {
 		} else if cfg, err := config.LoadFromBytes(data); err != nil {
 			log.Printf("AX_CONFIG_CONTENT: parse failed, using defaults: %v", err)
 		} else {
-			hc = cfg.Harnesses.AntigravityInteractions
+			hc = cfg.Registry.AntigravityInteractions
 		}
 	}
 	agent := hc.Agent

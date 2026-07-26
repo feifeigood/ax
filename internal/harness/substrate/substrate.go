@@ -35,7 +35,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/google/ax/internal/harness"
-	"github.com/google/ax/internal/k8s/ate"
+	"github.com/google/ax/internal/ate"
 	"github.com/google/ax/proto"
 	"github.com/google/uuid"
 )

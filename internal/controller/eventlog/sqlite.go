@@ -43,9 +43,9 @@ func OpenSQLiteEventLog(path string) (EventLog, error) {
 	if _, err := db.Exec(`
 		CREATE TABLE IF NOT EXISTS conversation_log (
 			conversation_id TEXT NOT NULL,
-			seq INTEGER NOT NULL,
+			step INTEGER NOT NULL,
 			payload TEXT NOT NULL,
-			PRIMARY KEY (conversation_id, seq)
+			PRIMARY KEY (conversation_id, step)
 		)`); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("sqlite_eventlog: create conversation_log table: %w", err)

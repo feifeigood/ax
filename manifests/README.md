@@ -73,10 +73,10 @@ export AX_SNAPSHOTS_BUCKET="snapshot-substrate-test-$GOOGLE_CLOUD_PROJECT"
 
 # Connect to your existing Postgres:
 export AX_EVENTLOG_DSN="postgres://user:pass@host:5432/db?sslmode=require"
-./hack/install-ax.sh --deploy-ax-server
+./manifests/install-ax.sh --deploy-ax-server
 
 # Or deploy a bundled Postgres for testing:
-./hack/install-ax.sh --deploy-ax-server --deploy-postgres
+./manifests/install-ax.sh --deploy-ax-server --deploy-postgres
 ```
 
 The bundled Postgres uses an auto-generated password. To get its DSN:
@@ -122,7 +122,7 @@ kubectl port-forward -n ax rs/ax-server 8494:8494
 Run an execution targeting the port-forwarded server.
 
 ```bash
-ax exec --server=localhost:8494 --input="hello, who are you?"
+ax --server=localhost:8494 --input="hello, who are you?"
 ```
 
 The server should respond with something like:
@@ -140,7 +140,7 @@ I am a helpful assistant. How can I help you today?
 To remove the AX server and its components, run:
 
 ```bash
-./hack/install-ax.sh --delete-ax-server
+./manifests/install-ax.sh --delete-ax-server
 ```
 
 > [!NOTE]
