@@ -22,6 +22,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -84,6 +85,41 @@ type SubstrateHarness struct {
 	warmActors       map[string]*warmActorState
 }
 
+// ateapiTokenFileEnv names the file holding a projected Kubernetes
+// ServiceAccount token to present to the substrate Control API. Empty means the
+// connection carries no credentials, which is only viable against a substrate
+// revision that authenticates callers purely at the transport layer.
+const ateapiTokenFileEnv = "AX_SUBSTRATE_ATEAPI_TOKEN_FILE"
+
+// ateapiTokenFile authenticates to the substrate Control API with a bearer
+// token read from a file.
+//
+// The Control API accepts either an mTLS client certificate or a Kubernetes
+// ServiceAccount JWT whose audience matches the server's configured value, and
+// it rejects a call carrying neither. This client dials with a server-only TLS
+// configuration, so the token is what identifies it.
+//
+// The file is read per call rather than cached because the projected token is
+// rotated in place by the kubelet; a token read once at dial time would expire
+// while the connection stayed open.
+type ateapiTokenFile string
+
+func (f ateapiTokenFile) GetRequestMetadata(context.Context, ...string) (map[string]string, error) {
+	raw, err := os.ReadFile(string(f))
+	if err != nil {
+		return nil, fmt.Errorf("reading ateapi token from %s: %w", string(f), err)
+	}
+	token := strings.TrimSpace(string(raw))
+	if token == "" {
+		return nil, fmt.Errorf("ateapi token file %s is empty", string(f))
+	}
+	return map[string]string{"authorization": "Bearer " + token}, nil
+}
+
+// RequireTransportSecurity reports true: the token is a bearer credential and
+// must never be sent over a plaintext connection.
+func (ateapiTokenFile) RequireTransportSecurity() bool { return true }
+
 // New creates a new SubstrateHarness.
 func New(harnessID string, endpoint string, namespace string, template string, port int, opts ...grpc.DialOption) (*SubstrateHarness, error) {
 	idleMode, idleTimeout, err := idlePolicyFromEnv()
@@ -99,8 +135,13 @@ func New(harnessID string, endpoint string, namespace string, template string, p
 	if template == "" {
 		template = "ax-harness-antigravity-template"
 	}
-	controlCreds := grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{InsecureSkipVerify: true}))
-	client, err := ate.NewClient(namespace, template, endpoint, controlCreds)
+	controlOpts := []grpc.DialOption{
+		grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{InsecureSkipVerify: true})),
+	}
+	if tokenFile := os.Getenv(ateapiTokenFileEnv); tokenFile != "" {
+		controlOpts = append(controlOpts, grpc.WithPerRPCCredentials(ateapiTokenFile(tokenFile)))
+	}
+	client, err := ate.NewClient(namespace, template, endpoint, controlOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create ATE client: %w", err)
 	}
