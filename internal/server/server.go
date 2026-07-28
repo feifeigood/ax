@@ -104,6 +104,13 @@ func (s *Server) SuspendConversation(ctx context.Context, req *proto.SuspendConv
 	if req.ConversationId == "" {
 		return nil, status.Errorf(codes.InvalidArgument, "conversation_id is required")
 	}
+	// Deliberate mutual exclusion between suspends, turns and deletes for the
+	// same conversation. It is the only turn/suspend serialization that exists
+	// in immediate-suspend mode, which keeps no warm state for a turn to park
+	// on: without it, a suspend racing a resume can release an actor a turn is
+	// about to use. An Exec that collides here is rejected with a retryable
+	// FailedPrecondition rather than queued -- a rare blip when a user's
+	// message races the reconciler, accepted as the price of the guard.
 	inFlight, cleanup := s.markInFlight(req.ConversationId)
 	if inFlight {
 		return nil, status.Errorf(codes.FailedPrecondition, "conversation %q is already in flight", req.ConversationId)

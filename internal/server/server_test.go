@@ -16,8 +16,11 @@ package server
 
 import (
 	"context"
+	"strings"
 	"testing"
+	"time"
 
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -113,6 +116,79 @@ func TestSuspendConversation_EmptyIDIsInvalidArgument(t *testing.T) {
 	}
 	if got := status.Code(err); got != codes.InvalidArgument {
 		t.Fatalf("status.Code(err) = %v, want %v", got, codes.InvalidArgument)
+	}
+}
+
+// blockingSuspenderHarness holds SuspendConversation open until it is released,
+// so a concurrent Exec can be observed while the suspend is in flight.
+type blockingSuspenderHarness struct {
+	harness.Harness
+	entered chan string
+	release chan struct{}
+}
+
+func (b *blockingSuspenderHarness) SuspendConversation(_ context.Context, id string) error {
+	b.entered <- id
+	<-b.release
+	return nil
+}
+
+// execStream is the minimal grpc.ServerStreamingServer the Exec handler needs
+// to reach its in-flight guard; the guard rejects before anything is sent.
+type execStream struct {
+	grpc.ServerStream
+	ctx context.Context
+}
+
+func (e *execStream) Context() context.Context       { return e.ctx }
+func (e *execStream) Send(*proto.ExecResponse) error { return nil }
+
+// The in-flight guard is shared deliberately between Exec, DeleteConversation
+// and SuspendConversation: it is the process-wide mutual exclusion between a
+// conversation's turns and its suspends, and the only one that exists in
+// immediate-suspend mode, which keeps no warm state for a turn to park on.
+// Removing it would expose the resume-vs-suspend race there. A colliding Exec
+// must therefore be rejected with a retryable FailedPrecondition.
+func TestSuspendConversationExcludesConcurrentExec(t *testing.T) {
+	h := &blockingSuspenderHarness{entered: make(chan string, 1), release: make(chan struct{})}
+	s := newTestServer(t, h)
+
+	suspendErr := make(chan error, 1)
+	go func() {
+		_, err := s.SuspendConversation(context.Background(), &proto.SuspendConversationRequest{ConversationId: "conv-1"})
+		suspendErr <- err
+	}()
+
+	select {
+	case <-h.entered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("SuspendConversation never reached the harness")
+	}
+
+	err := s.Exec(&proto.ExecRequest{ConversationId: "conv-1"}, &execStream{ctx: context.Background()})
+	if err == nil {
+		t.Fatal("Exec during an in-flight suspend: got nil error, want FailedPrecondition")
+	}
+	if got := status.Code(err); got != codes.FailedPrecondition {
+		t.Fatalf("status.Code(err) = %v, want %v (err = %v)", got, codes.FailedPrecondition, err)
+	}
+	if !strings.Contains(status.Convert(err).Message(), "already in flight") {
+		t.Fatalf("Exec error = %v, want it to report the in-flight conversation", err)
+	}
+
+	// A different conversation is unaffected: the guard is per conversation id.
+	if err := s.Exec(&proto.ExecRequest{ConversationId: "conv-other"}, &execStream{ctx: context.Background()}); status.Code(err) == codes.FailedPrecondition {
+		t.Fatalf("Exec for an unrelated conversation was rejected by the in-flight guard: %v", err)
+	}
+
+	close(h.release)
+	select {
+	case err := <-suspendErr:
+		if err != nil {
+			t.Fatalf("SuspendConversation: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("SuspendConversation did not complete after the harness was released")
 	}
 }
 
