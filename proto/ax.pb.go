@@ -968,6 +968,86 @@ func (*DeleteConversationResponse) Descriptor() ([]byte, []int) {
 	return file_proto_ax_proto_rawDescGZIP(), []int{12}
 }
 
+type SuspendConversationRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	ConversationId string                 `protobuf:"bytes,1,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *SuspendConversationRequest) Reset() {
+	*x = SuspendConversationRequest{}
+	mi := &file_proto_ax_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SuspendConversationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SuspendConversationRequest) ProtoMessage() {}
+
+func (x *SuspendConversationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_ax_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SuspendConversationRequest.ProtoReflect.Descriptor instead.
+func (*SuspendConversationRequest) Descriptor() ([]byte, []int) {
+	return file_proto_ax_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *SuspendConversationRequest) GetConversationId() string {
+	if x != nil {
+		return x.ConversationId
+	}
+	return ""
+}
+
+type SuspendConversationResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SuspendConversationResponse) Reset() {
+	*x = SuspendConversationResponse{}
+	mi := &file_proto_ax_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SuspendConversationResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SuspendConversationResponse) ProtoMessage() {}
+
+func (x *SuspendConversationResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_ax_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SuspendConversationResponse.ProtoReflect.Descriptor instead.
+func (*SuspendConversationResponse) Descriptor() ([]byte, []int) {
+	return file_proto_ax_proto_rawDescGZIP(), []int{14}
+}
+
 var File_proto_ax_proto protoreflect.FileDescriptor
 
 const file_proto_ax_proto_rawDesc = "" +
@@ -1026,7 +1106,10 @@ const file_proto_ax_proto_rawDesc = "" +
 	"\x10harness_metadata\x18\x03 \x01(\fR\x0fharnessMetadata\"D\n" +
 	"\x19DeleteConversationRequest\x12'\n" +
 	"\x0fconversation_id\x18\x01 \x01(\tR\x0econversationId\"\x1c\n" +
-	"\x1aDeleteConversationResponse*l\n" +
+	"\x1aDeleteConversationResponse\"E\n" +
+	"\x1aSuspendConversationRequest\x12'\n" +
+	"\x0fconversation_id\x18\x01 \x01(\tR\x0econversationId\"\x1d\n" +
+	"\x1bSuspendConversationResponse*l\n" +
 	"\x05State\x12\x15\n" +
 	"\x11STATE_UNSPECIFIED\x10\x00\x12\x11\n" +
 	"\rSTATE_PENDING\x10\x01\x12\x10\n" +
@@ -1041,9 +1124,10 @@ const file_proto_ax_proto_rawDesc = "" +
 	"\x0eHarnessService\x126\n" +
 	"\aConnect\x12\x12.ax.HarnessRequest\x1a\x13.ax.HarnessResponse(\x010\x012?\n" +
 	"\x10ExecutionService\x12+\n" +
-	"\x04Exec\x12\x0f.ax.ExecRequest\x1a\x10.ax.ExecResponse0\x012j\n" +
+	"\x04Exec\x12\x0f.ax.ExecRequest\x1a\x10.ax.ExecResponse0\x012\xc2\x01\n" +
 	"\x13ConversationService\x12S\n" +
-	"\x12DeleteConversation\x12\x1d.ax.DeleteConversationRequest\x1a\x1e.ax.DeleteConversationResponseB\x1cZ\x1agithub.com/google/ax/protob\x06proto3"
+	"\x12DeleteConversation\x12\x1d.ax.DeleteConversationRequest\x1a\x1e.ax.DeleteConversationResponse\x12V\n" +
+	"\x13SuspendConversation\x12\x1e.ax.SuspendConversationRequest\x1a\x1f.ax.SuspendConversationResponseB\x1cZ\x1agithub.com/google/ax/protob\x06proto3"
 
 var (
 	file_proto_ax_proto_rawDescOnce sync.Once
@@ -1058,29 +1142,31 @@ func file_proto_ax_proto_rawDescGZIP() []byte {
 }
 
 var file_proto_ax_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_proto_ax_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_proto_ax_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_proto_ax_proto_goTypes = []any{
-	(State)(0),                         // 0: ax.State
-	(CancelReason)(0),                  // 1: ax.CancelReason
-	(*Message)(nil),                    // 2: ax.Message
-	(*ConversationEvent)(nil),          // 3: ax.ConversationEvent
-	(*HarnessStart)(nil),               // 4: ax.HarnessStart
-	(*HarnessCancel)(nil),              // 5: ax.HarnessCancel
-	(*HarnessRequest)(nil),             // 6: ax.HarnessRequest
-	(*HarnessOutputs)(nil),             // 7: ax.HarnessOutputs
-	(*Error)(nil),                      // 8: ax.Error
-	(*HarnessEnd)(nil),                 // 9: ax.HarnessEnd
-	(*HarnessResponse)(nil),            // 10: ax.HarnessResponse
-	(*ExecRequest)(nil),                // 11: ax.ExecRequest
-	(*ExecResponse)(nil),               // 12: ax.ExecResponse
-	(*DeleteConversationRequest)(nil),  // 13: ax.DeleteConversationRequest
-	(*DeleteConversationResponse)(nil), // 14: ax.DeleteConversationResponse
-	(*Content)(nil),                    // 15: ax.Content
-	(*structpb.Struct)(nil),            // 16: google.protobuf.Struct
+	(State)(0),                          // 0: ax.State
+	(CancelReason)(0),                   // 1: ax.CancelReason
+	(*Message)(nil),                     // 2: ax.Message
+	(*ConversationEvent)(nil),           // 3: ax.ConversationEvent
+	(*HarnessStart)(nil),                // 4: ax.HarnessStart
+	(*HarnessCancel)(nil),               // 5: ax.HarnessCancel
+	(*HarnessRequest)(nil),              // 6: ax.HarnessRequest
+	(*HarnessOutputs)(nil),              // 7: ax.HarnessOutputs
+	(*Error)(nil),                       // 8: ax.Error
+	(*HarnessEnd)(nil),                  // 9: ax.HarnessEnd
+	(*HarnessResponse)(nil),             // 10: ax.HarnessResponse
+	(*ExecRequest)(nil),                 // 11: ax.ExecRequest
+	(*ExecResponse)(nil),                // 12: ax.ExecResponse
+	(*DeleteConversationRequest)(nil),   // 13: ax.DeleteConversationRequest
+	(*DeleteConversationResponse)(nil),  // 14: ax.DeleteConversationResponse
+	(*SuspendConversationRequest)(nil),  // 15: ax.SuspendConversationRequest
+	(*SuspendConversationResponse)(nil), // 16: ax.SuspendConversationResponse
+	(*Content)(nil),                     // 17: ax.Content
+	(*structpb.Struct)(nil),             // 18: google.protobuf.Struct
 }
 var file_proto_ax_proto_depIdxs = []int32{
-	15, // 0: ax.Message.content:type_name -> ax.Content
-	16, // 1: ax.ConversationEvent.harness_config:type_name -> google.protobuf.Struct
+	17, // 0: ax.Message.content:type_name -> ax.Content
+	18, // 1: ax.ConversationEvent.harness_config:type_name -> google.protobuf.Struct
 	2,  // 2: ax.ConversationEvent.messages:type_name -> ax.Message
 	0,  // 3: ax.ConversationEvent.state:type_name -> ax.State
 	2,  // 4: ax.HarnessStart.messages:type_name -> ax.Message
@@ -1097,11 +1183,13 @@ var file_proto_ax_proto_depIdxs = []int32{
 	6,  // 15: ax.HarnessService.Connect:input_type -> ax.HarnessRequest
 	11, // 16: ax.ExecutionService.Exec:input_type -> ax.ExecRequest
 	13, // 17: ax.ConversationService.DeleteConversation:input_type -> ax.DeleteConversationRequest
-	10, // 18: ax.HarnessService.Connect:output_type -> ax.HarnessResponse
-	12, // 19: ax.ExecutionService.Exec:output_type -> ax.ExecResponse
-	14, // 20: ax.ConversationService.DeleteConversation:output_type -> ax.DeleteConversationResponse
-	18, // [18:21] is the sub-list for method output_type
-	15, // [15:18] is the sub-list for method input_type
+	15, // 18: ax.ConversationService.SuspendConversation:input_type -> ax.SuspendConversationRequest
+	10, // 19: ax.HarnessService.Connect:output_type -> ax.HarnessResponse
+	12, // 20: ax.ExecutionService.Exec:output_type -> ax.ExecResponse
+	14, // 21: ax.ConversationService.DeleteConversation:output_type -> ax.DeleteConversationResponse
+	16, // 22: ax.ConversationService.SuspendConversation:output_type -> ax.SuspendConversationResponse
+	19, // [19:23] is the sub-list for method output_type
+	15, // [15:19] is the sub-list for method input_type
 	15, // [15:15] is the sub-list for extension type_name
 	15, // [15:15] is the sub-list for extension extendee
 	0,  // [0:15] is the sub-list for field type_name
@@ -1127,7 +1215,7 @@ func file_proto_ax_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_ax_proto_rawDesc), len(file_proto_ax_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   13,
+			NumMessages:   15,
 			NumExtensions: 0,
 			NumServices:   3,
 		},

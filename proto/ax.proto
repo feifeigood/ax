@@ -148,8 +148,20 @@ message DeleteConversationRequest {
 
 message DeleteConversationResponse {}
 
+message SuspendConversationRequest {
+  string conversation_id = 1;
+}
+
+message SuspendConversationResponse {}
+
 service ConversationService {
   // Deletes conversational events and all event log resources
   // for its children executions.
   rpc DeleteConversation(DeleteConversationRequest) returns (DeleteConversationResponse);
+
+  // Suspends any compute the conversation's harness holds between turns
+  // (e.g. a warm sandboxed actor). Idempotent: a conversation with nothing
+  // to release returns success. A conversation with an active turn returns
+  // FAILED_PRECONDITION and releases nothing.
+  rpc SuspendConversation(SuspendConversationRequest) returns (SuspendConversationResponse);
 }
