@@ -261,6 +261,13 @@ type ConversationServiceClient interface {
 	// (e.g. a warm sandboxed actor). Idempotent: a conversation with nothing
 	// to release returns success. A conversation with an active turn returns
 	// FAILED_PRECONDITION and releases nothing.
+	//
+	// The in-turn guarantee comes from the harness's between-turn bookkeeping.
+	// A harness configured to release its compute at the end of every turn keeps
+	// no such bookkeeping: there is nothing held between turns to release, the
+	// request goes straight to the compute control plane, and turn exclusion
+	// rests on the server's per-conversation in-flight guard, which rejects a
+	// suspend colliding with a turn in the same process with FAILED_PRECONDITION.
 	SuspendConversation(ctx context.Context, in *SuspendConversationRequest, opts ...grpc.CallOption) (*SuspendConversationResponse, error)
 }
 
@@ -303,6 +310,13 @@ type ConversationServiceServer interface {
 	// (e.g. a warm sandboxed actor). Idempotent: a conversation with nothing
 	// to release returns success. A conversation with an active turn returns
 	// FAILED_PRECONDITION and releases nothing.
+	//
+	// The in-turn guarantee comes from the harness's between-turn bookkeeping.
+	// A harness configured to release its compute at the end of every turn keeps
+	// no such bookkeeping: there is nothing held between turns to release, the
+	// request goes straight to the compute control plane, and turn exclusion
+	// rests on the server's per-conversation in-flight guard, which rejects a
+	// suspend colliding with a turn in the same process with FAILED_PRECONDITION.
 	SuspendConversation(context.Context, *SuspendConversationRequest) (*SuspendConversationResponse, error)
 	mustEmbedUnimplementedConversationServiceServer()
 }

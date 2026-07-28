@@ -572,6 +572,12 @@ func (h *SubstrateHarness) suspendWarmActor(conversationID, execID string, gener
 //     suspended (SuspendActor fast-forwards, see substrate's MarkSuspending
 //     IsComplete), never started (NotFound → success), or leaked by a previous
 //     process life — the case timers can never cover.
+//
+// Those states only exist in warm-then-suspend mode. In immediate-suspend mode
+// (the default) every turn suspends its own actor on Close, so there is no
+// between-turn warm state, no turn bookkeeping, and therefore no in-turn guard
+// here: the request goes straight to the control plane and turn exclusion rests
+// entirely on the server's per-conversation in-flight guard.
 func (h *SubstrateHarness) SuspendConversation(ctx context.Context, conversationID string) error {
 	if conversationID == "" {
 		return errors.New("conversation_id is required")
@@ -638,11 +644,24 @@ func (h *SubstrateHarness) SuspendConversation(ctx context.Context, conversation
 	// workflow fast-forwards on an already-suspended actor (MarkSuspendingStep
 	// and CallAteletSuspendStep both treat STATUS_SUSPENDED as complete), so
 	// this is a cheap control-plane no-op, not a second real suspend.
+	//
+	// suspendWarmActor's own call runs on its own hardcoded deadline, not the
+	// caller's, so if it times out while ateapi is still running the workflow
+	// the re-issue meets the held per-actor lock and comes back Aborted. That
+	// false negative self-corrects on the caller's next sweep, which finds no
+	// warm entry and confirms the (by then finished) suspend directly.
 	return h.suspendUntracked(ctx, conversationID)
 }
 
 // suspendUntracked suspends an actor this process holds no warm state for.
 // NotFound is success: no actor means nothing occupies a worker.
+//
+// Only NotFound. An actor substrate refuses to suspend because it is not
+// RUNNING — CRASHED above all, but also PAUSED — fails every attempt, so the
+// caller can never reach success for it and cannot tell "retry me" from "no
+// suspend will ever work here". Its retry backoff bounds the cost; mapping
+// ateapi's FailedPrecondition to a distinct terminal outcome is a known
+// follow-up.
 func (h *SubstrateHarness) suspendUntracked(ctx context.Context, conversationID string) error {
 	if _, err := h.ateClient.SuspendActor(ctx, conversationID); err != nil {
 		if status.Code(err) == codes.NotFound {
