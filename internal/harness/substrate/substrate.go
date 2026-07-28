@@ -597,7 +597,15 @@ func (h *SubstrateHarness) SuspendConversation(ctx context.Context, conversation
 	h.idleMu.Unlock()
 
 	h.suspendWarmActor(conversationID, "", generation)
-	return nil
+	// suspendWarmActor swallows the ateClient.SuspendActor error (it is shared
+	// with the timer path and Shutdown's drain, neither of which has anywhere
+	// to report a failure to). Re-issue the suspend here so a genuine failure
+	// surfaces to the caller instead of being reported as success. If
+	// suspendWarmActor's own call already succeeded, substrate's suspend
+	// workflow fast-forwards on an already-suspended actor (MarkSuspendingStep
+	// and CallAteletSuspendStep both treat STATUS_SUSPENDED as complete), so
+	// this is a cheap control-plane no-op, not a second real suspend.
+	return h.suspendUntracked(ctx, conversationID)
 }
 
 // suspendUntracked suspends an actor this process holds no warm state for.

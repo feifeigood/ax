@@ -811,8 +811,13 @@ func TestSuspendConversation_IdleWarmActorSuspendsImmediately(t *testing.T) {
 	if err := h.SuspendConversation(ctx, "conv-1"); err != nil {
 		t.Fatalf("SuspendConversation: %v", err)
 	}
-	if _, _, suspend := ctrl.Calls(); !slices.Equal(suspend, []string{"conv-1"}) {
-		t.Fatalf("suspend=%v, want exactly one SuspendActor call", suspend)
+	// Two SuspendActor calls are expected: suspendWarmActor's own call, plus
+	// the confirming suspendUntracked call that surfaces a genuine failure
+	// instead of reporting success unconditionally (see the comment on
+	// SuspendConversation's warm-entry branch). The second call lands on an
+	// already-suspended actor and fast-forwards.
+	if _, _, suspend := ctrl.Calls(); !slices.Equal(suspend, []string{"conv-1", "conv-1"}) {
+		t.Fatalf("suspend=%v, want exactly two SuspendActor calls", suspend)
 	}
 
 	// The warm entry is gone: a second Start must take the cold path
@@ -916,5 +921,35 @@ func TestSuspendConversation_SuspendAlreadyInFlightIsNoOp(t *testing.T) {
 	_, _, suspendAfter := ctrl.Calls()
 	if !slices.Equal(suspendBefore, suspendAfter) {
 		t.Fatalf("suspend calls = %v, want unchanged from %v (in-flight suspend must not trigger another)", suspendAfter, suspendBefore)
+	}
+}
+
+// TestSuspendConversation_WarmEntryControlPlaneFailureSurfaces guards against
+// a failed suspend being reported as success. suspendWarmActor (shared with
+// the timer path and Shutdown's drain) swallows the ateClient.SuspendActor
+// error; SuspendConversation's warm-entry branch must not simply return nil
+// after calling it, or a genuine substrate/rustfs failure becomes an
+// unrecoverable leak once the caller deletes its durable record on success.
+func TestSuspendConversation_WarmEntryControlPlaneFailureSurfaces(t *testing.T) {
+	ctrl := &harnesstest.MockControlServer{
+		ResumeIP:   "127.0.0.1",
+		SuspendErr: status.Error(codes.Unavailable, "ateom unreachable"),
+	}
+	srv := &harnesstest.MockHarnessServer{}
+	h := newTestSubstrateHarness(t, harnesstest.StartControlServer(t, ctrl), harnesstest.StartHarnessServer(t, srv))
+	h.idleMode = idleModeWarmThenSuspend
+	h.idleTimeout = time.Minute
+
+	ctx := context.Background()
+	exec, err := h.Start(ctx, "conv-fail", substrateHarnessConfig)
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	if err := exec.Close(ctx); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	if err := h.SuspendConversation(ctx, "conv-fail"); err == nil {
+		t.Fatal("SuspendConversation: got nil error, want a non-nil error surfacing the control-plane failure")
 	}
 }
