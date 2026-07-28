@@ -880,3 +880,41 @@ func TestSuspendConversation_NotFoundIsSuccess(t *testing.T) {
 		t.Fatalf("SuspendConversation: %v, want nil (NotFound is success)", err)
 	}
 }
+
+func TestSuspendConversation_SuspendAlreadyInFlightIsNoOp(t *testing.T) {
+	ctrl := &harnesstest.MockControlServer{ResumeIP: "127.0.0.1"}
+	srv := &harnesstest.MockHarnessServer{}
+	h := newTestSubstrateHarness(t, harnesstest.StartControlServer(t, ctrl), harnesstest.StartHarnessServer(t, srv))
+	h.idleMode = idleModeWarmThenSuspend
+	h.idleTimeout = time.Minute
+
+	ctx := context.Background()
+	exec, err := h.Start(ctx, "conv-inflight", substrateHarnessConfig)
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	if err := exec.Close(ctx); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	// White-box: mark the warm entry as already suspending, as suspendWarmActor
+	// does right before it calls out to the control plane, so the "suspend
+	// already in flight" branch runs without racing a real suspend.
+	h.idleMu.Lock()
+	state := h.warmActors["conv-inflight"]
+	if state == nil {
+		h.idleMu.Unlock()
+		t.Fatal("expected a warm entry after Close")
+	}
+	state.suspending = make(chan struct{})
+	h.idleMu.Unlock()
+
+	_, _, suspendBefore := ctrl.Calls()
+	if err := h.SuspendConversation(ctx, "conv-inflight"); err != nil {
+		t.Fatalf("SuspendConversation: %v", err)
+	}
+	_, _, suspendAfter := ctrl.Calls()
+	if !slices.Equal(suspendBefore, suspendAfter) {
+		t.Fatalf("suspend calls = %v, want unchanged from %v (in-flight suspend must not trigger another)", suspendAfter, suspendBefore)
+	}
+}
