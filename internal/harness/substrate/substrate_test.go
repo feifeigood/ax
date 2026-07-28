@@ -886,41 +886,102 @@ func TestSuspendConversation_NotFoundIsSuccess(t *testing.T) {
 	}
 }
 
-func TestSuspendConversation_SuspendAlreadyInFlightIsNoOp(t *testing.T) {
-	ctrl := &harnesstest.MockControlServer{ResumeIP: "127.0.0.1"}
-	srv := &harnesstest.MockHarnessServer{}
-	h := newTestSubstrateHarness(t, harnesstest.StartControlServer(t, ctrl), harnesstest.StartHarnessServer(t, srv))
+// markSuspending white-box-marks the conversation's warm entry as already
+// suspending, exactly as suspendWarmActor does right before it calls out to
+// the control plane, and returns the channel the branch under test parks on.
+func markSuspending(t *testing.T, h *SubstrateHarness, conversationID string) chan struct{} {
+	t.Helper()
+	h.idleMu.Lock()
+	defer h.idleMu.Unlock()
+	state := h.warmActors[conversationID]
+	if state == nil {
+		t.Fatal("expected a warm entry after Close")
+	}
+	done := make(chan struct{})
+	state.suspending = done
+	return done
+}
+
+// warmIdleHarness returns a warm-mode harness with one idle warm entry for
+// conversationID (a completed turn with the idle timer armed far out).
+func warmIdleHarness(t *testing.T, ctrl *harnesstest.MockControlServer, conversationID string) *SubstrateHarness {
+	t.Helper()
+	h := newTestSubstrateHarness(t, harnesstest.StartControlServer(t, ctrl), harnesstest.StartHarnessServer(t, &harnesstest.MockHarnessServer{}))
 	h.idleMode = idleModeWarmThenSuspend
 	h.idleTimeout = time.Minute
 
 	ctx := context.Background()
-	exec, err := h.Start(ctx, "conv-inflight", substrateHarnessConfig)
+	exec, err := h.Start(ctx, conversationID, substrateHarnessConfig)
 	if err != nil {
 		t.Fatalf("Start: %v", err)
 	}
 	if err := exec.Close(ctx); err != nil {
 		t.Fatalf("Close: %v", err)
 	}
+	return h
+}
 
-	// White-box: mark the warm entry as already suspending, as suspendWarmActor
-	// does right before it calls out to the control plane, so the "suspend
-	// already in flight" branch runs without racing a real suspend.
-	h.idleMu.Lock()
-	state := h.warmActors["conv-inflight"]
-	if state == nil {
-		h.idleMu.Unlock()
-		t.Fatal("expected a warm entry after Close")
-	}
-	state.suspending = make(chan struct{})
-	h.idleMu.Unlock()
+// An in-flight (timer-driven) suspend swallows its own control-plane error and
+// deletes the warm entry either way, so its completion is not evidence that the
+// actor was released. SuspendConversation must wait for it and then verify the
+// outcome with its own suspend, rather than reporting success on trust: the
+// caller deletes its durable retry record when this RPC succeeds.
+func TestSuspendConversation_WaitsForInFlightSuspendThenVerifies(t *testing.T) {
+	ctrl := &harnesstest.MockControlServer{ResumeIP: "127.0.0.1"}
+	h := warmIdleHarness(t, ctrl, "conv-inflight")
+
+	done := markSuspending(t, h, "conv-inflight")
+	close(done) // the in-flight suspend has finished (outcome unknown)
 
 	_, _, suspendBefore := ctrl.Calls()
-	if err := h.SuspendConversation(ctx, "conv-inflight"); err != nil {
+	if err := h.SuspendConversation(context.Background(), "conv-inflight"); err != nil {
 		t.Fatalf("SuspendConversation: %v", err)
 	}
 	_, _, suspendAfter := ctrl.Calls()
-	if !slices.Equal(suspendBefore, suspendAfter) {
-		t.Fatalf("suspend calls = %v, want unchanged from %v (in-flight suspend must not trigger another)", suspendAfter, suspendBefore)
+	if len(suspendAfter) != len(suspendBefore)+1 || suspendAfter[len(suspendAfter)-1] != "conv-inflight" {
+		t.Fatalf("suspend calls = %v, want one verifying SuspendActor on top of %v", suspendAfter, suspendBefore)
+	}
+}
+
+// The failure this branch exists for: the in-flight suspend is failing, its
+// error is logged and discarded, and the warm entry is dropped regardless. The
+// verifying suspend must surface the failure so the caller keeps its retry
+// record instead of leaking a RUNNING actor.
+func TestSuspendConversation_InFlightSuspendFailureSurfaces(t *testing.T) {
+	ctrl := &harnesstest.MockControlServer{
+		ResumeIP:   "127.0.0.1",
+		SuspendErr: status.Error(codes.Unavailable, "ateom unreachable"),
+	}
+	h := warmIdleHarness(t, ctrl, "conv-inflight-fail")
+
+	done := markSuspending(t, h, "conv-inflight-fail")
+	close(done)
+
+	if err := h.SuspendConversation(context.Background(), "conv-inflight-fail"); err == nil {
+		t.Fatal("SuspendConversation: got nil, want the verifying suspend's failure surfaced")
+	}
+}
+
+// Waiting on the in-flight suspend must honor the RPC deadline: a suspend that
+// never completes must not pin the handler past the caller's context.
+func TestSuspendConversation_InFlightWaitHonorsContext(t *testing.T) {
+	ctrl := &harnesstest.MockControlServer{ResumeIP: "127.0.0.1"}
+	h := warmIdleHarness(t, ctrl, "conv-inflight-ctx")
+
+	markSuspending(t, h, "conv-inflight-ctx") // nobody ever closes it
+
+	ctx, cancel := context.WithCancel(context.Background())
+	errCh := make(chan error, 1)
+	go func() { errCh <- h.SuspendConversation(ctx, "conv-inflight-ctx") }()
+	cancel()
+
+	select {
+	case err := <-errCh:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("SuspendConversation error = %v, want context.Canceled", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("SuspendConversation did not return after its context was canceled")
 	}
 }
 

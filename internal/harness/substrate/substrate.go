@@ -562,7 +562,9 @@ func (h *SubstrateHarness) suspendWarmActor(conversationID, execID string, gener
 //     suspendWarmActor path (generation bump neutralizes a fired-but-blocked
 //     timer callback, exactly as Shutdown does)
 //   - entry in a turn  → harness.ErrConversationInTurn; nothing is released
-//   - suspend already in flight → success (the caller's goal is met)
+//   - suspend already in flight → wait for it, then verify the outcome the
+//     same way the idle branch does: the in-flight suspend swallows its own
+//     error and drops the entry either way, so its completion proves nothing
 //   - no entry         → suspend directly: the actor is either already
 //     suspended (SuspendActor fast-forwards, see substrate's MarkSuspending
 //     IsComplete), never started (NotFound → success), or leaked by a previous
@@ -585,8 +587,20 @@ func (h *SubstrateHarness) SuspendConversation(ctx context.Context, conversation
 		return harness.ErrConversationInTurn
 	}
 	if state.suspending != nil {
+		done := state.suspending
 		h.idleMu.Unlock()
-		return nil
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-done:
+		}
+		// The in-flight suspend swallows its own SuspendActor error and drops
+		// the warm entry either way (suspendWarmActor), so its completion
+		// proves nothing about the actor. Verify the outcome: if it succeeded
+		// this fast-forwards on an already-suspended actor; if it failed this
+		// is the retry that keeps the caller from deleting its retry record for
+		// an actor that is still RUNNING.
+		return h.suspendUntracked(ctx, conversationID)
 	}
 	if state.timer != nil {
 		state.timer.Stop()
