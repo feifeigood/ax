@@ -554,6 +554,64 @@ func (h *SubstrateHarness) suspendWarmActor(conversationID, execID string, gener
 	h.idleMu.Unlock()
 }
 
+// SuspendConversation releases conversationID's actor on demand instead of
+// waiting for the idle timer. It is the harness half of the generic
+// ConversationService.SuspendConversation RPC.
+//
+//   - idle warm entry  → disarm the timer and suspend through the standard
+//     suspendWarmActor path (generation bump neutralizes a fired-but-blocked
+//     timer callback, exactly as Shutdown does)
+//   - entry in a turn  → harness.ErrConversationInTurn; nothing is released
+//   - suspend already in flight → success (the caller's goal is met)
+//   - no entry         → suspend directly: the actor is either already
+//     suspended (SuspendActor fast-forwards, see substrate's MarkSuspending
+//     IsComplete), never started (NotFound → success), or leaked by a previous
+//     process life — the case timers can never cover.
+func (h *SubstrateHarness) SuspendConversation(ctx context.Context, conversationID string) error {
+	if conversationID == "" {
+		return errors.New("conversation_id is required")
+	}
+	if h.idleMode != idleModeWarmThenSuspend {
+		return h.suspendUntracked(ctx, conversationID)
+	}
+	h.idleMu.Lock()
+	state := h.warmActors[conversationID]
+	if state == nil {
+		h.idleMu.Unlock()
+		return h.suspendUntracked(ctx, conversationID)
+	}
+	if state.inTurn {
+		h.idleMu.Unlock()
+		return harness.ErrConversationInTurn
+	}
+	if state.suspending != nil {
+		h.idleMu.Unlock()
+		return nil
+	}
+	if state.timer != nil {
+		state.timer.Stop()
+		state.timer = nil
+	}
+	state.generation++
+	generation := state.generation
+	h.idleMu.Unlock()
+
+	h.suspendWarmActor(conversationID, "", generation)
+	return nil
+}
+
+// suspendUntracked suspends an actor this process holds no warm state for.
+// NotFound is success: no actor means nothing occupies a worker.
+func (h *SubstrateHarness) suspendUntracked(ctx context.Context, conversationID string) error {
+	if _, err := h.ateClient.SuspendActor(ctx, conversationID); err != nil {
+		if status.Code(err) == codes.NotFound {
+			return nil
+		}
+		return fmt.Errorf("suspend substrate actor %s: %w", conversationID, err)
+	}
+	return nil
+}
+
 // Shutdown drains warm actors awaiting idle suspension so a process exit does
 // not leak them as RUNNING actors. A warm actor sits between turns with a
 // pending idle timer whose only home is this process's memory; if the process

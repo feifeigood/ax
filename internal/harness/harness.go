@@ -18,9 +18,15 @@ package harness
 
 import (
 	"context"
+	"errors"
 
 	"github.com/google/ax/proto"
 )
+
+// ErrConversationInTurn reports that a conversation cannot release its compute
+// right now because a turn is actively executing on it. Callers retry after
+// the turn ends.
+var ErrConversationInTurn = errors.New("conversation has an active turn")
 
 // Handler defines the streaming event hook callbacks for an execution turn.
 type Handler interface {

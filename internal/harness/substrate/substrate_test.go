@@ -17,6 +17,7 @@ package substrate
 import (
 	"bytes"
 	"context"
+	"errors"
 	"net"
 	"slices"
 	"strconv"
@@ -24,6 +25,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/ax/internal/harness"
 	"github.com/google/ax/internal/harness/harnesstest"
 	"github.com/google/ax/internal/ate"
 	"github.com/google/ax/proto"
@@ -786,5 +788,95 @@ func TestSubstrateExecutionEagerCloseCapabilityTracksIdleMode(t *testing.T) {
 				t.Fatalf("CloseBeforeNextStart() = %v, want %v", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestSuspendConversation_IdleWarmActorSuspendsImmediately(t *testing.T) {
+	ctrl := &harnesstest.MockControlServer{ResumeIP: "127.0.0.1"}
+	srv := &harnesstest.MockHarnessServer{}
+	h := newTestSubstrateHarness(t, harnesstest.StartControlServer(t, ctrl), harnesstest.StartHarnessServer(t, srv))
+	h.idleMode = idleModeWarmThenSuspend
+	h.idleTimeout = time.Minute
+
+	ctx := context.Background()
+	exec, err := h.Start(ctx, "conv-1", substrateHarnessConfig)
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	if err := exec.Close(ctx); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	// Timer is armed but far away; on-demand suspend must not wait for it.
+	if err := h.SuspendConversation(ctx, "conv-1"); err != nil {
+		t.Fatalf("SuspendConversation: %v", err)
+	}
+	if _, _, suspend := ctrl.Calls(); !slices.Equal(suspend, []string{"conv-1"}) {
+		t.Fatalf("suspend=%v, want exactly one SuspendActor call", suspend)
+	}
+
+	// The warm entry is gone: a second Start must take the cold path
+	// (CreateActor called again).
+	exec2, err := h.Start(ctx, "conv-1", substrateHarnessConfig)
+	if err != nil {
+		t.Fatalf("second Start: %v", err)
+	}
+	t.Cleanup(func() { _ = exec2.Close(ctx) })
+	if create, _, _ := ctrl.Calls(); !slices.Equal(create, []string{"conv-1", "conv-1"}) {
+		t.Fatalf("create=%v, want two creations (cold path after suspend)", create)
+	}
+}
+
+func TestSuspendConversation_InTurnRefuses(t *testing.T) {
+	ctrl := &harnesstest.MockControlServer{ResumeIP: "127.0.0.1"}
+	srv := &harnesstest.MockHarnessServer{}
+	h := newTestSubstrateHarness(t, harnesstest.StartControlServer(t, ctrl), harnesstest.StartHarnessServer(t, srv))
+	h.idleMode = idleModeWarmThenSuspend
+	h.idleTimeout = time.Minute
+
+	ctx := context.Background()
+	exec, err := h.Start(ctx, "conv-2", substrateHarnessConfig)
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	t.Cleanup(func() { _ = exec.Close(ctx) })
+
+	if err := h.SuspendConversation(ctx, "conv-2"); !errors.Is(err, harness.ErrConversationInTurn) {
+		t.Fatalf("SuspendConversation error = %v, want ErrConversationInTurn", err)
+	}
+	if _, _, suspend := ctrl.Calls(); len(suspend) != 0 {
+		t.Fatalf("suspend=%v, want no SuspendActor call while a turn is active", suspend)
+	}
+}
+
+func TestSuspendConversation_NoEntrySuspendsDirectly(t *testing.T) {
+	ctrl := &harnesstest.MockControlServer{ResumeIP: "127.0.0.1"}
+	srv := &harnesstest.MockHarnessServer{}
+	h := newTestSubstrateHarness(t, harnesstest.StartControlServer(t, ctrl), harnesstest.StartHarnessServer(t, srv))
+	h.idleMode = idleModeWarmThenSuspend
+	h.idleTimeout = time.Minute
+
+	// No turn ever ran for this conversation: SuspendConversation must still
+	// reach the control plane, releasing anything leaked by a previous process
+	// life.
+	if err := h.SuspendConversation(context.Background(), "conv-never-started"); err != nil {
+		t.Fatalf("SuspendConversation: %v", err)
+	}
+	if _, _, suspend := ctrl.Calls(); !slices.Equal(suspend, []string{"conv-never-started"}) {
+		t.Fatalf("suspend=%v, want exactly one SuspendActor call", suspend)
+	}
+}
+
+func TestSuspendConversation_NotFoundIsSuccess(t *testing.T) {
+	ctrl := &harnesstest.MockControlServer{
+		ResumeIP:   "127.0.0.1",
+		SuspendErr: status.Error(codes.NotFound, "no such actor"),
+	}
+	h := newTestSubstrateHarness(t, harnesstest.StartControlServer(t, ctrl), harnesstest.StartHarnessServer(t, &harnesstest.MockHarnessServer{}))
+	h.idleMode = idleModeWarmThenSuspend
+	h.idleTimeout = time.Minute
+
+	if err := h.SuspendConversation(context.Background(), "conv-never-existed"); err != nil {
+		t.Fatalf("SuspendConversation: %v, want nil (NotFound is success)", err)
 	}
 }
