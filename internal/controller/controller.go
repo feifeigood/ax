@@ -269,13 +269,47 @@ type ConversationSuspender interface {
 	SuspendConversation(ctx context.Context, conversationID string) error
 }
 
-// Suspend asks every capable harness to release conversationID's compute.
-// Harnesses without the capability are skipped; an ErrConversationInTurn from
-// any harness is returned as-is so the caller can retry after the turn.
+// Suspend releases the compute conversationID's harness holds between turns.
+// An ErrConversationInTurn is returned as-is so the caller can retry after the
+// turn.
+//
+// The owning harness is resolved from the event log, exactly as Exec resolves
+// it, and only that harness is asked. Broadcasting instead would send N-1
+// guaranteed-NotFound calls (ax registers three substrate harnesses in the
+// substrate deployment), let a transient failure from a harness that does not
+// own the conversation fail an RPC the owner already satisfied, and — for two
+// harnesses sharing an atespace — let the non-owner's no-entry path suspend an
+// actor straight past the owner's in-turn guard.
+//
+// Only a conversation this process has no event-log record of falls back to the
+// all-harness fan-out. That is the reclaim net for actors leaked by an earlier
+// process life or deleted conversations: nobody claims them, so every harness
+// is asked and NotFound from all of them is the expected, successful outcome.
 func (d *Controller) Suspend(ctx context.Context, conversationID string) error {
 	if conversationID == "" {
 		return fmt.Errorf("conversation_id is required")
 	}
+
+	_, harnessID, err := newLogger(d.eventLog, conversationID, "").ResumptionState(ctx)
+	if err != nil {
+		// Fall through to the fan-out: an unreadable event log must not block
+		// the reclaim path, and the fan-out reaches the owner too.
+		slog.WarnContext(ctx, "Failed to resolve the conversation's harness; suspending on every capable harness",
+			slog.String("conversation_id", conversationID),
+			slog.Any("error", err),
+		)
+	} else if harnessID != "" {
+		h, err := d.registry.Harness(harnessID)
+		if err != nil {
+			return fmt.Errorf("failed to get harness %q: %w", harnessID, err)
+		}
+		s, ok := h.(ConversationSuspender)
+		if !ok {
+			return fmt.Errorf("harness %q does not support suspending conversations", harnessID)
+		}
+		return s.SuspendConversation(ctx, conversationID)
+	}
+
 	var errs []error
 	for _, h := range d.registry.Harnesses() {
 		s, ok := h.(ConversationSuspender)

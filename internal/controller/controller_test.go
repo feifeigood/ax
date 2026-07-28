@@ -1055,7 +1055,11 @@ func (f *fakeSuspenderHarness) SuspendConversation(_ context.Context, id string)
 
 func newTestController(t *testing.T, r *Registry) *Controller {
 	t.Helper()
-	log := &eventlogtest.MemoryEventLog{}
+	return newTestControllerWithLog(t, r, &eventlogtest.MemoryEventLog{})
+}
+
+func newTestControllerWithLog(t *testing.T, r *Registry, log *eventlogtest.MemoryEventLog) *Controller {
+	t.Helper()
 	c, err := New(context.Background(), Config{
 		Registry:        r,
 		EventLogBuilder: func() (eventlog.EventLog, error) { return log, nil },
@@ -1110,5 +1114,113 @@ func TestControllerSuspend_SkipsIncapableHarnesses(t *testing.T) {
 	c := newTestController(t, r)
 	if err := c.Suspend(context.Background(), "conv-1"); err != nil {
 		t.Fatalf("Suspend with no capable harnesses: %v", err)
+	}
+}
+
+// seedConversationHarness records conversationID as owned by harnessID, which
+// is how Suspend resolves the harness to address.
+func seedConversationHarness(t *testing.T, log *eventlogtest.MemoryEventLog, conversationID, harnessID string) {
+	t.Helper()
+	if _, err := log.Append(context.Background(), &proto.ConversationEvent{
+		ConversationId: conversationID,
+		HarnessId:      harnessID,
+		State:          proto.State_STATE_COMPLETED,
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// A conversation the event log knows about must be suspended on its own harness
+// only. Broadcasting would send guaranteed-NotFound calls to the others, let a
+// non-owner's transient failure fail the whole RPC, and — for harnesses sharing
+// an atespace — let a non-owner suspend the actor past the owner's in-turn
+// guard.
+func TestControllerSuspend_AddressesOnlyTheOwningHarness(t *testing.T) {
+	r := NewRegistry()
+	owner, other := &fakeSuspenderHarness{}, &fakeSuspenderHarness{}
+	if err := r.RegisterHarness("harness-a", owner); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.RegisterHarness("harness-b", other); err != nil {
+		t.Fatal(err)
+	}
+	log := &eventlogtest.MemoryEventLog{}
+	seedConversationHarness(t, log, "conv-owned", "harness-a")
+	c := newTestControllerWithLog(t, r, log)
+
+	if err := c.Suspend(context.Background(), "conv-owned"); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(owner.calls, []string{"conv-owned"}) {
+		t.Fatalf("owner calls = %v, want the conversation suspended on its own harness", owner.calls)
+	}
+	if len(other.calls) != 0 {
+		t.Fatalf("non-owning harness calls = %v, want none", other.calls)
+	}
+}
+
+// A conversation with no event-log record belongs to nobody this process knows
+// of (an actor leaked by an earlier process life, a deleted conversation), so
+// every capable harness is asked: the fan-out is the reclaim net.
+func TestControllerSuspend_UnknownConversationFansOut(t *testing.T) {
+	r := NewRegistry()
+	a, b := &fakeSuspenderHarness{}, &fakeSuspenderHarness{}
+	if err := r.RegisterHarness("harness-a", a); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.RegisterHarness("harness-b", b); err != nil {
+		t.Fatal(err)
+	}
+	c := newTestController(t, r)
+
+	if err := c.Suspend(context.Background(), "conv-unknown"); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(a.calls, []string{"conv-unknown"}) || !slices.Equal(b.calls, []string{"conv-unknown"}) {
+		t.Fatalf("calls a=%v b=%v, want both harnesses asked to reclaim the conversation", a.calls, b.calls)
+	}
+}
+
+// When the resolved owner cannot suspend, the caller must be told rather than
+// receiving the silent success a capability scan would produce: nothing was
+// released, and the actor may well still be running.
+func TestControllerSuspend_OwningHarnessWithoutCapabilityErrors(t *testing.T) {
+	r := NewRegistry()
+	if err := r.RegisterHarness("antigravity", &dummyHarness{}); err != nil {
+		t.Fatal(err)
+	}
+	capable := &fakeSuspenderHarness{}
+	if err := r.RegisterHarness("substrate", capable); err != nil {
+		t.Fatal(err)
+	}
+	log := &eventlogtest.MemoryEventLog{}
+	seedConversationHarness(t, log, "conv-incapable", "antigravity")
+	c := newTestControllerWithLog(t, r, log)
+
+	if err := c.Suspend(context.Background(), "conv-incapable"); err == nil {
+		t.Fatal("Suspend on an owner without the capability: got nil, want an error")
+	}
+	if len(capable.calls) != 0 {
+		t.Fatalf("capable non-owner calls = %v, want none", capable.calls)
+	}
+}
+
+// A conversation whose recorded harness is not registered in this process is an
+// error, not a fan-out: silently broadcasting would hide the misconfiguration.
+func TestControllerSuspend_UnregisteredOwningHarnessErrors(t *testing.T) {
+	r := NewRegistry()
+	capable := &fakeSuspenderHarness{}
+	if err := r.RegisterHarness("substrate", capable); err != nil {
+		t.Fatal(err)
+	}
+	log := &eventlogtest.MemoryEventLog{}
+	seedConversationHarness(t, log, "conv-gone", "retired-harness")
+	c := newTestControllerWithLog(t, r, log)
+
+	if err := c.Suspend(context.Background(), "conv-gone"); err == nil {
+		t.Fatal("Suspend with an unregistered owning harness: got nil, want an error")
+	}
+	if len(capable.calls) != 0 {
+		t.Fatalf("calls = %v, want no harness addressed", capable.calls)
 	}
 }
