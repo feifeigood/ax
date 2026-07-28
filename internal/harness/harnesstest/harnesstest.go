@@ -51,6 +51,11 @@ type MockControlServer struct {
 	ResumeIPs      []string // per-call AteomPodIp values; overrides ResumeIP when set
 	ResumeNilActor bool     // when true, ResumeActor returns a nil Actor
 	SuspendErr     error    // returned from SuspendActor when non-nil
+	// SuspendHook, when set, runs at the start of every SuspendActor call, so a
+	// test can observe or manipulate harness state while a suspend is in
+	// flight. It runs on the server's handler goroutine, holding no harness
+	// lock.
+	SuspendHook func(conversationID string)
 }
 
 func (f *MockControlServer) CreateAtespace(_ context.Context, req *ateapipb.CreateAtespaceRequest) (*ateapipb.Atespace, error) {
@@ -83,6 +88,9 @@ func (f *MockControlServer) ResumeActor(_ context.Context, req *ateapipb.ResumeA
 }
 
 func (f *MockControlServer) SuspendActor(_ context.Context, req *ateapipb.SuspendActorRequest) (*ateapipb.SuspendActorResponse, error) {
+	if f.SuspendHook != nil {
+		f.SuspendHook(req.GetActor().GetName())
+	}
 	f.mu.Lock()
 	f.suspendCalls = append(f.suspendCalls, req.GetActor().GetName())
 	f.mu.Unlock()

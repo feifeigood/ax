@@ -22,6 +22,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -982,6 +983,43 @@ func TestSuspendConversation_InFlightWaitHonorsContext(t *testing.T) {
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("SuspendConversation did not return after its context was canceled")
+	}
+}
+
+// suspendWarmActor's close(done) releases any beginWarmTurn parked on the
+// suspending channel, and that waiter re-creates the warm entry with inTurn set
+// and cold-starts the actor. The confirming suspend must not fire on that live
+// turn's actor (and must certainly not report success for it): re-entry means
+// ErrConversationInTurn, so the caller keeps its record and retries later.
+func TestSuspendConversation_ReentryDuringSuspendRefuses(t *testing.T) {
+	ctrl := &harnesstest.MockControlServer{ResumeIP: "127.0.0.1"}
+	h := warmIdleHarness(t, ctrl, "conv-reentry")
+
+	// Stand in for the released beginWarmTurn waiter: while suspendWarmActor is
+	// out at the control plane, a fresh entry appears with a turn in flight.
+	// (A distinct state value, as the waiter's would be, so suspendWarmActor's
+	// suspending-identity check correctly leaves it alone.)
+	var once sync.Once
+	ctrl.SuspendHook = func(conversationID string) {
+		once.Do(func() {
+			h.idleMu.Lock()
+			h.warmActors[conversationID] = &warmActorState{inTurn: true}
+			h.idleMu.Unlock()
+		})
+	}
+
+	err := h.SuspendConversation(context.Background(), "conv-reentry")
+	if !errors.Is(err, harness.ErrConversationInTurn) {
+		t.Fatalf("SuspendConversation error = %v, want ErrConversationInTurn", err)
+	}
+	if _, _, suspend := ctrl.Calls(); !slices.Equal(suspend, []string{"conv-reentry"}) {
+		t.Fatalf("suspend=%v, want only suspendWarmActor's own call (no confirming suspend on the re-entered actor)", suspend)
+	}
+	h.idleMu.Lock()
+	state := h.warmActors["conv-reentry"]
+	h.idleMu.Unlock()
+	if state == nil || !state.inTurn {
+		t.Fatalf("warm entry = %+v, want the re-entered turn left intact", state)
 	}
 }
 

@@ -560,7 +560,10 @@ func (h *SubstrateHarness) suspendWarmActor(conversationID, execID string, gener
 //
 //   - idle warm entry  → disarm the timer and suspend through the standard
 //     suspendWarmActor path (generation bump neutralizes a fired-but-blocked
-//     timer callback, exactly as Shutdown does)
+//     timer callback, exactly as Shutdown does), then re-read the map before
+//     confirming: suspendWarmActor releases parked beginWarmTurn waiters, and
+//     a waiter that re-entered the conversation must not have its live actor
+//     suspended out from under it (→ harness.ErrConversationInTurn instead)
 //   - entry in a turn  → harness.ErrConversationInTurn; nothing is released
 //   - suspend already in flight → wait for it, then verify the outcome the
 //     same way the idle branch does: the in-flight suspend swallows its own
@@ -611,6 +614,22 @@ func (h *SubstrateHarness) SuspendConversation(ctx context.Context, conversation
 	h.idleMu.Unlock()
 
 	h.suspendWarmActor(conversationID, "", generation)
+
+	// suspendWarmActor's close(done) releases any beginWarmTurn parked on the
+	// suspending channel, and that waiter immediately re-creates the entry with
+	// inTurn set and cold-starts the actor. Re-read the map before touching the
+	// control plane again: any entry at all (in a turn, parked, or freshly idle
+	// after a whole turn slipped through) means the conversation was re-entered
+	// and this actor is no longer ours to release. ErrConversationInTurn is
+	// right in every one of those sub-cases — the caller keeps its record and
+	// retries once the conversation goes idle again.
+	h.idleMu.Lock()
+	_, reentered := h.warmActors[conversationID]
+	h.idleMu.Unlock()
+	if reentered {
+		return harness.ErrConversationInTurn
+	}
+
 	// suspendWarmActor swallows the ateClient.SuspendActor error (it is shared
 	// with the timer path and Shutdown's drain, neither of which has anywhere
 	// to report a failure to). Re-issue the suspend here so a genuine failure
