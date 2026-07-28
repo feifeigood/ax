@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -260,6 +261,32 @@ func (a *harnessHandler) complete(ctx context.Context, execID string, metadata [
 		Step:            seq,
 		HarnessMetadata: metadata,
 	})
+}
+
+// ConversationSuspender is an optional harness capability: release any compute
+// held for a conversation between turns (substrate warm mode implements it).
+type ConversationSuspender interface {
+	SuspendConversation(ctx context.Context, conversationID string) error
+}
+
+// Suspend asks every capable harness to release conversationID's compute.
+// Harnesses without the capability are skipped; an ErrConversationInTurn from
+// any harness is returned as-is so the caller can retry after the turn.
+func (d *Controller) Suspend(ctx context.Context, conversationID string) error {
+	if conversationID == "" {
+		return fmt.Errorf("conversation_id is required")
+	}
+	var errs []error
+	for _, h := range d.registry.Harnesses() {
+		s, ok := h.(ConversationSuspender)
+		if !ok {
+			continue
+		}
+		if err := s.SuspendConversation(ctx, conversationID); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
 }
 
 // Delete deletes all events for a specific conversation ID.

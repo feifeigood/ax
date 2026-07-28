@@ -19,6 +19,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -32,6 +33,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/google/ax/internal/controller"
+	"github.com/google/ax/internal/harness"
 	"github.com/google/ax/proto"
 )
 
@@ -90,6 +92,31 @@ func (s *Server) DeleteConversation(ctx context.Context, req *proto.DeleteConver
 		return nil, status.Errorf(codes.Internal, "failed to delete conversation: %v", err)
 	}
 	return &proto.DeleteConversationResponse{}, nil
+}
+
+// SuspendConversation asks every capable harness to release the compute it
+// holds for the conversation between turns. It is a no-op for harnesses that
+// don't implement the capability.
+func (s *Server) SuspendConversation(ctx context.Context, req *proto.SuspendConversationRequest) (*proto.SuspendConversationResponse, error) {
+	slog.InfoContext(ctx, "Suspending conversation...",
+		slog.String("conversation_id", req.ConversationId))
+
+	if req.ConversationId == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "conversation_id is required")
+	}
+	inFlight, cleanup := s.markInFlight(req.ConversationId)
+	if inFlight {
+		return nil, status.Errorf(codes.FailedPrecondition, "conversation %q is already in flight", req.ConversationId)
+	}
+	defer cleanup()
+
+	if err := s.controller.Suspend(ctx, req.ConversationId); err != nil {
+		if errors.Is(err, harness.ErrConversationInTurn) {
+			return nil, status.Errorf(codes.FailedPrecondition, "conversation %q has an active turn", req.ConversationId)
+		}
+		return nil, status.Errorf(codes.Internal, "failed to suspend conversation: %v", err)
+	}
+	return &proto.SuspendConversationResponse{}, nil
 }
 
 // Serve starts the gRPC server on the specified address.

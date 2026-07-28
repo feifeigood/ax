@@ -17,6 +17,7 @@ package controller
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -1035,5 +1036,79 @@ func TestExec_PendingResumePanicStillClosesExecution(t *testing.T) {
 
 	if !slices.Contains(journal, "close:exec-1") {
 		t.Fatalf("journal = %v, want Close to run despite the panic", journal)
+	}
+}
+
+// fakeSuspenderHarness implements the optional ConversationSuspender
+// capability. It embeds a nil harness.Harness because Suspend never calls
+// Start; only the capability method is exercised.
+type fakeSuspenderHarness struct {
+	harness.Harness
+	calls []string
+	err   error
+}
+
+func (f *fakeSuspenderHarness) SuspendConversation(_ context.Context, id string) error {
+	f.calls = append(f.calls, id)
+	return f.err
+}
+
+func newTestController(t *testing.T, r *Registry) *Controller {
+	t.Helper()
+	log := &eventlogtest.MemoryEventLog{}
+	c, err := New(context.Background(), Config{
+		Registry:        r,
+		EventLogBuilder: func() (eventlog.EventLog, error) { return log, nil },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = c.Close() })
+	return c
+}
+
+// Suspend must invoke SuspendConversation on every registered harness that
+// implements the optional ConversationSuspender capability.
+func TestControllerSuspend_CallsCapableHarnesses(t *testing.T) {
+	r := NewRegistry()
+	fake := &fakeSuspenderHarness{}
+	if err := r.RegisterHarness("substrate", fake); err != nil {
+		t.Fatal(err)
+	}
+	c := newTestController(t, r)
+	if err := c.Suspend(context.Background(), "conv-1"); err != nil {
+		t.Fatal(err)
+	}
+	if len(fake.calls) != 1 || fake.calls[0] != "conv-1" {
+		t.Fatalf("calls = %v", fake.calls)
+	}
+}
+
+// Suspend must propagate harness.ErrConversationInTurn unchanged so callers
+// can detect the "retry after the turn ends" condition with errors.Is.
+func TestControllerSuspend_PropagatesInTurn(t *testing.T) {
+	r := NewRegistry()
+	fake := &fakeSuspenderHarness{err: harness.ErrConversationInTurn}
+	if err := r.RegisterHarness("substrate", fake); err != nil {
+		t.Fatal(err)
+	}
+	c := newTestController(t, r)
+	err := c.Suspend(context.Background(), "conv-1")
+	if !errors.Is(err, harness.ErrConversationInTurn) {
+		t.Fatalf("Suspend error = %v, want it to wrap %v", err, harness.ErrConversationInTurn)
+	}
+}
+
+// Harnesses that do not implement ConversationSuspender must be skipped, not
+// treated as an error: the capability is optional (e.g. antigravity harnesses
+// do not implement it).
+func TestControllerSuspend_SkipsIncapableHarnesses(t *testing.T) {
+	r := NewRegistry()
+	if err := r.RegisterHarness("antigravity", &dummyHarness{}); err != nil {
+		t.Fatal(err)
+	}
+	c := newTestController(t, r)
+	if err := c.Suspend(context.Background(), "conv-1"); err != nil {
+		t.Fatalf("Suspend with no capable harnesses: %v", err)
 	}
 }

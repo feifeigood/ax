@@ -74,6 +74,17 @@ func (r *Registry) SetDefaultHarness(id string) error {
 	return nil
 }
 
+// Harnesses returns every registered harness, for capability scans.
+func (r *Registry) Harnesses() []harness.Harness {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	out := make([]harness.Harness, 0, len(r.harnesses))
+	for _, h := range r.harnesses {
+		out = append(out, h)
+	}
+	return out
+}
+
 // Close releases resources held by the registry. It drains every registered
 // harness that implements the optional harness.Drainer capability so warm
 // actors awaiting deferred idle suspension are suspended rather than leaked on
