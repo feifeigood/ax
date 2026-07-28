@@ -17,13 +17,16 @@ package substrate
 import (
 	"bytes"
 	"context"
+	"errors"
 	"net"
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/google/ax/internal/harness"
 	"github.com/google/ax/internal/harness/harnesstest"
 	"github.com/google/ax/internal/ate"
 	"github.com/google/ax/proto"
@@ -786,5 +789,266 @@ func TestSubstrateExecutionEagerCloseCapabilityTracksIdleMode(t *testing.T) {
 				t.Fatalf("CloseBeforeNextStart() = %v, want %v", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestSuspendConversation_IdleWarmActorSuspendsImmediately(t *testing.T) {
+	ctrl := &harnesstest.MockControlServer{ResumeIP: "127.0.0.1"}
+	srv := &harnesstest.MockHarnessServer{}
+	h := newTestSubstrateHarness(t, harnesstest.StartControlServer(t, ctrl), harnesstest.StartHarnessServer(t, srv))
+	h.idleMode = idleModeWarmThenSuspend
+	h.idleTimeout = time.Minute
+
+	ctx := context.Background()
+	exec, err := h.Start(ctx, "conv-1", substrateHarnessConfig)
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	if err := exec.Close(ctx); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	// Timer is armed but far away; on-demand suspend must not wait for it.
+	if err := h.SuspendConversation(ctx, "conv-1"); err != nil {
+		t.Fatalf("SuspendConversation: %v", err)
+	}
+	// Two SuspendActor calls are expected: suspendWarmActor's own call, plus
+	// the confirming suspendUntracked call that surfaces a genuine failure
+	// instead of reporting success unconditionally (see the comment on
+	// SuspendConversation's warm-entry branch). The second call lands on an
+	// already-suspended actor and fast-forwards.
+	if _, _, suspend := ctrl.Calls(); !slices.Equal(suspend, []string{"conv-1", "conv-1"}) {
+		t.Fatalf("suspend=%v, want exactly two SuspendActor calls", suspend)
+	}
+
+	// The warm entry is gone: a second Start must take the cold path
+	// (CreateActor called again).
+	exec2, err := h.Start(ctx, "conv-1", substrateHarnessConfig)
+	if err != nil {
+		t.Fatalf("second Start: %v", err)
+	}
+	t.Cleanup(func() { _ = exec2.Close(ctx) })
+	if create, _, _ := ctrl.Calls(); !slices.Equal(create, []string{"conv-1", "conv-1"}) {
+		t.Fatalf("create=%v, want two creations (cold path after suspend)", create)
+	}
+}
+
+func TestSuspendConversation_InTurnRefuses(t *testing.T) {
+	ctrl := &harnesstest.MockControlServer{ResumeIP: "127.0.0.1"}
+	srv := &harnesstest.MockHarnessServer{}
+	h := newTestSubstrateHarness(t, harnesstest.StartControlServer(t, ctrl), harnesstest.StartHarnessServer(t, srv))
+	h.idleMode = idleModeWarmThenSuspend
+	h.idleTimeout = time.Minute
+
+	ctx := context.Background()
+	exec, err := h.Start(ctx, "conv-2", substrateHarnessConfig)
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	t.Cleanup(func() { _ = exec.Close(ctx) })
+
+	if err := h.SuspendConversation(ctx, "conv-2"); !errors.Is(err, harness.ErrConversationInTurn) {
+		t.Fatalf("SuspendConversation error = %v, want ErrConversationInTurn", err)
+	}
+	if _, _, suspend := ctrl.Calls(); len(suspend) != 0 {
+		t.Fatalf("suspend=%v, want no SuspendActor call while a turn is active", suspend)
+	}
+}
+
+func TestSuspendConversation_NoEntrySuspendsDirectly(t *testing.T) {
+	ctrl := &harnesstest.MockControlServer{ResumeIP: "127.0.0.1"}
+	srv := &harnesstest.MockHarnessServer{}
+	h := newTestSubstrateHarness(t, harnesstest.StartControlServer(t, ctrl), harnesstest.StartHarnessServer(t, srv))
+	h.idleMode = idleModeWarmThenSuspend
+	h.idleTimeout = time.Minute
+
+	// No turn ever ran for this conversation: SuspendConversation must still
+	// reach the control plane, releasing anything leaked by a previous process
+	// life.
+	if err := h.SuspendConversation(context.Background(), "conv-never-started"); err != nil {
+		t.Fatalf("SuspendConversation: %v", err)
+	}
+	if _, _, suspend := ctrl.Calls(); !slices.Equal(suspend, []string{"conv-never-started"}) {
+		t.Fatalf("suspend=%v, want exactly one SuspendActor call", suspend)
+	}
+}
+
+func TestSuspendConversation_NotFoundIsSuccess(t *testing.T) {
+	ctrl := &harnesstest.MockControlServer{
+		ResumeIP:   "127.0.0.1",
+		SuspendErr: status.Error(codes.NotFound, "no such actor"),
+	}
+	h := newTestSubstrateHarness(t, harnesstest.StartControlServer(t, ctrl), harnesstest.StartHarnessServer(t, &harnesstest.MockHarnessServer{}))
+	h.idleMode = idleModeWarmThenSuspend
+	h.idleTimeout = time.Minute
+
+	if err := h.SuspendConversation(context.Background(), "conv-never-existed"); err != nil {
+		t.Fatalf("SuspendConversation: %v, want nil (NotFound is success)", err)
+	}
+}
+
+// markSuspending white-box-marks the conversation's warm entry as already
+// suspending, exactly as suspendWarmActor does right before it calls out to
+// the control plane, and returns the channel the branch under test parks on.
+func markSuspending(t *testing.T, h *SubstrateHarness, conversationID string) chan struct{} {
+	t.Helper()
+	h.idleMu.Lock()
+	defer h.idleMu.Unlock()
+	state := h.warmActors[conversationID]
+	if state == nil {
+		t.Fatal("expected a warm entry after Close")
+	}
+	done := make(chan struct{})
+	state.suspending = done
+	return done
+}
+
+// warmIdleHarness returns a warm-mode harness with one idle warm entry for
+// conversationID (a completed turn with the idle timer armed far out).
+func warmIdleHarness(t *testing.T, ctrl *harnesstest.MockControlServer, conversationID string) *SubstrateHarness {
+	t.Helper()
+	h := newTestSubstrateHarness(t, harnesstest.StartControlServer(t, ctrl), harnesstest.StartHarnessServer(t, &harnesstest.MockHarnessServer{}))
+	h.idleMode = idleModeWarmThenSuspend
+	h.idleTimeout = time.Minute
+
+	ctx := context.Background()
+	exec, err := h.Start(ctx, conversationID, substrateHarnessConfig)
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	if err := exec.Close(ctx); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	return h
+}
+
+// An in-flight (timer-driven) suspend swallows its own control-plane error and
+// deletes the warm entry either way, so its completion is not evidence that the
+// actor was released. SuspendConversation must wait for it and then verify the
+// outcome with its own suspend, rather than reporting success on trust: the
+// caller deletes its durable retry record when this RPC succeeds.
+func TestSuspendConversation_WaitsForInFlightSuspendThenVerifies(t *testing.T) {
+	ctrl := &harnesstest.MockControlServer{ResumeIP: "127.0.0.1"}
+	h := warmIdleHarness(t, ctrl, "conv-inflight")
+
+	done := markSuspending(t, h, "conv-inflight")
+	close(done) // the in-flight suspend has finished (outcome unknown)
+
+	_, _, suspendBefore := ctrl.Calls()
+	if err := h.SuspendConversation(context.Background(), "conv-inflight"); err != nil {
+		t.Fatalf("SuspendConversation: %v", err)
+	}
+	_, _, suspendAfter := ctrl.Calls()
+	if len(suspendAfter) != len(suspendBefore)+1 || suspendAfter[len(suspendAfter)-1] != "conv-inflight" {
+		t.Fatalf("suspend calls = %v, want one verifying SuspendActor on top of %v", suspendAfter, suspendBefore)
+	}
+}
+
+// The failure this branch exists for: the in-flight suspend is failing, its
+// error is logged and discarded, and the warm entry is dropped regardless. The
+// verifying suspend must surface the failure so the caller keeps its retry
+// record instead of leaking a RUNNING actor.
+func TestSuspendConversation_InFlightSuspendFailureSurfaces(t *testing.T) {
+	ctrl := &harnesstest.MockControlServer{
+		ResumeIP:   "127.0.0.1",
+		SuspendErr: status.Error(codes.Unavailable, "ateom unreachable"),
+	}
+	h := warmIdleHarness(t, ctrl, "conv-inflight-fail")
+
+	done := markSuspending(t, h, "conv-inflight-fail")
+	close(done)
+
+	if err := h.SuspendConversation(context.Background(), "conv-inflight-fail"); err == nil {
+		t.Fatal("SuspendConversation: got nil, want the verifying suspend's failure surfaced")
+	}
+}
+
+// Waiting on the in-flight suspend must honor the RPC deadline: a suspend that
+// never completes must not pin the handler past the caller's context.
+func TestSuspendConversation_InFlightWaitHonorsContext(t *testing.T) {
+	ctrl := &harnesstest.MockControlServer{ResumeIP: "127.0.0.1"}
+	h := warmIdleHarness(t, ctrl, "conv-inflight-ctx")
+
+	markSuspending(t, h, "conv-inflight-ctx") // nobody ever closes it
+
+	ctx, cancel := context.WithCancel(context.Background())
+	errCh := make(chan error, 1)
+	go func() { errCh <- h.SuspendConversation(ctx, "conv-inflight-ctx") }()
+	cancel()
+
+	select {
+	case err := <-errCh:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("SuspendConversation error = %v, want context.Canceled", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("SuspendConversation did not return after its context was canceled")
+	}
+}
+
+// suspendWarmActor's close(done) releases any beginWarmTurn parked on the
+// suspending channel, and that waiter re-creates the warm entry with inTurn set
+// and cold-starts the actor. The confirming suspend must not fire on that live
+// turn's actor (and must certainly not report success for it): re-entry means
+// ErrConversationInTurn, so the caller keeps its record and retries later.
+func TestSuspendConversation_ReentryDuringSuspendRefuses(t *testing.T) {
+	ctrl := &harnesstest.MockControlServer{ResumeIP: "127.0.0.1"}
+	h := warmIdleHarness(t, ctrl, "conv-reentry")
+
+	// Stand in for the released beginWarmTurn waiter: while suspendWarmActor is
+	// out at the control plane, a fresh entry appears with a turn in flight.
+	// (A distinct state value, as the waiter's would be, so suspendWarmActor's
+	// suspending-identity check correctly leaves it alone.)
+	var once sync.Once
+	ctrl.SuspendHook = func(conversationID string) {
+		once.Do(func() {
+			h.idleMu.Lock()
+			h.warmActors[conversationID] = &warmActorState{inTurn: true}
+			h.idleMu.Unlock()
+		})
+	}
+
+	err := h.SuspendConversation(context.Background(), "conv-reentry")
+	if !errors.Is(err, harness.ErrConversationInTurn) {
+		t.Fatalf("SuspendConversation error = %v, want ErrConversationInTurn", err)
+	}
+	if _, _, suspend := ctrl.Calls(); !slices.Equal(suspend, []string{"conv-reentry"}) {
+		t.Fatalf("suspend=%v, want only suspendWarmActor's own call (no confirming suspend on the re-entered actor)", suspend)
+	}
+	h.idleMu.Lock()
+	state := h.warmActors["conv-reentry"]
+	h.idleMu.Unlock()
+	if state == nil || !state.inTurn {
+		t.Fatalf("warm entry = %+v, want the re-entered turn left intact", state)
+	}
+}
+
+// TestSuspendConversation_WarmEntryControlPlaneFailureSurfaces guards against
+// a failed suspend being reported as success. suspendWarmActor (shared with
+// the timer path and Shutdown's drain) swallows the ateClient.SuspendActor
+// error; SuspendConversation's warm-entry branch must not simply return nil
+// after calling it, or a genuine substrate/rustfs failure becomes an
+// unrecoverable leak once the caller deletes its durable record on success.
+func TestSuspendConversation_WarmEntryControlPlaneFailureSurfaces(t *testing.T) {
+	ctrl := &harnesstest.MockControlServer{
+		ResumeIP:   "127.0.0.1",
+		SuspendErr: status.Error(codes.Unavailable, "ateom unreachable"),
+	}
+	srv := &harnesstest.MockHarnessServer{}
+	h := newTestSubstrateHarness(t, harnesstest.StartControlServer(t, ctrl), harnesstest.StartHarnessServer(t, srv))
+	h.idleMode = idleModeWarmThenSuspend
+	h.idleTimeout = time.Minute
+
+	ctx := context.Background()
+	exec, err := h.Start(ctx, "conv-fail", substrateHarnessConfig)
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	if err := exec.Close(ctx); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	if err := h.SuspendConversation(ctx, "conv-fail"); err == nil {
+		t.Fatal("SuspendConversation: got nil error, want a non-nil error surfacing the control-plane failure")
 	}
 }

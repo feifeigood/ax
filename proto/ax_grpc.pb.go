@@ -246,7 +246,8 @@ var ExecutionService_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	ConversationService_DeleteConversation_FullMethodName = "/ax.ConversationService/DeleteConversation"
+	ConversationService_DeleteConversation_FullMethodName  = "/ax.ConversationService/DeleteConversation"
+	ConversationService_SuspendConversation_FullMethodName = "/ax.ConversationService/SuspendConversation"
 )
 
 // ConversationServiceClient is the client API for ConversationService service.
@@ -256,6 +257,18 @@ type ConversationServiceClient interface {
 	// Deletes conversational events and all event log resources
 	// for its children executions.
 	DeleteConversation(ctx context.Context, in *DeleteConversationRequest, opts ...grpc.CallOption) (*DeleteConversationResponse, error)
+	// Suspends any compute the conversation's harness holds between turns
+	// (e.g. a warm sandboxed actor). Idempotent: a conversation with nothing
+	// to release returns success. A conversation with an active turn returns
+	// FAILED_PRECONDITION and releases nothing.
+	//
+	// The in-turn guarantee comes from the harness's between-turn bookkeeping.
+	// A harness configured to release its compute at the end of every turn keeps
+	// no such bookkeeping: there is nothing held between turns to release, the
+	// request goes straight to the compute control plane, and turn exclusion
+	// rests on the server's per-conversation in-flight guard, which rejects a
+	// suspend colliding with a turn in the same process with FAILED_PRECONDITION.
+	SuspendConversation(ctx context.Context, in *SuspendConversationRequest, opts ...grpc.CallOption) (*SuspendConversationResponse, error)
 }
 
 type conversationServiceClient struct {
@@ -276,6 +289,16 @@ func (c *conversationServiceClient) DeleteConversation(ctx context.Context, in *
 	return out, nil
 }
 
+func (c *conversationServiceClient) SuspendConversation(ctx context.Context, in *SuspendConversationRequest, opts ...grpc.CallOption) (*SuspendConversationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SuspendConversationResponse)
+	err := c.cc.Invoke(ctx, ConversationService_SuspendConversation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ConversationServiceServer is the server API for ConversationService service.
 // All implementations must embed UnimplementedConversationServiceServer
 // for forward compatibility.
@@ -283,6 +306,18 @@ type ConversationServiceServer interface {
 	// Deletes conversational events and all event log resources
 	// for its children executions.
 	DeleteConversation(context.Context, *DeleteConversationRequest) (*DeleteConversationResponse, error)
+	// Suspends any compute the conversation's harness holds between turns
+	// (e.g. a warm sandboxed actor). Idempotent: a conversation with nothing
+	// to release returns success. A conversation with an active turn returns
+	// FAILED_PRECONDITION and releases nothing.
+	//
+	// The in-turn guarantee comes from the harness's between-turn bookkeeping.
+	// A harness configured to release its compute at the end of every turn keeps
+	// no such bookkeeping: there is nothing held between turns to release, the
+	// request goes straight to the compute control plane, and turn exclusion
+	// rests on the server's per-conversation in-flight guard, which rejects a
+	// suspend colliding with a turn in the same process with FAILED_PRECONDITION.
+	SuspendConversation(context.Context, *SuspendConversationRequest) (*SuspendConversationResponse, error)
 	mustEmbedUnimplementedConversationServiceServer()
 }
 
@@ -295,6 +330,9 @@ type UnimplementedConversationServiceServer struct{}
 
 func (UnimplementedConversationServiceServer) DeleteConversation(context.Context, *DeleteConversationRequest) (*DeleteConversationResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteConversation not implemented")
+}
+func (UnimplementedConversationServiceServer) SuspendConversation(context.Context, *SuspendConversationRequest) (*SuspendConversationResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SuspendConversation not implemented")
 }
 func (UnimplementedConversationServiceServer) mustEmbedUnimplementedConversationServiceServer() {}
 func (UnimplementedConversationServiceServer) testEmbeddedByValue()                             {}
@@ -335,6 +373,24 @@ func _ConversationService_DeleteConversation_Handler(srv interface{}, ctx contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ConversationService_SuspendConversation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SuspendConversationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConversationServiceServer).SuspendConversation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConversationService_SuspendConversation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConversationServiceServer).SuspendConversation(ctx, req.(*SuspendConversationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ConversationService_ServiceDesc is the grpc.ServiceDesc for ConversationService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -345,6 +401,10 @@ var ConversationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteConversation",
 			Handler:    _ConversationService_DeleteConversation_Handler,
+		},
+		{
+			MethodName: "SuspendConversation",
+			Handler:    _ConversationService_SuspendConversation_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

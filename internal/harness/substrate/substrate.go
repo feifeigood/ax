@@ -554,6 +554,124 @@ func (h *SubstrateHarness) suspendWarmActor(conversationID, execID string, gener
 	h.idleMu.Unlock()
 }
 
+// SuspendConversation releases conversationID's actor on demand instead of
+// waiting for the idle timer. It is the harness half of the generic
+// ConversationService.SuspendConversation RPC.
+//
+//   - idle warm entry  → disarm the timer and suspend through the standard
+//     suspendWarmActor path (generation bump neutralizes a fired-but-blocked
+//     timer callback, exactly as Shutdown does), then re-read the map before
+//     confirming: suspendWarmActor releases parked beginWarmTurn waiters, and
+//     a waiter that re-entered the conversation must not have its live actor
+//     suspended out from under it (→ harness.ErrConversationInTurn instead)
+//   - entry in a turn  → harness.ErrConversationInTurn; nothing is released
+//   - suspend already in flight → wait for it, then verify the outcome the
+//     same way the idle branch does: the in-flight suspend swallows its own
+//     error and drops the entry either way, so its completion proves nothing
+//   - no entry         → suspend directly: the actor is either already
+//     suspended (SuspendActor fast-forwards, see substrate's MarkSuspending
+//     IsComplete), never started (NotFound → success), or leaked by a previous
+//     process life — the case timers can never cover.
+//
+// Those states only exist in warm-then-suspend mode. In immediate-suspend mode
+// (the default) every turn suspends its own actor on Close, so there is no
+// between-turn warm state, no turn bookkeeping, and therefore no in-turn guard
+// here: the request goes straight to the control plane and turn exclusion rests
+// entirely on the server's per-conversation in-flight guard.
+func (h *SubstrateHarness) SuspendConversation(ctx context.Context, conversationID string) error {
+	if conversationID == "" {
+		return errors.New("conversation_id is required")
+	}
+	if h.idleMode != idleModeWarmThenSuspend {
+		return h.suspendUntracked(ctx, conversationID)
+	}
+	h.idleMu.Lock()
+	state := h.warmActors[conversationID]
+	if state == nil {
+		h.idleMu.Unlock()
+		return h.suspendUntracked(ctx, conversationID)
+	}
+	if state.inTurn {
+		h.idleMu.Unlock()
+		return harness.ErrConversationInTurn
+	}
+	if state.suspending != nil {
+		done := state.suspending
+		h.idleMu.Unlock()
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-done:
+		}
+		// The in-flight suspend swallows its own SuspendActor error and drops
+		// the warm entry either way (suspendWarmActor), so its completion
+		// proves nothing about the actor. Verify the outcome: if it succeeded
+		// this fast-forwards on an already-suspended actor; if it failed this
+		// is the retry that keeps the caller from deleting its retry record for
+		// an actor that is still RUNNING.
+		return h.suspendUntracked(ctx, conversationID)
+	}
+	if state.timer != nil {
+		state.timer.Stop()
+		state.timer = nil
+	}
+	state.generation++
+	generation := state.generation
+	h.idleMu.Unlock()
+
+	h.suspendWarmActor(conversationID, "", generation)
+
+	// suspendWarmActor's close(done) releases any beginWarmTurn parked on the
+	// suspending channel, and that waiter immediately re-creates the entry with
+	// inTurn set and cold-starts the actor. Re-read the map before touching the
+	// control plane again: any entry at all (in a turn, parked, or freshly idle
+	// after a whole turn slipped through) means the conversation was re-entered
+	// and this actor is no longer ours to release. ErrConversationInTurn is
+	// right in every one of those sub-cases — the caller keeps its record and
+	// retries once the conversation goes idle again.
+	h.idleMu.Lock()
+	_, reentered := h.warmActors[conversationID]
+	h.idleMu.Unlock()
+	if reentered {
+		return harness.ErrConversationInTurn
+	}
+
+	// suspendWarmActor swallows the ateClient.SuspendActor error (it is shared
+	// with the timer path and Shutdown's drain, neither of which has anywhere
+	// to report a failure to). Re-issue the suspend here so a genuine failure
+	// surfaces to the caller instead of being reported as success. If
+	// suspendWarmActor's own call already succeeded, substrate's suspend
+	// workflow fast-forwards on an already-suspended actor (MarkSuspendingStep
+	// and CallAteletSuspendStep both treat STATUS_SUSPENDED as complete), so
+	// this is a cheap control-plane no-op, not a second real suspend.
+	//
+	// suspendWarmActor's own call runs on its own hardcoded deadline, not the
+	// caller's, so if it times out while ateapi is still running the workflow
+	// the re-issue meets the held per-actor lock and comes back Aborted. That
+	// false negative self-corrects on the caller's next sweep, which finds no
+	// warm entry and confirms the (by then finished) suspend directly.
+	return h.suspendUntracked(ctx, conversationID)
+}
+
+// suspendUntracked suspends an actor this process holds no warm state for.
+// NotFound is success: no actor means nothing occupies a worker.
+//
+// Only NotFound. An actor substrate refuses to suspend because it is not
+// RUNNING — CRASHED above all, but also PAUSED — fails every attempt, so the
+// caller can never reach success for it and cannot tell "retry me" from "no
+// suspend will ever work here". Its retry backoff bounds the cost; mapping
+// ateapi's FailedPrecondition to a distinct terminal outcome is a known
+// follow-up.
+func (h *SubstrateHarness) suspendUntracked(ctx context.Context, conversationID string) error {
+	if _, err := h.ateClient.SuspendActor(ctx, conversationID); err != nil {
+		if status.Code(err) == codes.NotFound {
+			return nil
+		}
+		return fmt.Errorf("suspend substrate actor %s: %w", conversationID, err)
+	}
+	return nil
+}
+
 // Shutdown drains warm actors awaiting idle suspension so a process exit does
 // not leak them as RUNNING actors. A warm actor sits between turns with a
 // pending idle timer whose only home is this process's memory; if the process
