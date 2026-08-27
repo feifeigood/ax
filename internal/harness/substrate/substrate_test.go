@@ -448,6 +448,51 @@ func TestSubstrateHarness_ResumeNilActor(t *testing.T) {
 	}
 }
 
+// The worker pool saturating (ResourceExhausted), a concurrent resume
+// (Aborted), and a control-plane blip (Unavailable) are transient by design;
+// Start must wait them out instead of failing the turn.
+func TestSubstrateHarness_ResumeRetriesTransientCodes(t *testing.T) {
+	ctrl := &harnesstest.MockControlServer{
+		ResumeIP: "127.0.0.1",
+		ResumeErrs: []error{
+			status.Error(codes.ResourceExhausted, "no free workers available"),
+			status.Error(codes.Unavailable, "control plane restarting"),
+		},
+	}
+	srv := &harnesstest.MockHarnessServer{}
+	h := newTestSubstrateHarness(t, harnesstest.StartControlServer(t, ctrl), harnesstest.StartHarnessServer(t, srv))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	exec, err := h.Start(ctx, "conv-retry", substrateHarnessConfig)
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	t.Cleanup(func() { _ = exec.Close(ctx) })
+	if _, resume, _ := ctrl.Calls(); len(resume) != 3 {
+		t.Fatalf("resume calls = %d, want 2 transient failures then success", len(resume))
+	}
+}
+
+func TestSubstrateHarness_ResumeDoesNotRetryTerminalCodes(t *testing.T) {
+	ctrl := &harnesstest.MockControlServer{
+		ResumeIP:   "127.0.0.1",
+		ResumeErrs: []error{status.Error(codes.NotFound, "actor not found")},
+	}
+	h := newTestSubstrateHarness(t, harnesstest.StartControlServer(t, ctrl), harnesstest.StartHarnessServer(t, &harnesstest.MockHarnessServer{}))
+
+	_, err := h.Start(context.Background(), "conv-terminal", substrateHarnessConfig)
+	if err == nil {
+		t.Fatal("expected error for NotFound resume, got nil")
+	}
+	if !strings.Contains(err.Error(), "actor not found") {
+		t.Errorf("error = %v, want the NotFound cause preserved", err)
+	}
+	if _, resume, _ := ctrl.Calls(); len(resume) != 1 {
+		t.Fatalf("resume calls = %d, want no retries for NotFound", len(resume))
+	}
+}
+
 func TestSubstrateHarness_HarnessFailedFrame(t *testing.T) {
 	ctrl := &harnesstest.MockControlServer{ResumeIP: "127.0.0.1"}
 	srv := &harnesstest.MockHarnessServer{FailFrame: true, ErrCode: 13, ErrMessage: "boom"}

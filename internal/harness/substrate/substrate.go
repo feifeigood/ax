@@ -21,11 +21,13 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math/rand/v2"
 	"os"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/agent-substrate/substrate/pkg/proto/ateapipb"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel"
 	"google.golang.org/grpc"
@@ -275,13 +277,60 @@ func (h *SubstrateHarness) Start(ctx context.Context, conversationID string, har
 	return h.connect(ctx, conversationID, harnessConfig, workerAddr, healthCheckTimeout)
 }
 
+// resumeRetryBudget bounds how long a Start waits out transient resume
+// failures before failing the turn. Only the wait between attempts is
+// budgeted; an in-flight ResumeActor keeps the caller's own deadline, since a
+// legitimate cold restore can be slow.
+const resumeRetryBudget = 30 * time.Second
+
+// resumeRetryBaseDelay is the wait before the first resume retry; each
+// subsequent wait grows 1.5x (plus up to 50% jitter) and is capped at 2s.
+const resumeRetryBaseDelay = 100 * time.Millisecond
+
+// resumeActor calls ResumeActor, retrying the three transient conditions the
+// router's request parking also retries: a momentarily saturated worker pool
+// (ResourceExhausted), a concurrent resume of the same actor (Aborted), and a
+// control-plane blip (Unavailable). Anything else fails immediately.
+func (h *SubstrateHarness) resumeActor(ctx context.Context, conversationID string) (*ateapipb.ResumeActorResponse, error) {
+	start := time.Now()
+	delay := resumeRetryBaseDelay
+	for {
+		resp, err := h.ateClient.ResumeActor(ctx, conversationID)
+		if err == nil {
+			return resp, nil
+		}
+		switch status.Code(err) {
+		case codes.ResourceExhausted, codes.Aborted, codes.Unavailable:
+		default:
+			return nil, err
+		}
+		wait := delay + rand.N(delay/2)
+		if time.Since(start)+wait > resumeRetryBudget {
+			return nil, fmt.Errorf("retry budget exhausted after %s: %w", time.Since(start).Round(time.Millisecond), err)
+		}
+		slog.InfoContext(ctx, "Retrying transient substrate resume failure",
+			slog.String("conversation_id", conversationID),
+			slog.String("code", status.Code(err).String()),
+			slog.Duration("wait", wait),
+		)
+		timer := time.NewTimer(wait)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return nil, fmt.Errorf("canceled while retrying transient resume failure: %w", err)
+		case <-timer.C:
+		}
+		delay = min(delay*3/2, 2*time.Second)
+	}
+}
+
 // resumeWorkerAddr resumes the actor through ATE, confirms it holds a worker
 // assignment, and returns the address to dial — always the atenet-router
 // ingress, which routes to the actor's current worker by :authority.
 // ResumeActor is idempotent for RUNNING actors, so warm turns pay only the
 // control-plane check and do not restore the actor.
 func (h *SubstrateHarness) resumeWorkerAddr(ctx context.Context, conversationID string) (string, error) {
-	resumeResp, err := h.ateClient.ResumeActor(ctx, conversationID)
+	resumeResp, err := h.resumeActor(ctx, conversationID)
 	if err != nil {
 		return "", fmt.Errorf("failed to resume substrate actor %s: %w", conversationID, err)
 	}
