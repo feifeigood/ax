@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -132,7 +133,7 @@ func TestNewReadsWarmIdlePolicyFromEnvironment(t *testing.T) {
 	t.Setenv("AX_SUBSTRATE_IDLE_MODE", "warm-then-suspend")
 	t.Setenv("AX_SUBSTRATE_IDLE_TIMEOUT", "750ms")
 
-	h, err := New("antigravity", "127.0.0.1:1", "ax", "antigravity-template", 50053)
+	h, err := New("antigravity", "127.0.0.1:1", "ax", "antigravity-template", 50053, "")
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -149,7 +150,7 @@ func TestNewDefaultsToImmediateSuspend(t *testing.T) {
 	t.Setenv("AX_SUBSTRATE_IDLE_MODE", "")
 	t.Setenv("AX_SUBSTRATE_IDLE_TIMEOUT", "")
 
-	h, err := New("antigravity", "127.0.0.1:1", "ax", "antigravity-template", 50053)
+	h, err := New("antigravity", "127.0.0.1:1", "ax", "antigravity-template", 50053, "")
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -164,7 +165,7 @@ func TestNewRejectsInvalidIdlePolicy(t *testing.T) {
 		t.Run(mode, func(t *testing.T) {
 			t.Setenv("AX_SUBSTRATE_IDLE_MODE", mode)
 
-			if _, err := New("antigravity", "127.0.0.1:1", "ax", "antigravity-template", 50053); err == nil {
+			if _, err := New("antigravity", "127.0.0.1:1", "ax", "antigravity-template", 50053, ""); err == nil {
 				t.Fatalf("New accepted invalid AX_SUBSTRATE_IDLE_MODE %q", mode)
 			}
 		})
@@ -190,11 +191,16 @@ func newTestSubstrateHarness(t *testing.T, ctrlAddr, harnessAddr string) *Substr
 	if err != nil {
 		t.Fatalf("failed to create ate client: %v", err)
 	}
+	// The mock harness server stands in for the router ingress: the harness
+	// dials routerAddr for every conversation and selects the actor via
+	// :authority, which the mock ignores.
 	return &SubstrateHarness{
-		harnessID: "antigravity",
-		ateClient: client,
-		port:      port,
-		dialOpts:  []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
+		harnessID:  "antigravity",
+		ateClient:  client,
+		namespace:  "ax",
+		port:       port,
+		routerAddr: harnessAddr,
+		dialOpts:   []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
 	}
 }
 
@@ -417,15 +423,15 @@ func TestSubstrateHarness_CreateAlreadyExistsTolerated(t *testing.T) {
 }
 
 func TestSubstrateHarness_ResumeNoWorkerIP(t *testing.T) {
-	ctrl := &harnesstest.MockControlServer{ResumeIP: ""} // empty AteomPodIp
+	ctrl := &harnesstest.MockControlServer{ResumeIP: ""} // resume yields no worker assignment
 	h := newTestSubstrateHarness(t, harnesstest.StartControlServer(t, ctrl), harnesstest.StartHarnessServer(t, &harnesstest.MockHarnessServer{}))
 
 	_, err := h.Start(context.Background(), "conv-1", substrateHarnessConfig)
 	if err == nil {
-		t.Fatal("expected error for empty worker IP, got nil")
+		t.Fatal("expected error for missing worker assignment, got nil")
 	}
-	if !strings.Contains(err.Error(), "no active worker IP") {
-		t.Errorf("error = %v, want it to mention 'no active worker IP'", err)
+	if !strings.Contains(err.Error(), "no worker assignment") {
+		t.Errorf("error = %v, want it to mention 'no worker assignment'", err)
 	}
 }
 
@@ -485,8 +491,16 @@ func TestSubstrateHarness_UnreachableWarmActorIsSuspendedBeforeColdResume(t *tes
 	srvB := &harnesstest.MockHarnessServer{}
 	addrB := harnesstest.StartHarnessServer(t, srvB)
 
+	// The dial target is always the router ingress; which worker actually
+	// answers changes when the actor is rescheduled. Model that by routing
+	// every dial through a mutable backend address, flipped by the suspend
+	// that resets the unreachable warm actor: the following cold resume
+	// lands the actor on the replacement worker.
+	var backend atomic.Value
+	backend.Store(addrA)
 	ctrl := &harnesstest.MockControlServer{
-		ResumeIPs: []string{"127.0.0.10", "127.0.0.10", "127.0.0.11", "127.0.0.11"},
+		ResumeIP:    "127.0.0.1",
+		SuspendHook: func(string) { backend.Store(addrB) },
 	}
 	h := newTestSubstrateHarness(t, harnesstest.StartControlServer(t, ctrl), addrA)
 	h.idleMode = idleModeWarmThenSuspend
@@ -494,13 +508,8 @@ func TestSubstrateHarness_UnreachableWarmActorIsSuspendedBeforeColdResume(t *tes
 	h.warmProbeTimeout = 100 * time.Millisecond
 	h.dialOpts = []grpc.DialOption{
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithContextDialer(func(ctx context.Context, target string) (net.Conn, error) {
-			host, _, err := net.SplitHostPort(target)
-			if err != nil {
-				return nil, err
-			}
-			actualAddr := map[string]string{"127.0.0.10": addrA, "127.0.0.11": addrB}[host]
-			return (&net.Dialer{}).DialContext(ctx, "tcp", actualAddr)
+		grpc.WithContextDialer(func(ctx context.Context, _ string) (net.Conn, error) {
+			return (&net.Dialer{}).DialContext(ctx, "tcp", backend.Load().(string))
 		}),
 	}
 
@@ -546,14 +555,14 @@ func TestSubstrateHarness_UnreachableWarmActorIsSuspendedBeforeColdResume(t *tes
 	}
 }
 
-// A cached worker address can still be healthy after its IP has been reassigned
-// to another actor. Warm reuse must resolve the current worker through ATE before
-// connecting instead of treating generic gRPC health as proof of actor identity.
-func TestSubstrateHarness_WarmReuseUsesAuthoritativeWorkerAddress(t *testing.T) {
+// Warm reuse dials a fixed ingress, so the per-turn ResumeActor call is the
+// only thing asserting the actor is still this conversation's and still
+// placed. Every warm turn must revalidate through the control plane instead
+// of trusting the cached connection state.
+func TestSubstrateHarness_WarmReuseRevalidatesThroughControlPlane(t *testing.T) {
 	ctrl := &harnesstest.MockControlServer{ResumeIP: "127.0.0.1"}
-	srvA := &harnesstest.MockHarnessServer{}
-	addrA := harnesstest.StartHarnessServer(t, srvA)
-	h := newTestSubstrateHarness(t, harnesstest.StartControlServer(t, ctrl), addrA)
+	srv := &harnesstest.MockHarnessServer{}
+	h := newTestSubstrateHarness(t, harnesstest.StartControlServer(t, ctrl), harnesstest.StartHarnessServer(t, srv))
 	h.idleMode = idleModeWarmThenSuspend
 	h.idleTimeout = time.Minute // must not fire during the test
 
@@ -577,41 +586,19 @@ func TestSubstrateHarness_WarmReuseUsesAuthoritativeWorkerAddress(t *testing.T) 
 	}
 
 	runTurn("one")
-
-	// ATE now reports a different worker while the cached endpoint remains
-	// healthy. Changing the test port models the authoritative worker address.
-	srvB := &harnesstest.MockHarnessServer{}
-	addrB := harnesstest.StartHarnessServer(t, srvB)
-	_, portStr, err := net.SplitHostPort(addrB)
-	if err != nil {
-		t.Fatalf("bad replacement addr %q: %v", addrB, err)
-	}
-	if h.port, err = strconv.Atoi(portStr); err != nil {
-		t.Fatalf("bad replacement port %q: %v", portStr, err)
-	}
-
 	runTurn("two")
-
-	if got := srvA.ConnectCalls(); got != 1 {
-		t.Fatalf("cached worker Connect calls = %d, want no reuse after ATE moved the actor", got)
-	}
-	if got := srvB.ConnectCalls(); got != 1 {
-		t.Fatalf("authoritative worker Connect calls = %d, want 1", got)
-	}
-	wantResumes := []string{"conv-fallback", "conv-fallback"}
-	if _, resume, _ := ctrl.Calls(); !slices.Equal(resume, wantResumes) {
-		t.Fatalf("resume=%v, want one authoritative resume check per turn", resume)
-	}
-
-	// Every warm turn revalidates ownership; it does not trust the refreshed
-	// address across turns.
 	runTurn("three")
-	wantResumes = append(wantResumes, "conv-fallback")
-	if _, resume, _ := ctrl.Calls(); !slices.Equal(resume, wantResumes) {
+
+	create, resume, _ := ctrl.Calls()
+	if !slices.Equal(create, []string{"conv-fallback"}) {
+		t.Fatalf("create=%v, want a single create on the cold first turn", create)
+	}
+	want := []string{"conv-fallback", "conv-fallback", "conv-fallback"}
+	if !slices.Equal(resume, want) {
 		t.Fatalf("resume=%v, want one authoritative resume check per turn", resume)
 	}
-	if got := srvB.ConnectCalls(); got != 2 {
-		t.Fatalf("authoritative worker Connect calls = %d, want 2", got)
+	if got := srv.ConnectCalls(); got != 3 {
+		t.Fatalf("Connect calls = %d, want one per turn", got)
 	}
 }
 
