@@ -268,10 +268,10 @@ func (h *SubstrateHarness) resumeWorkerAddr(ctx context.Context, conversationID 
 	if actor.GetMetadata().GetName() != conversationID {
 		return "", fmt.Errorf("received actor %s while resuming %s", actor.GetMetadata().GetName(), conversationID)
 	}
-	if actor.GetAteomPodIp() == "" {
-		return "", fmt.Errorf("actor %s has no active worker IP address", conversationID)
+	if actor.GetStatus().GetWorkerAssignment().GetWorkerPodIp() == "" {
+		return "", fmt.Errorf("actor %s has no active worker IP address (state %s)", conversationID, actor.GetStatus().GetState())
 	}
-	return fmt.Sprintf("%s:%d", actor.GetAteomPodIp(), h.port), nil
+	return fmt.Sprintf("%s:%d", actor.GetStatus().GetWorkerAssignment().GetWorkerPodIp(), h.port), nil
 }
 
 // connect dials the actor's worker address and waits for the harness to be
