@@ -1,3 +1,43 @@
+> [!IMPORTANT]
+> ## 这是 AgentFleet 的硬分叉,不再跟踪上游
+>
+> 本仓库是 [`google/ax`](https://github.com/google/ax) 的分叉,自 **2026-08-31** 起转为**硬分叉**:
+> 不再 merge、rebase 或 cherry-pick 上游任何提交。下方的原始 README 描述的是上游项目;
+> 它对本仓库仍然大体适用,但**不再是权威**。
+>
+> ### 分支
+>
+> | 分支 | 是什么 |
+> |---|---|
+> | **`agentfleet/main`** | **本仓库真正的开发线。一切分支从这里开,一切 PR 合到这里。** |
+> | `main` | 分叉点(2026-07-26,上游 `cbd2c56`)的历史镜像。**不含本仓库任何改动,请勿使用。** |
+>
+> ### 为什么硬分叉
+>
+> 上游并未停更,但它走向了与我们不同的方向(Antigravity 桌面/本地开发形态),
+> 同时在一个月内三次改动了我们所依赖的接缝:`ExecutionService` 向 InteractionsService 靠拢、
+> `harnessConfig` → `agentConfig` 改名、`skills.Available` → `[]skills.Group`。
+>
+> 与此同时,我们自己的改动 —— `harness_metadata` 字段、terminal metadata 流、
+> `CloseBeforeNextStart`、COMPLETED/FAILED 双路 —— 都是 AgentFleet 的产品特性,
+> 上游没有理由承担。**继续同步的代价在上升,收益接近于零。**
+>
+> 实际上本仓库早已事实性硬分叉:AgentFleet 一直把 `ax_ref` 钉在本仓库的具体 SHA 上,
+> 且只 import 本仓库的 proto 与 client。这次只是把它明确记录下来。
+>
+> ### 需要上游的某个特性怎么办
+>
+> **阅读上游代码并自行实现,不要走 git。** 上游重写过 git 历史
+> (同一提交在两边 SHA 不同),因此跨仓库的三方合并结论不可信 —— 曾经实测过一次:
+> 合并带进 15 个不属于我们的文件改动,并静默丢失了上游的一处重构。
+>
+> ### 上游追溯
+>
+> 分叉点:`cbd2c56`(2026-07-26)。上游此后的提交请直接查阅
+> [`google/ax`](https://github.com/google/ax)。
+
+---
+
 # Agent Executor (AX)
 
 > [!WARNING]
