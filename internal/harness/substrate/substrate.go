@@ -21,11 +21,13 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math/rand/v2"
 	"os"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/agent-substrate/substrate/pkg/proto/ateapipb"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel"
 	"google.golang.org/grpc"
@@ -48,6 +50,19 @@ var _ harness.Execution = (*substrateExecution)(nil)
 // healthCheckTimeout defines the maximum time Start waits for a freshly
 // created/resumed actor's harness to become reachable and ready.
 const healthCheckTimeout = 60 * time.Second
+
+// defaultRouterAddr is the in-cluster address of the atenet-router Service,
+// the single ingress for all actor traffic. Since substrate removed the
+// worker pod's compatibility DNAT, actors are only reachable through the
+// router's Envoy (h2c on the plain HTTP port), which resolves the target
+// from the request :authority.
+const defaultRouterAddr = "atenet-router.ate-system.svc:80"
+
+// actorDNSSuffix is substrate's actor addressing zone. The router derives
+// (atespace, actor) from an :authority of the form
+// "<actor>.<atespace>.actors.resources.substrate.ate.dev"; resolving that
+// name in DNS is optional, the router only reads the header.
+const actorDNSSuffix = "actors.resources.substrate.ate.dev"
 
 const defaultWarmIdleTimeout = 30 * time.Second
 
@@ -73,10 +88,12 @@ type warmActorState struct {
 
 // SubstrateHarness manages execution in a SubstrATE sandboxed actor over gRPC HarnessService.
 type SubstrateHarness struct {
-	harnessID string
-	ateClient *ate.Client
-	port      int
-	dialOpts  []grpc.DialOption
+	harnessID  string
+	ateClient  *ate.Client
+	namespace  string
+	port       int
+	routerAddr string
+	dialOpts   []grpc.DialOption
 
 	idleMode         idleMode
 	idleTimeout      time.Duration
@@ -120,14 +137,19 @@ func (f ateapiTokenFile) GetRequestMetadata(context.Context, ...string) (map[str
 // must never be sent over a plaintext connection.
 func (ateapiTokenFile) RequireTransportSecurity() bool { return true }
 
-// New creates a new SubstrateHarness.
-func New(harnessID string, endpoint string, namespace string, template string, port int, opts ...grpc.DialOption) (*SubstrateHarness, error) {
+// New creates a new SubstrateHarness. routerAddr is the atenet-router ingress
+// the harness connections are dialed through; empty selects the in-cluster
+// default.
+func New(harnessID string, endpoint string, namespace string, template string, port int, routerAddr string, opts ...grpc.DialOption) (*SubstrateHarness, error) {
 	idleMode, idleTimeout, err := idlePolicyFromEnv()
 	if err != nil {
 		return nil, err
 	}
 	if port == 0 {
-		port = 50053 // Default HarnessService port
+		port = 80 // Default HarnessService port; the actor-side target the router forwards to.
+	}
+	if routerAddr == "" {
+		routerAddr = defaultRouterAddr
 	}
 	if namespace == "" {
 		namespace = "ax"
@@ -152,7 +174,9 @@ func New(harnessID string, endpoint string, namespace string, template string, p
 	return &SubstrateHarness{
 		harnessID:        harnessID,
 		ateClient:        client,
+		namespace:        namespace,
 		port:             port,
+		routerAddr:       routerAddr,
 		dialOpts:         opts,
 		idleMode:         idleMode,
 		idleTimeout:      idleTimeout,
@@ -253,11 +277,60 @@ func (h *SubstrateHarness) Start(ctx context.Context, conversationID string, har
 	return h.connect(ctx, conversationID, harnessConfig, workerAddr, healthCheckTimeout)
 }
 
-// resumeWorkerAddr resolves the current actor through ATE and returns its
-// authoritative worker address. ResumeActor is idempotent for RUNNING actors,
-// so warm turns pay only the control-plane check and do not restore the actor.
+// resumeRetryBudget bounds how long a Start waits out transient resume
+// failures before failing the turn. Only the wait between attempts is
+// budgeted; an in-flight ResumeActor keeps the caller's own deadline, since a
+// legitimate cold restore can be slow.
+const resumeRetryBudget = 30 * time.Second
+
+// resumeRetryBaseDelay is the wait before the first resume retry; each
+// subsequent wait grows 1.5x (plus up to 50% jitter) and is capped at 2s.
+const resumeRetryBaseDelay = 100 * time.Millisecond
+
+// resumeActor calls ResumeActor, retrying the three transient conditions the
+// router's request parking also retries: a momentarily saturated worker pool
+// (ResourceExhausted), a concurrent resume of the same actor (Aborted), and a
+// control-plane blip (Unavailable). Anything else fails immediately.
+func (h *SubstrateHarness) resumeActor(ctx context.Context, conversationID string) (*ateapipb.ResumeActorResponse, error) {
+	start := time.Now()
+	delay := resumeRetryBaseDelay
+	for {
+		resp, err := h.ateClient.ResumeActor(ctx, conversationID)
+		if err == nil {
+			return resp, nil
+		}
+		switch status.Code(err) {
+		case codes.ResourceExhausted, codes.Aborted, codes.Unavailable:
+		default:
+			return nil, err
+		}
+		wait := delay + rand.N(delay/2)
+		if time.Since(start)+wait > resumeRetryBudget {
+			return nil, fmt.Errorf("retry budget exhausted after %s: %w", time.Since(start).Round(time.Millisecond), err)
+		}
+		slog.InfoContext(ctx, "Retrying transient substrate resume failure",
+			slog.String("conversation_id", conversationID),
+			slog.String("code", status.Code(err).String()),
+			slog.Duration("wait", wait),
+		)
+		timer := time.NewTimer(wait)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return nil, fmt.Errorf("canceled while retrying transient resume failure: %w", err)
+		case <-timer.C:
+		}
+		delay = min(delay*3/2, 2*time.Second)
+	}
+}
+
+// resumeWorkerAddr resumes the actor through ATE, confirms it holds a worker
+// assignment, and returns the address to dial — always the atenet-router
+// ingress, which routes to the actor's current worker by :authority.
+// ResumeActor is idempotent for RUNNING actors, so warm turns pay only the
+// control-plane check and do not restore the actor.
 func (h *SubstrateHarness) resumeWorkerAddr(ctx context.Context, conversationID string) (string, error) {
-	resumeResp, err := h.ateClient.ResumeActor(ctx, conversationID)
+	resumeResp, err := h.resumeActor(ctx, conversationID)
 	if err != nil {
 		return "", fmt.Errorf("failed to resume substrate actor %s: %w", conversationID, err)
 	}
@@ -268,16 +341,29 @@ func (h *SubstrateHarness) resumeWorkerAddr(ctx context.Context, conversationID 
 	if actor.GetMetadata().GetName() != conversationID {
 		return "", fmt.Errorf("received actor %s while resuming %s", actor.GetMetadata().GetName(), conversationID)
 	}
-	if actor.GetAteomPodIp() == "" {
-		return "", fmt.Errorf("actor %s has no active worker IP address", conversationID)
+	if actor.GetStatus().GetWorkerAssignment().GetWorkerPodIp() == "" {
+		return "", fmt.Errorf("actor %s has no worker assignment after resume (state %s)", conversationID, actor.GetStatus().GetState())
 	}
-	return fmt.Sprintf("%s:%d", actor.GetAteomPodIp(), h.port), nil
+	return h.routerAddr, nil
 }
 
-// connect dials the actor's worker address and waits for the harness to be
-// reachable and ready before handing back the execution.
+// actorAuthority is the :authority the router resolves to this conversation's
+// actor. A non-default port rides along; the router forwards it to the actor
+// as the target port.
+func (h *SubstrateHarness) actorAuthority(conversationID string) string {
+	authority := fmt.Sprintf("%s.%s.%s", conversationID, h.namespace, actorDNSSuffix)
+	if h.port != 80 {
+		authority = fmt.Sprintf("%s:%d", authority, h.port)
+	}
+	return authority
+}
+
+// connect dials the actor through the router ingress and waits for the
+// harness to be reachable and ready before handing back the execution. The
+// per-conversation :authority is what selects the actor.
 func (h *SubstrateHarness) connect(ctx context.Context, conversationID string, harnessConfig []byte, workerAddr string, healthTimeout time.Duration) (harness.Execution, error) {
-	conn, err := grpc.NewClient(workerAddr, h.dialOpts...)
+	dialOpts := append(append([]grpc.DialOption(nil), h.dialOpts...), grpc.WithAuthority(h.actorAuthority(conversationID)))
+	conn, err := grpc.NewClient(workerAddr, dialOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to dial remote harness service at %s: %w", workerAddr, err)
 	}

@@ -211,11 +211,12 @@ type SkillRefConfig struct {
 // SubstrateHarnessConfig registers a custom harness deployed on substrate
 // from a user-provided container image.
 type SubstrateHarnessConfig struct {
-	ID        string `yaml:"id"`                // Unique harness identifier
-	Namespace string `yaml:"namespace"`         // ActorTemplate namespace (user-owned, not "ax")
-	Template  string `yaml:"template"`          // ActorTemplate name
-	Port      int    `yaml:"port,omitempty"`    // HarnessService port
-	Default   bool   `yaml:"default,omitempty"` // Default harness or not
+	ID         string `yaml:"id"`                   // Unique harness identifier
+	Namespace  string `yaml:"namespace"`            // ActorTemplate namespace (user-owned, not "ax")
+	Template   string `yaml:"template"`             // ActorTemplate name
+	Port       int    `yaml:"port,omitempty"`       // HarnessService port on the actor
+	RouterAddr string `yaml:"routerAddr,omitempty"` // atenet-router ingress address; empty selects the in-cluster default
+	Default    bool   `yaml:"default,omitempty"`    // Default harness or not
 }
 
 // NewHarness builds the custom harness. Custom harnesses always run as substrate
@@ -225,12 +226,12 @@ func (c SubstrateHarnessConfig) NewHarness(endpoint string) (harness.Harness, er
 	if port == 0 {
 		port = substrateDefaultPort
 	}
-	return newSubstrateHarness(c.ID, endpoint, c.Namespace, c.Template, port)
+	return newSubstrateHarness(c.ID, endpoint, c.Namespace, c.Template, port, c.RouterAddr)
 }
 
 // newSubstrateHarness brings up a harness that is deployed as a substrate actor.
-func newSubstrateHarness(harnessID, endpoint, namespace, template string, port int) (harness.Harness, error) {
-	sh, err := substrate.New(harnessID, endpoint, namespace, template, port)
+func newSubstrateHarness(harnessID, endpoint, namespace, template string, port int, routerAddr string) (harness.Harness, error) {
+	sh, err := substrate.New(harnessID, endpoint, namespace, template, port, routerAddr)
 	if err != nil {
 		return nil, err
 	}

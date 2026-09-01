@@ -47,8 +47,9 @@ type MockControlServer struct {
 	suspendCalls []string
 
 	CreateErr      error    // returned from CreateActor when non-nil
-	ResumeIP       string   // AteomPodIp returned from ResumeActor
-	ResumeIPs      []string // per-call AteomPodIp values; overrides ResumeIP when set
+	ResumeIP       string   // worker assignment pod IP returned from ResumeActor
+	ResumeIPs      []string // per-call pod IP values; overrides ResumeIP when set
+	ResumeErrs     []error  // per-call ResumeActor errors, consumed in order; nil entries and calls past the end succeed
 	ResumeNilActor bool     // when true, ResumeActor returns a nil Actor
 	SuspendErr     error    // returned from SuspendActor when non-nil
 	// SuspendHook, when set, runs at the start of every SuspendActor call, so a
@@ -80,11 +81,24 @@ func (f *MockControlServer) ResumeActor(_ context.Context, req *ateapipb.ResumeA
 		index := min(len(f.resumeCalls)-1, len(f.ResumeIPs)-1)
 		resumeIP = f.ResumeIPs[index]
 	}
+	var resumeErr error
+	if index := len(f.resumeCalls) - 1; index < len(f.ResumeErrs) {
+		resumeErr = f.ResumeErrs[index]
+	}
 	f.mu.Unlock()
+	if resumeErr != nil {
+		return nil, resumeErr
+	}
 	if f.ResumeNilActor {
 		return &ateapipb.ResumeActorResponse{}, nil
 	}
-	return &ateapipb.ResumeActorResponse{Actor: &ateapipb.Actor{Metadata: &ateapipb.ResourceMetadata{Name: req.GetActor().GetName()}, AteomPodIp: resumeIP}}, nil
+	return &ateapipb.ResumeActorResponse{Actor: &ateapipb.Actor{
+		Metadata: &ateapipb.ResourceMetadata{Name: req.GetActor().GetName()},
+		Status: &ateapipb.ActorStatus{
+			State:            ateapipb.ActorState_ACTOR_STATE_RUNNING,
+			WorkerAssignment: &ateapipb.WorkerAssignment{WorkerPodIp: resumeIP},
+		},
+	}}, nil
 }
 
 func (f *MockControlServer) SuspendActor(_ context.Context, req *ateapipb.SuspendActorRequest) (*ateapipb.SuspendActorResponse, error) {
@@ -97,7 +111,10 @@ func (f *MockControlServer) SuspendActor(_ context.Context, req *ateapipb.Suspen
 	if f.SuspendErr != nil {
 		return nil, f.SuspendErr
 	}
-	return &ateapipb.SuspendActorResponse{}, nil
+	return &ateapipb.SuspendActorResponse{Actor: &ateapipb.Actor{
+		Metadata: &ateapipb.ResourceMetadata{Name: req.GetActor().GetName()},
+		Status:   &ateapipb.ActorStatus{State: ateapipb.ActorState_ACTOR_STATE_SUSPENDED},
+	}}, nil
 }
 
 // Calls returns copies of the recorded call lists.
